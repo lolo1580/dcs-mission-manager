@@ -229,6 +229,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -f deploy/Dockerfile -t d
 DCS mission manager/
 ├─ README.md
 ├─ CHANGELOG.md
+├─ Makefile / build.ps1       # commandes de build
 ├─ dcs-lua/                  # scripts à installer côté DCS
 │   ├─ Config/dcsmm.cfg      # modèle de configuration
 │   ├─ Export.lua            # positions → UDP (live map)
@@ -243,6 +244,7 @@ DCS mission manager/
 │       └─ api/              # REST + SSE + UI embarquée (dist/)
 ├─ frontend/                 # Svelte + Vite + Leaflet
 ├─ tiles/                    # tuiles DCS par théâtre (Phase 1)
+├─ tools/                    # émetteur de télémétrie de test
 ├─ deploy/                   # Dockerfile + docker-compose.yml
 └─ docs/                     # documentation
 ```
