@@ -1,28 +1,49 @@
 --[[
   DCS Mission Manager — Export.lua
   ------------------------------------------------------------------
-  Envoie la position du joueur au backend en UDP/JSON, une fois par
-  seconde, sans impacter les performances du simulateur.
+  Envoie au backend, en UDP/JSON :
+    - la position du joueur (message "ownship") ;
+    - la liste des objets du monde (message "world"), filtrée pour
+      ne garder que les unités utiles à la live map.
+
+  Tout est échantillonné à intervalle régulier via
+  LuaExportActivityNextEvent, sans jamais bloquer une frame.
 
   ⚠️  NE PAS REMPLACER un Export.lua existant (Tacview, SRS, DCS-BIOS…).
       Ajoute plutôt le bloc `do ... end` ci-dessous À LA FIN de ton
       Export.lua existant, ou copie ce fichier si tu n'en as pas.
 
   Prérequis : Config/dcsmm.cfg présent dans Saved Games\DCS\Config\
+
+  Options (dcsmm.cfg) :
+    dcsmm_send_interval   intervalle d'envoi du joueur, en secondes (défaut 1.0)
+    dcsmm_world_interval  intervalle d'envoi du monde, en secondes (défaut 2.0)
+    dcsmm_world_enabled   activer/désactiver l'export du monde (défaut true)
+    dcsmm_world_radius    rayon max en km autour du joueur (0 = pas de limite)
+    dcsmm_max_objects     nombre max d'objets par message (défaut 800)
+    dcsmm_coalitions      liste des coalitions à inclure (défaut {"blue","red"})
 ]]
 
 do
-  -- Le logger `log.*` est disponible dans tous les états Lua ; `net.*` et
-  -- `lfs.*` ne le sont pas forcément selon le contexte, d'où les gardes.
+  ---------------------------------------------------------------------------
+  -- Journalisation défensive
+  ---------------------------------------------------------------------------
   local function say(msg)
     if log and log.write then
       pcall(log.write, "DCSMM", log.INFO or 0, msg)
     end
   end
 
-  local host, udpPort, interval, enabled = "127.0.0.1", 7778, 1.0, true
+  ---------------------------------------------------------------------------
+  -- Configuration
+  ---------------------------------------------------------------------------
+  local host, udpPort = "127.0.0.1", 7778
+  local interval, worldInterval = 1.0, 2.0
+  local enabled, worldEnabled = true, true
+  local worldRadiusKm, maxObjects = 0, 800
+  local coalitions = { blue = true, red = true }
+  local ownshipLat, ownshipLng = nil, nil
 
-  -- Chargement défensif de la configuration utilisateur.
   if lfs and lfs.writedir then
     local cfgPath = lfs.writedir() .. "Config/dcsmm.cfg"
     local ok, chunk = pcall(loadfile, cfgPath)
@@ -31,10 +52,19 @@ do
       setmetatable(env, { __index = _G })
       setfenv(chunk, env)
       pcall(chunk)
+
       host = env.dcsmm_host or host
       udpPort = env.dcsmm_udp_port or udpPort
       interval = env.dcsmm_send_interval or interval
+      worldInterval = env.dcsmm_world_interval or worldInterval
+      worldRadiusKm = env.dcsmm_world_radius or worldRadiusKm
+      maxObjects = env.dcsmm_max_objects or maxObjects
       if env.dcsmm_enabled ~= nil then enabled = env.dcsmm_enabled end
+      if env.dcsmm_world_enabled ~= nil then worldEnabled = env.dcsmm_world_enabled end
+      if type(env.dcsmm_coalitions) == "table" then
+        coalitions = {}
+        for _, c in ipairs(env.dcsmm_coalitions) do coalitions[c] = true end
+      end
     end
   end
 
@@ -45,12 +75,23 @@ do
   end
 
   local conn
+  local nextWorldAt
 
   local function connect()
     conn = socket.udp()
+    conn:setpayloadsize(65507)          -- maximise la taille des datagrammes
     conn:setpeername(host, udpPort)
   end
 
+  local function send(payload)
+    if not conn then pcall(connect) end
+    if conn then pcall(function() conn:send(payload) end) end
+  end
+
+  ---------------------------------------------------------------------------
+  -- Encodage JSON minimal (les chaînes DCS ne contiennent pas de caractères
+  -- exotiques, mais on échappe tout de même les caractères sensibles).
+  ---------------------------------------------------------------------------
   local function jsonEscape(s)
     return tostring(s):gsub('[%z\1-\31\\"]', function(c)
       if c == '"' then return '\\"' end
@@ -62,51 +103,120 @@ do
     end)
   end
 
+  ---------------------------------------------------------------------------
+  -- Position du joueur
+  ---------------------------------------------------------------------------
   local function sendOwnship()
-    local data = LoGetSelfData and LoGetSelfData() or nil
-    if not data or not data.LatLongAlt then
-      return
-    end
+    local getSelf = LoGetSelfData or (Export and Export.LoGetSelfData)
+    local getPilot = LoGetPilotName or (Export and Export.LoGetPilotName)
+    local getTime = LoGetModelTime or (Export and Export.LoGetModelTime)
 
-    local name = (LoGetPilotName and LoGetPilotName()) or "Player"
-    -- Dans l'API Export, `SelfData.Name` est le type d'appareil (ex. F-16C_50).
-    local unitType = data.Name or "unknown"
-    local coalition = data.Coalition or "unknown"
+    local data = getSelf and getSelf() or nil
+    if not data or not data.LatLongAlt then return end
 
-    local payload = string.format(
+    local name = (getPilot and getPilot()) or "Player"
+    ownshipLat = data.LatLongAlt.Lat
+    ownshipLng = data.LatLongAlt.Long
+
+    send(string.format(
       '{"type":"ownship","name":"%s","unitType":"%s","coalition":"%s",' ..
       '"lat":%.6f,"lng":%.6f,"alt":%.2f,"heading":%.2f,"modelTime":%.2f}',
       jsonEscape(name),
-      jsonEscape(unitType),
-      jsonEscape(coalition),
-      data.LatLongAlt.Lat,
-      data.LatLongAlt.Long,
+      jsonEscape(data.Name or "unknown"),
+      jsonEscape(data.Coalition or "unknown"),
+      ownshipLat, ownshipLng,
       data.LatLongAlt.Alt,
       data.Heading or 0,
-      (LoGetModelTime and LoGetModelTime()) or 0
-    )
-
-    if conn then
-      pcall(function() conn:send(payload) end)
-    end
+      (getTime and getTime()) or 0
+    ))
   end
 
+  ---------------------------------------------------------------------------
+  -- Objets du monde
+  ---------------------------------------------------------------------------
+  -- Distance approximative en km (suffisante pour un filtre de rayon).
+  local function approxDistanceKm(lat1, lng1, lat2, lng2)
+    local dLat = (lat2 - lat1) * 111.0
+    local dLng = (lng2 - lng1) * 111.0 * math.cos(math.rad(lat1))
+    return math.sqrt(dLat * dLat + dLng * dLng)
+  end
+
+  local function sendWorld()
+    -- Selon l'état Lua, les fonctions d'export sont globales (LoGet…) ou
+    -- regroupées dans le namespace Export. ; on résout les deux.
+    local getWorld = LoGetWorldObjects or (Export and Export.LoGetWorldObjects)
+    local isAllowed = LoIsObjectExportAllowed or (Export and Export.LoIsObjectExportAllowed)
+    if not getWorld then return end
+
+    -- En multijoueur, l'export d'objets dépend d'une option serveur.
+    if isAllowed then
+      local ok, res = pcall(isAllowed)
+      if ok and res == false then return end
+    end
+
+    local ok2, objects = pcall(getWorld)
+    if not ok2 or type(objects) ~= "table" then return end
+
+    local parts, count = {}, 0
+    for id, o in pairs(objects) do
+      if count >= maxObjects then break end
+      if type(o) == "table" and o.LatLongAlt then
+        local co = o.Coalition or "neutral"
+        local include = coalitions[co] == true
+        if include then
+          local lat, lng = o.LatLongAlt.Lat, o.LatLongAlt.Long
+          if ownshipLat and worldRadiusKm > 0 then
+            include = approxDistanceKm(ownshipLat, ownshipLng, lat, lng) <= worldRadiusKm
+          end
+          if include then
+            count = count + 1
+            parts[count] = string.format(
+              '{"id":"%s","type":"%s","coalition":"%s","country":"%s",' ..
+              '"lat":%.6f,"lng":%.6f,"alt":%.1f,"heading":%.1f}',
+              jsonEscape(tostring(id)),
+              jsonEscape(o.TypeName or o.Name or "unknown"),
+              jsonEscape(co),
+              jsonEscape(o.Country or ""),
+              lat, lng,
+              o.LatLongAlt.Alt or 0,
+              o.Heading or 0
+            )
+          end
+        end
+      end
+    end
+
+    if count == 0 then return end
+    send('{"type":"world","count":' .. count .. ',"units":[' ..
+      table.concat(parts, ",") .. ']}')
+  end
+
+  ---------------------------------------------------------------------------
+  -- Callbacks Export
+  ---------------------------------------------------------------------------
   function LuaExportStart()
     if not enabled then return end
     pcall(connect)
-    say("export des positions activé (" .. host .. ":" .. tostring(udpPort) .. ")")
+    say("export activé (" .. host .. ":" .. tostring(udpPort) .. ")")
   end
 
   function LuaExportStop()
     if conn then pcall(function() conn:close() end) end
   end
 
-  -- Appelé par le timer du simulateur ; on planifie le prochain envoi afin
-  -- de ne jamais bloquer une frame.
   function LuaExportActivityNextEvent(t)
     if not enabled then return t end
-    if not conn then pcall(connect) end
     pcall(sendOwnship)
+
+    if worldEnabled then
+      -- On décale le premier envoi du monde pour ne pas tout envoyer d'un coup.
+      if not nextWorldAt then nextWorldAt = t + 0.5 end
+      if t >= nextWorldAt then
+        pcall(sendWorld)
+        nextWorldAt = t + worldInterval
+      end
+    end
+
     return t + interval
   end
 end

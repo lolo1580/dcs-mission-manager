@@ -1,16 +1,22 @@
 // Package udp receives telemetry from the DCS Lua scripts over UDP.
 //
-// The wire format is one JSON object per datagram, for example:
+// Two message kinds are produced by the Export.lua script:
 //
 //	{"type":"ownship","name":"Player","unitType":"F-16C_50","coalition":"blue",
 //	 "lat":41.5,"lng":41.8,"alt":5000,"heading":123,"modelTime":42.0}
+//
+//	{"type":"world","count":123,"units":[
+//	   {"id":"42","type":"T-72B","coalition":"red","country":"Russia",
+//	    "lat":42.1,"lng":41.2,"alt":120,"heading":270}, ...]}
 package udp
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 
+	"dcsmm/internal/category"
 	"dcsmm/internal/state"
 )
 
@@ -20,11 +26,36 @@ type Message struct {
 	Name      string  `json:"name"`
 	UnitType  string  `json:"unitType"`
 	Coalition string  `json:"coalition"`
+	Country   string  `json:"country"`
 	Lat       float64 `json:"lat"`
 	Lng       float64 `json:"lng"`
 	Alt       float64 `json:"alt"`
 	Heading   float64 `json:"heading"`
 	ModelTime float64 `json:"modelTime"`
+	Units     []World `json:"units"`
+}
+
+// World is one entry of a "world" message.
+type World struct {
+	ID        string  `json:"id"`
+	Type      string  `json:"type"`
+	Coalition string  `json:"coalition"`
+	Country   string  `json:"country"`
+	Lat       float64 `json:"lat"`
+	Lng       float64 `json:"lng"`
+	Alt       float64 `json:"alt"`
+	Heading   float64 `json:"heading"`
+}
+
+// Listener turns UDP datagrams into store updates.
+type Listener struct {
+	store      *state.Store
+	classifier *category.Classifier
+}
+
+// NewListener creates a listener updating store, classifying types with c.
+func NewListener(store *state.Store, c *category.Classifier) *Listener {
+	return &Listener{store: store, classifier: c}
 }
 
 // Listen opens a UDP socket bound to addr.
@@ -36,10 +67,12 @@ func Listen(addr string) (*net.UDPConn, error) {
 	return net.ListenUDP("udp", udpAddr)
 }
 
-// Serve reads datagrams from conn until it is closed, updating store for each
-// valid message. It is meant to run in its own goroutine.
-func Serve(conn *net.UDPConn, store *state.Store) {
-	buf := make([]byte, 65535)
+const ownshipID = "ownship"
+
+// Serve reads datagrams from conn until it is closed, updating the store for
+// each valid message. It is meant to run in its own goroutine.
+func (l *Listener) Serve(conn *net.UDPConn) {
+	buf := make([]byte, 1<<20) // world snapshots are larger than a single unit
 	for {
 		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
@@ -53,16 +86,53 @@ func Serve(conn *net.UDPConn, store *state.Store) {
 			log.Printf("udp: decode: %v", err)
 			continue
 		}
+		l.handle(&m)
+	}
+}
 
-		store.Update(&state.Unit{
-			Name:      m.Name,
-			UnitType:  m.UnitType,
+func (l *Listener) handle(m *Message) {
+	switch m.Type {
+	case "ownship":
+		l.store.Update(&state.Unit{
+			ID:        ownshipID,
+			Type:      m.UnitType,
+			Label:     m.Name,
+			Category:  l.classifier.Classify(m.UnitType),
 			Coalition: m.Coalition,
+			Country:   m.Country,
 			Lat:       m.Lat,
 			Lng:       m.Lng,
 			Alt:       m.Alt,
 			Heading:   m.Heading,
-			ModelTime: m.ModelTime,
+			Ownship:   true,
 		})
+	case "world":
+		units := make([]state.Unit, 0, len(m.Units))
+		for _, w := range m.Units {
+			if w.ID == "" {
+				continue
+			}
+			units = append(units, state.Unit{
+				ID:        w.ID,
+				Type:      w.Type,
+				Category:  l.classifier.Classify(w.Type),
+				Coalition: w.Coalition,
+				Country:   w.Country,
+				Lat:       w.Lat,
+				Lng:       w.Lng,
+				Alt:       w.Alt,
+				Heading:   w.Heading,
+			})
+		}
+		l.store.UpdateAll(units)
+	case "":
+		log.Printf("udp: message without type, ignored")
+	default:
+		log.Printf("udp: unknown message type %q", m.Type)
 	}
+}
+
+// FormatUnit is a small helper used by tests and logs.
+func FormatUnit(u state.Unit) string {
+	return fmt.Sprintf("%s/%s %s (%.4f, %.4f)", u.ID, u.Type, u.Coalition, u.Lat, u.Lng)
 }

@@ -6,7 +6,9 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // Config holds the runtime configuration of the backend.
@@ -17,12 +19,22 @@ type Config struct {
 	UDPAddr string
 	// TCPAddr is the listen address for events and downstream commands (Phase 2+).
 	TCPAddr string
-	// DBPath is the path of the SQLite database.
+	// DBPath is the path of the SQLite database (Phase 3+).
 	DBPath string
-	// Theatre is the default DCS theatre used for map projection.
+	// Theatre is the default DCS theatre.
 	Theatre string
 	// LogLevel is one of debug, info, warn, error.
 	LogLevel string
+	// UnitTTL is how long a unit is kept after its last update.
+	UnitTTL time.Duration
+	// TilesDir is the directory holding DCS map tiles (per theatre).
+	TilesDir string
+	// BasemapURL is the fallback map tile template used when no DCS tiles exist.
+	BasemapURL string
+	// CategoriesFile is an optional JSON file overriding unit type categories.
+	CategoriesFile string
+	// MaxUnits caps how many units are kept in the store.
+	MaxUnits int
 }
 
 func env(key, def string) string {
@@ -32,14 +44,38 @@ func env(key, def string) string {
 	return def
 }
 
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
+
+// envDuration reads a duration expressed in seconds (integer or decimal).
+func envDuration(key string, def time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return time.Duration(f * float64(time.Second))
+		}
+	}
+	return def
+}
+
 // Load reads the configuration from the environment, applying defaults.
 func Load() Config {
 	return Config{
-		HTTPAddr: env("DCSMM_HTTP_ADDR", "0.0.0.0:8080"),
-		UDPAddr:  env("DCSMM_UDP_ADDR", "127.0.0.1:7778"),
-		TCPAddr:  env("DCSMM_TCP_ADDR", "127.0.0.1:7779"),
-		DBPath:   env("DCSMM_DB_PATH", "./data/dcsmm.db"),
-		Theatre:  env("DCSMM_THEATRE", "Caucasus"),
-		LogLevel: strings.ToLower(env("DCSMM_LOG_LEVEL", "info")),
+		HTTPAddr:       env("DCSMM_HTTP_ADDR", "0.0.0.0:8080"),
+		UDPAddr:        env("DCSMM_UDP_ADDR", "127.0.0.1:7778"),
+		TCPAddr:        env("DCSMM_TCP_ADDR", "127.0.0.1:7779"),
+		DBPath:         env("DCSMM_DB_PATH", "./data/dcsmm.db"),
+		Theatre:        env("DCSMM_THEATRE", "Caucasus"),
+		LogLevel:       strings.ToLower(env("DCSMM_LOG_LEVEL", "info")),
+		UnitTTL:        envDuration("DCSMM_UNIT_TTL", 5*time.Second),
+		TilesDir:       env("DCSMM_TILES_DIR", "./tiles"),
+		BasemapURL:     env("DCSMM_BASEMAP_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+		CategoriesFile: env("DCSMM_CATEGORIES", "./categories.json"),
+		MaxUnits:       envInt("DCSMM_MAX_UNITS", 5000),
 	}
 }

@@ -29,7 +29,8 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 
 | Fonction | État | Détail |
 |---|---|---|
-| Live map temps réel | 🚧 Phase 0 | Positions des unités, tuiles DCS authentiques |
+| Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
+| Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
 | Débriefings | 📋 Prévu | Lecture de `debrief.log`, historique |
 | Stats avancées | 📋 Prévu | Pilote/carrière, armes, engins, réseau |
 | Contrôle serveur | 📋 Prévu | Liste des missions, kick/ban, slots, chat |
@@ -139,11 +140,16 @@ défauts raisonnables — identique pour l'`.exe` et pour Docker.
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `DCSMM_HTTP_ADDR` | `0.0.0.0:8080` | Adresse d'écoute HTTP (Web UI + WS) |
-| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (positions) |
+| `DCSMM_HTTP_ADDR` | `0.0.0.0:8080` | Adresse d'écoute HTTP (Web UI + SSE) |
+| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (télémétrie Live map) |
 | `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMM_DB_PATH` | `./data/dcsmm.db` | Chemin de la base SQLite |
-| `DCSMM_THEATRE` | `Caucasus` | Théâtre par défaut (projection) |
+| `DCSMM_THEATRE` | `Caucasus` | Théâtre par défaut |
+| `DCSMM_UNIT_TTL` | `5` (secondes) | Délai avant qu'une unité silencieuse disparaisse |
+| `DCSMM_TILES_DIR` | `./tiles` | Dossier des tuiles de carte DCS |
+| `DCSMM_BASEMAP_URL` | OSM | Fond de carte de repli (template `{z}/{x}/{y}`) |
+| `DCSMM_CATEGORIES` | `./categories.json` | Surcharge de classification des engins |
+| `DCSMM_MAX_UNITS` | `5000` | Nombre maximum d'unités suivies |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ### Côté DCS — `Saved Games\DCS\Config\dcsmm.cfg`
@@ -153,8 +159,12 @@ défauts raisonnables — identique pour l'`.exe` et pour Docker.
 dcsmm_host = "127.0.0.1"
 dcsmm_udp_port = 7778
 dcsmm_tcp_port = 7779
-dcsmm_enabled = true
-dcsmm_send_interval = 1.0   -- secondes entre deux envois de positions
+
+-- Live map
+dcsmm_send_interval = 1.0    -- position du joueur (secondes)
+dcsmm_world_enabled = true   -- export de tous les objets
+dcsmm_world_interval = 2.0   -- liste des objets (secondes)
+dcsmm_world_radius = 0       -- filtre par rayon en km (0 = tout)
 ```
 
 ---
@@ -239,12 +249,17 @@ DCS mission manager/
 │   ├─ cmd/dcsmm/main.go
 │   └─ internal/
 │       ├─ config/           # chargement env + défauts
+│       ├─ category/         # classification des engins (type DCS → famille)
+│       ├─ theatre/          # théâtres DCS et leurs emprises
 │       ├─ udp/              # récepteur + décodage
 │       ├─ state/            # store unités (en mémoire)
-│       └─ api/              # REST + SSE + UI embarquée (dist/)
+│       └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
 ├─ frontend/                 # Svelte + Vite + Leaflet
+│   └─ src/
+│       ├─ App.svelte
+│       └─ lib/              # carte, panneau latéral, fiche unité, stores
 ├─ tiles/                    # tuiles DCS par théâtre (Phase 1)
-├─ tools/                    # émetteur de télémétrie de test
+├─ tools/                    # émetteur de télémétrie de test, extracteur de tuiles
 ├─ deploy/                   # Dockerfile + docker-compose.yml
 └─ docs/                     # documentation
 ```
@@ -254,7 +269,7 @@ DCS mission manager/
 ## Roadmap
 
 - [x] **Phase 0 — PoC** : `Export.lua` (position joueur) → Go → carte Leaflet
-- [ ] **Phase 1 — Live map** : tous les objets, projection par théâtre, tuiles DCS authentiques
+- [x] **Phase 1 — Live map** : tous les objets, catégories, filtres, traces, recherche, tuiles DCS
 - [ ] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, canal de commandes
 - [ ] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur, historique
 - [ ] **Phase 4 — Stats avancées** : 7 modules (pilote, armes, cartes, balance, sortie, réseau, engins)

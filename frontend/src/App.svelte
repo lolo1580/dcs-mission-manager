@@ -1,103 +1,37 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
-  import L from 'leaflet';
-  import 'leaflet/dist/leaflet.css';
+  import MapView from './lib/MapView.svelte';
+  import Sidebar from './lib/Sidebar.svelte';
+  import UnitDetails from './lib/UnitDetails.svelte';
+  import { connected, lastUpdate, units, visibleUnits } from './lib/units.js';
 
-  let mapEl;
-  let map;
-  /** @type {Record<string, L.Marker>} */
-  let markers = {};
-  let connected = false;
-  let unitCount = 0;
-  let lastUpdate = null;
-  let source;
-
-  const COALITION_COLOR = {
-    blue: '#58a6ff',
-    red: '#f85149',
-    neutral: '#9da7b3',
-  };
-
-  function markerColor(unit) {
-    return COALITION_COLOR[unit.coalition] ?? COALITION_COLOR.neutral;
-  }
-
-  function upsertUnit(unit) {
-    if (typeof unit.lat !== 'number' || typeof unit.lng !== 'number') return;
-    const latlng = [unit.lat, unit.lng];
-    const color = markerColor(unit);
-
-    let marker = markers[unit.name];
-    if (!marker) {
-      marker = L.circleMarker(latlng, {
-        radius: 6,
-        color,
-        weight: 2,
-        fillColor: color,
-        fillOpacity: 0.7,
-      }).addTo(map);
-      marker.bindTooltip(unit.name);
-      markers[unit.name] = marker;
-    } else {
-      marker.setLatLng(latlng);
-      marker.setStyle({ color, fillColor: color });
-    }
-    marker.setTooltipContent(
-      `${unit.name}<br/>${unit.unitType || ''}<br/>` +
-        `alt ${Math.round(unit.alt)} m · cap ${Math.round(unit.heading)}°`
-    );
-  }
-
-  function applyState(units) {
-    unitCount = units.length;
-    lastUpdate = new Date();
-    for (const u of units) upsertUnit(u);
-  }
-
-  function connect() {
-    source = new EventSource('/api/events');
-    source.onopen = () => (connected = true);
-    source.onerror = () => (connected = false);
-    source.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'state') applyState(msg.units ?? []);
-      } catch {
-        /* ignore malformed frames */
-      }
-    };
-  }
-
-  onMount(() => {
-    map = L.map(mapEl, { zoomControl: true }).setView([45, 40], 5);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 12,
-    }).addTo(map);
-    connect();
-
-    return () => {
-      source?.close();
-      map?.remove();
-    };
-  });
-
-  onDestroy(() => source?.close());
+  let mapView;
 </script>
 
 <div class="layout">
   <header>
     <strong>DCS Mission Manager</strong>
     <span class="live">
-      <span class="dot" class:on={connected}></span>
-      {connected ? 'connecté' : 'hors ligne'}
+      <span class="dot" class:on={$connected}></span>
+      {$connected ? 'connecté' : 'hors ligne'}
     </span>
-    <span class="meta">{unitCount} unité{unitCount === 1 ? '' : 's'}</span>
-    {#if lastUpdate}
-      <span class="meta">maj {lastUpdate.toLocaleTimeString()}</span>
+    <span class="sep"></span>
+    <span class="meta">{$units.length} unité{$units.length === 1 ? '' : 's'} suivie{$units.length === 1 ? '' : 's'}</span>
+    <span class="meta">{$visibleUnits.length} affichée{$visibleUnits.length === 1 ? '' : 's'}</span>
+    {#if $lastUpdate}
+      <span class="meta">maj {$lastUpdate.toLocaleTimeString()}</span>
     {/if}
+    <button class="recenter" on:click={() => mapView?.recenter()} title="Recentrer la carte">
+      Recentrer
+    </button>
   </header>
-  <div class="map" bind:this={mapEl}></div>
+
+  <main>
+    <Sidebar />
+    <div class="map-wrap">
+      <MapView bind:this={mapView} />
+      <UnitDetails />
+    </div>
+  </main>
 </div>
 
 <style>
@@ -110,11 +44,15 @@
   header {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.65rem 1rem;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
+  }
+
+  header strong {
+    white-space: nowrap;
   }
 
   .live {
@@ -135,18 +73,40 @@
     background: var(--green);
   }
 
+  .sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+  }
+
   .meta {
     color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .recenter {
     margin-left: auto;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
   }
 
-  .meta + .meta {
-    margin-left: 0;
+  .recenter:hover {
+    border-color: var(--blue);
   }
 
-  .map {
-    width: 100%;
-    height: 100%;
-    background: #0b0f14;
+  main {
+    display: flex;
+    min-height: 0;
+  }
+
+  .map-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
   }
 </style>

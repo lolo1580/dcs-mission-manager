@@ -1,0 +1,10 @@
+{
+  "_comment": "Surcharge de classification des engins pour la live map. Copier en categories.json (chemin DCSMM_CATEGORIES) et adapter. Les types DCS absents d'ici gardent la classification heuristique intégrée. Valeurs possibles : plane, heli, ground, ship, structure, other.",
+  "F-16C_50": "plane",
+  "FA-18C_hornet": "plane",
+  "SA-10": "ground",
+  "SA-15": "ground",
+  "T-90": "ground",
+  "USS_Arleigh_Burke": "ship",
+  "Kuznetsov": "ship"
+}

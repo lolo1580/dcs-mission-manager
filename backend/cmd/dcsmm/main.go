@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"dcsmm/internal/api"
+	"dcsmm/internal/category"
 	"dcsmm/internal/config"
 	"dcsmm/internal/state"
 	"dcsmm/internal/udp"
@@ -23,17 +24,20 @@ import (
 func main() {
 	cfg := config.Load()
 
-	store := state.New(10 * time.Second)
+	store := state.New(cfg.UnitTTL, cfg.MaxUnits)
+	classifier := category.New(cfg.CategoriesFile)
 
 	conn, err := udp.Listen(cfg.UDPAddr)
 	if err != nil {
 		log.Fatalf("udp: listen on %s: %v", cfg.UDPAddr, err)
 	}
 	defer conn.Close()
-	go udp.Serve(conn, store)
+
+	listener := udp.NewListener(store, classifier)
+	go listener.Serve(conn)
 	log.Printf("udp: listening on %s", cfg.UDPAddr)
 
-	srv := api.New(store)
+	srv := api.New(cfg, store)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

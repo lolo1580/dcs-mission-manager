@@ -1,5 +1,5 @@
 // Package api exposes the manager's HTTP interface: a small JSON API, a
-// Server-Sent Events stream for live updates, and the embedded web UI.
+// Server-Sent Events stream for live updates, map tiles, and the embedded web UI.
 package api
 
 import (
@@ -9,11 +9,16 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"dcsmm/internal/config"
 	"dcsmm/internal/state"
+	"dcsmm/internal/theatre"
 )
 
 // The frontend build is written here by `npm run build` (see
@@ -37,7 +42,7 @@ const fallbackPage = `<!doctype html>
       body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
              background: #0f1419; color: #e6edf3; display: grid; place-items: center; min-height: 100vh; }
       main { max-width: 640px; padding: 2rem; }
-      h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+      h1 { font-size: 1.5rem; margin: 0 0 1rem; }
       p { line-height: 1.6; color: #9da7b3; }
       code { background: #1f2630; padding: .1rem .35rem; border-radius: 4px; }
       a { color: #58a6ff; }
@@ -54,7 +59,8 @@ const fallbackPage = `<!doctype html>
 npm install
 npm run build</code></pre>
       <p class="status"><span class="dot">●</span> API : <a href="/api/health">/api/health</a> ·
-        <a href="/api/state">/api/state</a> · <a href="/api/events">/api/events</a></p>
+        <a href="/api/state">/api/state</a> · <a href="/api/events">/api/events</a> ·
+        <a href="/api/theatres">/api/theatres</a></p>
     </main>
   </body>
 </html>
@@ -62,13 +68,28 @@ npm run build</code></pre>
 
 // Server wires the unit store to the HTTP handlers.
 type Server struct {
-	store *state.Store
-	hub   *hub
+	cfg      config.Config
+	store    *state.Store
+	hub      *hub
+	theatres []theatre.Theatre
+	tilesDir string
+	basemap  string
 }
 
 // New creates a server backed by store.
-func New(store *state.Store) *Server {
-	return &Server{store: store, hub: newHub()}
+func New(cfg config.Config, store *state.Store) *Server {
+	theatres := theatre.All()
+	for i := range theatres {
+		theatres[i].Tiles = hasTiles(cfg.TilesDir, theatres[i].ID)
+	}
+	return &Server{
+		cfg:      cfg,
+		store:    store,
+		hub:      newHub(),
+		theatres: theatres,
+		tilesDir: cfg.TilesDir,
+		basemap:  cfg.BasemapURL,
+	}
 }
 
 // Handler returns the HTTP router.
@@ -77,6 +98,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/health", s.handleHealth)
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/events", s.handleEvents)
+	mux.HandleFunc("/api/theatres", s.handleTheatres)
+	mux.HandleFunc("/api/units/", s.handleUnit)
+	mux.HandleFunc("/api/tiles/", s.handleTiles)
 	mux.Handle("/", s.webHandler())
 	return mux
 }
@@ -98,13 +122,41 @@ func (s *Server) RunBroadcast(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// Summary aggregates unit counts for the UI legend.
+type Summary struct {
+	ByCategory  map[string]int `json:"byCategory"`
+	ByCoalition map[string]int `json:"byCoalition"`
+}
+
+func summarise(units []state.Unit) Summary {
+	s := Summary{
+		ByCategory:  make(map[string]int),
+		ByCoalition: make(map[string]int),
+	}
+	for _, u := range units {
+		cat := u.Category
+		if cat == "" {
+			cat = "other"
+		}
+		s.ByCategory[cat]++
+		co := u.Coalition
+		if co == "" {
+			co = "neutral"
+		}
+		s.ByCoalition[co]++
+	}
+	return s
+}
+
 func (s *Server) stateJSON() ([]byte, error) {
 	units := s.store.Snapshot()
+	sort.Slice(units, func(i, j int) bool { return units[i].ID < units[j].ID })
 	payload := map[string]any{
-		"type":  "state",
-		"count": len(units),
-		"units": units,
-		"ts":    time.Now().UnixMilli(),
+		"type":    "state",
+		"count":   len(units),
+		"units":   units,
+		"summary": summarise(units),
+		"ts":      time.Now().UnixMilli(),
 	}
 	return json.Marshal(payload)
 }
@@ -116,12 +168,123 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {
-	units := s.store.Snapshot()
+// handleState returns the current units, optionally filtered.
+//
+// Query parameters: category, coalition, ownship=true, q (type/label substring).
+func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
+	units := filter(s.store.Snapshot(), r)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"count": len(units),
-		"units": units,
+		"count":   len(units),
+		"units":   units,
+		"summary": summarise(units),
 	})
+}
+
+func filter(units []state.Unit, r *http.Request) []state.Unit {
+	q := r.URL.Query()
+	category := q.Get("category")
+	coalition := q.Get("coalition")
+	ownship := q.Get("ownship") == "true"
+	search := strings.ToLower(q.Get("q"))
+
+	if category == "" && coalition == "" && !ownship && search == "" {
+		return units
+	}
+	out := make([]state.Unit, 0, len(units))
+	for _, u := range units {
+		if category != "" && u.Category != category {
+			continue
+		}
+		if coalition != "" && u.Coalition != coalition {
+			continue
+		}
+		if ownship && !u.Ownship {
+			continue
+		}
+		if search != "" && !strings.Contains(strings.ToLower(u.Type+" "+u.Label), search) {
+			continue
+		}
+		out = append(out, u)
+	}
+	return out
+}
+
+// handleUnit returns a single unit by id.
+func (s *Server) handleUnit(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/units/")
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing unit id"})
+		return
+	}
+	for _, u := range s.store.Snapshot() {
+		if u.ID == id {
+			writeJSON(w, http.StatusOK, u)
+			return
+		}
+	}
+	writeJSON(w, http.StatusNotFound, map[string]string{"error": "unit not found"})
+}
+
+func (s *Server) handleTheatres(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"default":  s.cfg.Theatre,
+		"basemap":  s.basemap,
+		"theatres": s.theatres,
+	})
+}
+
+// handleTiles serves DCS map tiles laid out as <tilesDir>/<theatre>/<z>/<x>/<y>.png.
+func (s *Server) handleTiles(w http.ResponseWriter, r *http.Request) {
+	rest := strings.TrimPrefix(r.URL.Path, "/api/tiles/")
+	parts := strings.Split(rest, "/")
+	if len(parts) != 4 {
+		http.NotFound(w, r)
+		return
+	}
+	th, z, x, y := parts[0], parts[1], parts[2], parts[3]
+	if !validTilePart(th) || !validTilePart(z) || !validTilePart(x) || !validTilePart(y) {
+		http.NotFound(w, r)
+		return
+	}
+	// Guard against path traversal by rejecting separators and dots already
+	// covered by validTilePart; join and ensure the result stays under tilesDir.
+	full := filepath.Join(s.tilesDir, th, z, x, y+".png")
+	absBase, err := filepath.Abs(s.tilesDir)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	absFull, err := filepath.Abs(full)
+	if err != nil || !strings.HasPrefix(absFull, absBase) {
+		http.NotFound(w, r)
+		return
+	}
+	if _, err := os.Stat(absFull); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.ServeFile(w, r, absFull)
+}
+
+func validTilePart(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' && r != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func hasTiles(dir, theatreID string) bool {
+	if dir == "" {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, theatreID))
+	return err == nil && info.IsDir()
 }
 
 // handleEvents implements a Server-Sent Events stream.
