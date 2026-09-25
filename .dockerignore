@@ -1,0 +1,15 @@
+# Dépendances et artefacts de build frontend
+frontend/node_modules
+frontend/dist
+
+# Build Go
+backend/dcsmm
+backend/dcsmm.exe
+
+# Données locales
+data
+
+# Divers
+.git
+.gitignore
+deploy/docker-compose.yml

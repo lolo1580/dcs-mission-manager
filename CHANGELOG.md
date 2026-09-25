@@ -1,0 +1,62 @@
+# Changelog
+
+Toutes les modifications notables de ce projet sont documentées dans ce fichier.
+
+Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet adhère
+au [versionnage sémantique](https://semver.org/lang/fr/).
+
+## [Non publié]
+
+### À venir
+
+- Phase 1 — Live map complète (tous les objets, tuiles DCS authentiques)
+- Phase 2 — Événements & joueurs (hooks, chat, `net.get_stat`)
+- Phase 3 — Débriefings (transport réseau + parseur)
+- Phase 4 — Statistiques avancées (7 modules)
+- Phase 5 — Packaging final et injecteur Lua
+
+## [0.1.0] — 2026-09-25
+
+Première version : **PoC Phase 0** — validation de la chaîne DCS → Go → navigateur.
+
+### Ajouté
+
+- **Documentation**
+  - `README.md` : vision, architecture, prérequis, démarrage rapide, configuration,
+    installation Lua, déploiement `.exe`/Docker, structure, roadmap.
+  - `CHANGELOG.md` : suivi des versions.
+  - `docs/architecture.md` : flux de données, composants, choix techniques.
+  - `docs/dcs-installation.md` : guide d'installation côté DCS et dépannage.
+
+- **Outils**
+  - `tools/send-telemetry.mjs` : émetteur de télémétrie factice pour tester sans DCS.
+  - `Makefile` et `build.ps1` : commandes de build (frontend, backend, Docker).
+
+- **Scripts DCS (`dcs-lua/`)**
+  - `Config/dcsmm.cfg` : modèle de configuration (IP backend, ports, intervalle d'envoi).
+  - `Export.lua` : export de la position du joueur vers le backend en UDP/JSON,
+    échantillonné une fois par seconde via `LuaExportActivityNextEvent` (aucun impact
+    sur les performances du simulateur).
+
+- **Backend Go (`backend/`)**
+  - `internal/config` : configuration par variables d'environnement (`DCSMM_*`) avec défauts.
+  - `internal/udp` : récepteur UDP décodant le JSON des positions.
+  - `internal/state` : store en mémoire des unités (avec péremption).
+  - `internal/api` : serveur HTTP (REST `GET /api/state`, flux **Server-Sent Events**
+    `/api/events`) + service de l'interface web embarquée.
+  - `cmd/dcsmm/main.go` : point d'entrée assemblant les briques.
+
+- **Frontend (`frontend/`)**
+  - Interface Leaflet minimale affichant la position des unités en temps réel via
+    **Server-Sent Events**, avec une page de repli générée si le frontend n'est pas buildé.
+
+- **Déploiement (`deploy/`)**
+  - `Dockerfile` multi-stage (build frontend + backend → image Alpine minimale, non-root).
+  - `docker-compose.yml` avec ports UDP/TCP publiés et volume SQLite.
+
+### Notes
+
+- DCS World reste sur Windows et ne tourne jamais dans le conteneur Docker ; le manager
+  communique avec lui par le réseau.
+- Le temps réel de la Phase 0 utilise **SSE** (flux descendant). Un canal TCP
+  bidirectionnel (commandes vers DCS) est prévu en Phase 2.

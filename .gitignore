@@ -1,0 +1,28 @@
+# Build artifacts
+/backend/dcsmm
+/backend/dcsmm.exe
+/dist/
+*.exe
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+
+# Generated frontend assets embedded in Go. The `dist/.gitkeep` placeholder is
+# committed so that `go build` works before the frontend has been built.
+/backend/internal/api/dist/*
+!/backend/internal/api/dist/.gitkeep
+
+# Local data
+/data/
+*.db
+*.db-journal
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local DCS scripts (never commit personal paths)
+dcs-lua/Config/dcsmm.local.cfg
