@@ -394,6 +394,20 @@ func (s *Server) handleVisibility(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleTheatres(w http.ResponseWriter, _ *http.Request) {
+	// Prefer the extent derived from DCS's own data; the hardcoded bounds are
+	// only a fallback for a map that is not installed (nothing to measure).
+	if s.aerodromes != nil {
+		for i := range s.theatres {
+			if ext, ok := s.aerodromes.Extent(s.theatres[i].ID); ok {
+				s.theatres[i].Bounds = theatre.Bounds{
+					MinLat: ext.MinLat,
+					MinLng: ext.MinLng,
+					MaxLat: ext.MaxLat,
+					MaxLng: ext.MaxLng,
+				}
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"default":  s.cfg.Theatre,
 		"theatres": s.theatres,

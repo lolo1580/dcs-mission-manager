@@ -11,6 +11,22 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **The map extents were wrong for every theatre, and are now measured instead of
+  guessed.** The bounds were literals typed by hand, and comparing them with
+  DCS's own data showed they were wrong everywhere: Kola really spans 11.7 to
+  40.1 degrees of longitude where the literal said 19 to 34, the Marianas reach
+  latitude 20.7 where the literal stopped at 15.6, and the Persian Gulf starts at
+  51.0 where the literal said 47. The extent is now computed from the theatre's
+  own airfields and settlements, so it is exact and follows DCS when a map is
+  patched. Verified: no airfield falls outside its theatre's box.
+  - The hardcoded bounds remain only as a fallback for a map that is not
+    installed, where there is nothing to measure.
+- **The Marianas WWII terrain was indexed under the wrong id.** DCS ships the
+  folder as `MarianasWWII` but declares the theatre as `MarianaIslandsWWII`, and
+  the folder name was used as the id, so the theatre keyed its airfields under a
+  name the UI never asks for. The id declared in the terrain's `entry.lua` is now
+  authoritative, which also gives that map a measured extent and makes its 11
+  airfields reachable.
 - **Four defects found by a systematic review**, none of them visible in normal
   use:
   - **A truncated data file could crash the backend.** The gettext wrapper `_(`

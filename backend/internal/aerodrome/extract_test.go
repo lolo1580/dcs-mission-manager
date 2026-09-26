@@ -232,6 +232,72 @@ func TestFormatTACAN(t *testing.T) {
 	}
 }
 
+// TestDeclaredTheatreID covers the folder-name/id discrepancy: DCS ships
+// "MarianasWWII" in a folder of that name but declares the theatre as
+// "MarianaIslandsWWII", and the declared id is what a mission and the UI use.
+func TestDeclaredTheatreID(t *testing.T) {
+	dir := t.TempDir()
+	if got := declaredTheatreID(dir); got != "" {
+		t.Errorf("no entry.lua should yield an empty id, got %q", got)
+	}
+
+	entry := `if not USE_TERRAIN4 then return end
+
+theatre =
+{
+	['Skins'] = { { name = _("Marianas"), dir = "Theme" } };
+	['id'] = "MarianaIslandsWWII";
+	['localizedName'] = "Marianas";
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "entry.lua"), []byte(entry), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := declaredTheatreID(dir); got != "MarianaIslandsWWII" {
+		t.Errorf("declaredTheatreID = %q, want MarianaIslandsWWII", got)
+	}
+}
+
+// TestExtentIsDerivedFromData locks the replacement of the hardcoded bounding
+// boxes, which were wrong for every map: Kola spans 11.7-40 degrees of longitude
+// where the literal said 19-34.
+func TestExtentIsDerivedFromData(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	c.byTheatre["Testland"] = []Aerodrome{
+		{ID: "A", Lat: 10, Lng: 20},
+		{ID: "B", Lat: 12, Lng: 24},
+	}
+	c.towns["Testland"] = []Town{{Name: "T", Lat: 11.5, Lng: 22}}
+
+	ext, ok := c.Extent("Testland")
+	if !ok {
+		t.Fatal("an extent should be derivable")
+	}
+	// The box must contain every point, with a small margin around it.
+	if ext.MinLat > 10 || ext.MaxLat < 12 || ext.MinLng > 20 || ext.MaxLng < 24 {
+		t.Errorf("extent %+v does not contain the points", ext)
+	}
+	// And it must not be absurdly padded.
+	if ext.MinLat < 9.9 || ext.MaxLat > 12.1 || ext.MinLng < 19.9 || ext.MaxLng > 24.1 {
+		t.Errorf("extent %+v is padded too far", ext)
+	}
+
+	// A theatre with no data has no extent, so the fallback bounds are used.
+	if _, ok := c.Extent("Nowhere"); ok {
+		t.Error("a theatre with no data should not yield an extent")
+	}
+
+	// Airfields with no known position must not drag the box to (0,0).
+	c.byTheatre["Empty"] = []Aerodrome{{ID: "X"}}
+	if _, ok := c.Extent("Empty"); ok {
+		t.Error("positionless airfields should not define an extent")
+	}
+}
+
 // TestEmbeddedFallback checks that the catalogue still works without DCS, and
 // that every embedded entry is tagged as such.
 func TestEmbeddedFallback(t *testing.T) {

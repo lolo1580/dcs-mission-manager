@@ -11,6 +11,24 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Les étendues des cartes étaient fausses pour tous les théâtres, et sont
+  désormais mesurées au lieu d'être devinées.** Les bornes étaient des littéraux
+  saisis à la main, et la comparaison avec les données de DCS montre qu'ils
+  étaient faux partout : Kola couvre en réalité 11,7 à 40,1 degrés de longitude
+  là où le littéral indiquait 19 à 34, les Mariannes atteignent la latitude 20,7
+  là où le littéral s'arrêtait à 15,6, et le golfe Persique commence à 51,0 là où
+  le littéral disait 47. L'étendue est maintenant calculée à partir des
+  aérodromes et des localités du théâtre : elle est exacte et suit DCS quand une
+  carte est mise à jour. Vérifié : aucun aérodrome ne tombe hors de la boîte de
+  son théâtre.
+  - Les bornes codées en dur ne servent plus que de repli pour une carte non
+    installée, où il n'y a rien à mesurer.
+- **Le terrain Marianas WWII était indexé sous le mauvais identifiant.** DCS
+  livre le dossier sous `MarianasWWII` mais déclare le théâtre
+  `MarianaIslandsWWII`, et le nom de dossier servait d'identifiant : le théâtre
+  rangeait donc ses aérodromes sous un nom que l'interface ne demande jamais.
+  L'identifiant déclaré dans `entry.lua` fait désormais foi, ce qui donne aussi à
+  cette carte une étendue mesurée et rend ses 11 aérodromes accessibles.
 - **Quatre défauts trouvés par une revue systématique**, aucun visible en usage
   normal :
   - **Un fichier de données tronqué pouvait faire planter le backend.** Le

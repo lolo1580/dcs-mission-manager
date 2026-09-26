@@ -29,6 +29,11 @@ type Theatre struct {
 // mismatch makes them unreachable even though they were read successfully.
 // "MarianaIslands" and "SinaiMap" are DCS's spellings, not "Marianas" and
 // "Sinai".
+//
+// Bounds are a FALLBACK only. The real extent is measured from the map's own
+// airfields and settlements at startup (see aerodrome.Catalog.Extent), which is
+// exact and follows DCS. The literals below are used when a map is not installed
+// and there is therefore nothing to measure; they are approximate by nature.
 var builtin = []Theatre{
 	{ID: "Caucasus", Name: "Caucasus", Bounds: Bounds{41.0, 36.5, 45.5, 45.0}},
 	{ID: "Syria", Name: "Syria", Bounds: Bounds{32.0, 34.0, 37.5, 42.5}},

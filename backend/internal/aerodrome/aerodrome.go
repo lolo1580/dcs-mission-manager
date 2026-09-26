@@ -14,6 +14,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -153,8 +154,16 @@ func LoadWithDCS(terrainsDir string) (*Catalog, []TerrainReport, error) {
 		if !e.IsDir() {
 			continue
 		}
-		theatre := e.Name()
-		dir := filepath.Join(terrainsDir, theatre)
+		// The folder name is not always the theatre id: DCS ships
+		// "MarianasWWII" in a folder of that name but declares the theatre as
+		// "MarianaIslandsWWII". The declared id is authoritative when the
+		// terrain states one, because that is what a mission and the UI use.
+		folder := e.Name()
+		theatre := folder
+		dir := filepath.Join(terrainsDir, folder)
+		if declared := declaredTheatreID(dir); declared != "" {
+			theatre = declared
+		}
 
 		terrain, err := LoadTerrain(dir, theatre)
 		if err != nil {
@@ -323,6 +332,88 @@ func (c *Catalog) Towns(theatre string) []Town {
 
 // HasTowns reports whether a theatre has town data.
 func (c *Catalog) HasTowns(theatre string) bool { return len(c.towns[theatre]) > 0 }
+
+// declaredTheatreID reads the theatre id a terrain declares in its entry.lua
+// (`['id'] = "MarianaIslandsWWII"`). It returns "" when the file is absent or
+// does not state one, in which case the folder name is the best available guess.
+func declaredTheatreID(dir string) string {
+	raw, err := os.ReadFile(filepath.Join(dir, "entry.lua"))
+	if err != nil {
+		return ""
+	}
+	m := reTheatreID.FindSubmatch(raw)
+	if m == nil {
+		return ""
+	}
+	return string(m[1])
+}
+
+// reTheatreID matches ['id'] = "Name" in a terrain's entry.lua.
+var reTheatreID = regexp.MustCompile(`\['id'\]\s*=\s*"([^"]+)"`)
+
+// Extent is a geographic bounding box, in degrees.
+type Extent struct {
+	MinLat float64
+	MinLng float64
+	MaxLat float64
+	MaxLng float64
+}
+
+// Extent returns the geographic extent of a theatre's own data: its airfields and
+// its settlements, both read from DCS. ok is false when the theatre has no data
+// at all (typically a map that is not installed).
+//
+// This replaces hardcoded bounding boxes, which were approximations typed by hand
+// and were wrong for every map: Kola's real longitude span is 11.7 to 39.5 where
+// the literal said 19 to 34, and the Marianas reach latitude 20.5 where the
+// literal stopped at 15.6. Deriving the box from the data is exact, and it
+// follows DCS when a map is patched.
+func (c *Catalog) Extent(theatre string) (Extent, bool) {
+	var (
+		e     Extent
+		first = true
+	)
+
+	consider := func(lat, lng float64) {
+		if lat == 0 && lng == 0 {
+			return // no position known
+		}
+		if first {
+			e = Extent{MinLat: lat, MaxLat: lat, MinLng: lng, MaxLng: lng}
+			first = false
+			return
+		}
+		e.MinLat = math.Min(e.MinLat, lat)
+		e.MaxLat = math.Max(e.MaxLat, lat)
+		e.MinLng = math.Min(e.MinLng, lng)
+		e.MaxLng = math.Max(e.MaxLng, lng)
+	}
+
+	for _, a := range c.byTheatre[theatre] {
+		consider(a.Lat, a.Lng)
+	}
+	for _, t := range c.towns[theatre] {
+		consider(t.Lat, t.Lng)
+	}
+	if first {
+		return Extent{}, false
+	}
+
+	// A margin so a marker sitting on the outermost point is not clipped by the
+	// frame. A degenerate box (a single point) still gets a usable size.
+	const margin = 0.02
+	padLat := math.Max((e.MaxLat-e.MinLat)*margin, 0.05)
+	padLng := math.Max((e.MaxLng-e.MinLng)*margin, 0.05)
+	return Extent{
+		MinLat: clampLat(e.MinLat - padLat),
+		MaxLat: clampLat(e.MaxLat + padLat),
+		MinLng: clampLng(e.MinLng - padLng),
+		MaxLng: clampLng(e.MaxLng + padLng),
+	}, true
+}
+
+func clampLat(v float64) float64 { return math.Max(-90, math.Min(90, v)) }
+func clampLng(v float64) float64 { return math.Max(-180, math.Min(180, v)) }
 
 func (c *Catalog) sortAll() {
 	for th := range c.byTheatre {
