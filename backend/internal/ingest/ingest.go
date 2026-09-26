@@ -116,7 +116,7 @@ func (w *Writer) missionIDFor(m model.Message) int64 {
 	}
 	name := m.Name
 	if name == "" {
-		name = "Mission inconnue"
+		name = "Unknown mission"
 	}
 	id, err := w.db.EnsureMission(name, "Caucasus")
 	if err != nil {

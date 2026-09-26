@@ -1,15 +1,15 @@
 // tools/send-telemetry.mjs
 //
-// Émetteur de télémétrie de test : simule ce que DCS enverrait via Export.lua.
-// Permet de valider le backend et la live map sans lancer DCS.
+// Test telemetry sender: simulates what DCS would send via Export.lua.
+// Lets you validate the backend and the live map without launching DCS.
 //
-// Usage :
+// Usage:
 //   node tools/send-telemetry.mjs [host] [port]
 //   node tools/send-telemetry.mjs 127.0.0.1 7778
 //
-// Émet :
-//   - un message "ownship" par seconde (le joueur) ;
-//   - un message "world" toutes les 2 secondes (unités IA + navires + sol).
+// Sends:
+//   - an "ownship" message every second (the player);
+//   - a "world" message every 2 seconds (AI units + ships + ground).
 
 import dgram from 'node:dgram';
 
@@ -42,7 +42,7 @@ const worldTemplates = [
 ];
 
 let t = 0;
-console.log(`Envoi de télémétrie vers ${host}:${port} (Ctrl+C pour arrêter)`);
+console.log(`Sending telemetry to ${host}:${port} (Ctrl+C to stop)`);
 
 setInterval(() => {
   t += 1;

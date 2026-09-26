@@ -38,7 +38,7 @@ var webFS embed.FS
 // fallbackPage is served when the frontend has not been built yet, so that the
 // backend is still usable and self-explanatory out of the box.
 const fallbackPage = `<!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -58,9 +58,9 @@ const fallbackPage = `<!doctype html>
   </head>
   <body>
     <main>
-      <h1>DCS Mission Manager — backend actif</h1>
-      <p>Le backend fonctionne, mais le frontend n'a pas encore été buildé. C'est la page de repli embarquée.</p>
-      <p>Pour builder l'interface :</p>
+      <h1>DCS Mission Manager — backend is up</h1>
+      <p>The backend is running, but the frontend has not been built yet. This is the embedded fallback page.</p>
+      <p>To build the UI:</p>
       <pre><code>cd frontend
 npm install
 npm run build</code></pre>

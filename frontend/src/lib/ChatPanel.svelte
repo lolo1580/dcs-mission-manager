@@ -1,5 +1,6 @@
 <script>
   import { chat } from './session.js';
+  import { t, tNow } from './i18n.js';
 
   let draft = '';
   let sending = false;
@@ -19,12 +20,12 @@
       if (!res.ok) {
         // The backend explains why (downstream channel not wired yet).
         const body = await res.json().catch(() => ({}));
-        error = body.error ?? `Envoi refusé (${res.status})`;
+        error = body.error ?? tNow('chat.refused', { status: res.status });
         return;
       }
       draft = '';
     } catch {
-      error = "Backend injoignable";
+      error = tNow('chat.unreachable');
     } finally {
       sending = false;
     }
@@ -37,25 +38,25 @@
 
 <section class="chat">
   <h2>
-    Chat <span class="count">{$chat.length}</span>
+    {$t('chat.title')} <span class="count">{$chat.length}</span>
   </h2>
 
   <ul>
     {#each $chat.slice(-200) as c (`${c.id}`)}
       <li>
         <span class="t">{timeOf(c)}</span>
-        <span class="from">{c.from || 'système'}</span>
+        <span class="from">{c.from || $t('chat.system')}</span>
         <span class="msg">{c.message}</span>
       </li>
     {/each}
     {#if $chat.length === 0}
-      <li class="empty">Aucun message</li>
+      <li class="empty">{$t('chat.none')}</li>
     {/if}
   </ul>
 
   <form on:submit|preventDefault={submit}>
-    <input bind:value={draft} placeholder="Message…" disabled={sending} />
-    <button type="submit" disabled={sending || !draft.trim()}>Envoyer</button>
+    <input bind:value={draft} placeholder={$t('chat.placeholder')} disabled={sending} />
+    <button type="submit" disabled={sending || !draft.trim()}>{$t('chat.send')}</button>
   </form>
   {#if error}<p class="error">{error}</p>{/if}
 </section>

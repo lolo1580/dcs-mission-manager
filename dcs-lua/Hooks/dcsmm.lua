@@ -1,27 +1,27 @@
 --[[
   DCS Mission Manager — Hooks/dcsmm.lua
   ------------------------------------------------------------------
-  Envoie au backend, en TCP/JSON (une ligne JSON par message) :
-    - les événements de jeu (kill, crash, eject, takeoff, landing…) ;
-    - la liste des joueurs connectés avec leurs statistiques ;
-    - le chat ;
-    - le début et la fin de mission.
+  Sends to the backend, over TCP/JSON (one JSON line per message):
+    - game events (kill, crash, eject, takeoff, landing...);
+    - the list of connected players with their statistics;
+    - the chat;
+    - the mission start and end.
 
-  À placer dans : Saved Games\DCS\Scripts\Hooks\dcsmm.lua
+  Place this in: Saved Games\DCS\Scripts\Hooks\dcsmm.lua
 
-  ⚠️  DCS charge TOUS les fichiers .lua de Hooks/ et les trie par nom.
-      Ce fichier est additif : il n'écrase aucun autre hook.
+  ⚠️  DCS loads ALL .lua files from Hooks/ and sorts them by name.
+      This file is additive: it does not overwrite any other hook.
 
-  Prérequis : Config/dcsmm.cfg présent dans Saved Games\DCS\Config\
+  Prerequisite: Config/dcsmm.cfg present in Saved Games\DCS\Config\
 
-  Options (dcsmm.cfg) :
-    dcsmm_host            adresse du backend (défaut 127.0.0.1)
-    dcsmm_tcp_port        port TCP du backend (défaut 7779)
-    dcsmm_enabled         activer/désactiver (défaut true)
-    dcsmm_players_interval intervalle d'envoi des joueurs en secondes (défaut 5.0)
+  Options (dcsmm.cfg):
+    dcsmm_host            backend address (default 127.0.0.1)
+    dcsmm_tcp_port        backend TCP port (default 7779)
+    dcsmm_enabled         enable/disable (default true)
+    dcsmm_players_interval players send interval in seconds (default 5.0)
 ]]
 
--- >>> DCSMM-BEGIN (bloc géré automatiquement — ne pas éditer à la main) >>>
+-- >>> DCSMM-BEGIN (managed block — do not edit by hand) >>>
 do
   local function say(msg)
     if net and net.log then net.log("DCSMM: " .. tostring(msg)) end
@@ -49,25 +49,25 @@ do
   end
 
   if not enabled then
-    say("hooks désactivés par la configuration")
+    say("hooks disabled by configuration")
     return
   end
 
   local socket_ok, socket = pcall(require, "socket")
   if not socket_ok then
-    say("LuaSocket introuvable, hooks désactivés")
+    say("LuaSocket not found, hooks disabled")
     return
   end
 
   ---------------------------------------------------------------------------
-  -- Connexion TCP persistante (reconnexion automatique)
+  -- Persistent TCP connection (automatic reconnection)
   ---------------------------------------------------------------------------
   local conn
 
   local function connect()
     local c, err = socket.tcp()
     if not c then return false end
-    c:settimeout(0.5)               -- ne jamais bloquer le simulateur
+    c:settimeout(0.5)               -- never block the simulator
     local okConn, cerr = c:connect(host, tcpPort)
     if not okConn and cerr ~= "already connected" then
       c:close()
@@ -75,7 +75,7 @@ do
     end
     c:setoption("tcp-nodelay", true)
     conn = c
-    say("connecté au backend " .. host .. ":" .. tostring(tcpPort))
+    say("connected to backend " .. host .. ":" .. tostring(tcpPort))
     return true
   end
 
@@ -103,7 +103,7 @@ do
     return true
   end
 
-  -- Sérialise une valeur Lua en JSON (types simples, listes, tables).
+  -- Serializes a Lua value to JSON (simple types, lists, tables).
   local function toJson(v)
     local t = type(v)
     if t == "nil" then return "null" end
@@ -114,7 +114,7 @@ do
     if t == "boolean" then return v and "true" or "false" end
     if t == "string" then return '"' .. jsonEscape(v) .. '"' end
     if t == "table" then
-      -- Détection liste vs objet.
+      -- List vs object detection.
       local isArray = #v > 0
       local parts = {}
       if isArray then
@@ -132,7 +132,7 @@ do
   end
 
   ---------------------------------------------------------------------------
-  -- Événements de jeu
+  -- Game events
   ---------------------------------------------------------------------------
   local function sendEvent(eventName, ...)
     local args = { ... }
@@ -146,9 +146,9 @@ do
   end
 
   ---------------------------------------------------------------------------
-  -- Joueurs et statistiques
+  -- Players and statistics
   ---------------------------------------------------------------------------
-  -- net.get_stat renvoie un entier ; on protège chaque appel.
+  -- net.get_stat returns an integer; we protect every call.
   local function stat(playerID, id)
     local ok, v = pcall(net.get_stat, playerID, id)
     if ok and type(v) == "number" then return math.floor(v) end
@@ -161,9 +161,9 @@ do
     return nil
   end
 
-  -- Associe un slotID à son type d'appareil. Sim.getAvailableSlots renvoie la
-  -- liste des slots disponibles avec leur type ; on construit la table une fois
-  -- par mission et on la rafraîchit périodiquement (des slots peuvent apparaître).
+  -- Maps a slotID to its aircraft type. Sim.getAvailableSlots returns the
+  -- list of available slots with their type; we build the table once per
+  -- mission and refresh it periodically (slots can appear).
   local slotTypes = {}
 
   local function refreshSlotTypes()
@@ -190,8 +190,8 @@ do
     slotTypes = map
   end
 
-  -- Le slotID d'un joueur en multi-siège vaut "unitID_seatID" ; on ne garde que
-  -- la partie unitID pour retrouver le type.
+  -- A player's slotID in a multi-seat aircraft is "unitID_seatID"; we keep only
+  -- the unitID part to look up the type.
   local function unitTypeForSlot(slot)
     if not slot or slot == "" then return "" end
     if slotTypes[slot] then return slotTypes[slot] end
@@ -232,10 +232,10 @@ do
   end
 
   ---------------------------------------------------------------------------
-  -- Débrief : lecture de debrief.log et envoi en morceaux
+  -- Debrief: reading debrief.log and sending it in chunks
   ---------------------------------------------------------------------------
-  -- Le fichier peut dépasser 1 Mo ; on l'envoie en morceaux base64 pour ne pas
-  -- saturer la connexion ni bloquer le simulateur.
+  -- The file can exceed 1 MB; we send it in base64 chunks so we don't
+  -- saturate the connection or block the simulator.
   local CHUNK_BYTES = 32768
 
   local function readFile(path)
@@ -246,7 +246,7 @@ do
     return data
   end
 
-  -- Encodage base64 (LuaSocket le fournit ; sinon on n'envoie pas).
+  -- Base64 encoding (LuaSocket provides it; otherwise we don't send).
   local function b64(data)
     if socket and socket.base64 then
       local ok, v = pcall(socket.base64, data)
@@ -264,7 +264,7 @@ do
     local path = lfs.writedir() .. "Logs/debrief.log"
     local data = readFile(path)
     if not data or #data == 0 then
-      say("debrief.log introuvable ou vide")
+      say("debrief.log not found or empty")
       return
     end
 
@@ -276,7 +276,7 @@ do
       local part = data:sub(i * CHUNK_BYTES + 1, (i + 1) * CHUNK_BYTES)
       local encoded = b64(part)
       if not encoded then
-        say("encodage base64 indisponible, débrief non envoyé")
+        say("base64 encoding unavailable, debrief not sent")
         return
       end
       sendLine(toJson({
@@ -289,19 +289,19 @@ do
         data = encoded,
       }))
     end
-    say(string.format("débrief envoyé (%d octets, %d morceaux)", #data, chunks))
+    say(string.format("debrief sent (%d bytes, %d chunks)", #data, chunks))
   end
 
   ---------------------------------------------------------------------------
-  -- Table de callbacks attendue par Sim.setUserCallbacks
+  -- Callback table expected by Sim.setUserCallbacks
   ---------------------------------------------------------------------------
   local dcsmm = {}
 
   function dcsmm.onSimulationStart()
     local name = (Sim and Sim.getMissionName and Sim.getMissionName()) or "?"
     refreshSlotTypes()
-    -- On transmet les options de mission : le backend en a besoin pour
-    -- respecter les règles de visibilité (fog of war) de la mission.
+    -- We forward the mission options: the backend needs them to
+    -- respect the mission's visibility rules (fog of war).
     local options = nil
     if Sim and Sim.getMissionOptions then
       local ok, opts = pcall(Sim.getMissionOptions)
@@ -314,21 +314,21 @@ do
       options = options,
     }))
     sendPlayers()
-    say("mission démarrée : " .. tostring(name))
+    say("mission started: " .. tostring(name))
   end
 
   function dcsmm.onSimulationStop()
-    -- On envoie le débrief AVANT de fermer la connexion : le backend attend
-    -- le fichier pour l'historiser.
+    -- We send the debrief BEFORE closing the connection: the backend waits
+    -- for the file to archive it.
     pcall(sendDebrief)
     sendLine(toJson({ type = "mission", phase = "end" }))
     if conn then pcall(function() conn:close() end) end
     conn = nil
-    say("mission terminée")
+    say("mission ended")
   end
 
   function dcsmm.onGameEvent(eventName, arg1, arg2, arg3, arg4)
-    -- On transmet tous les arguments non nuls ; le backend les stocke tels quels.
+    -- We forward all non-nil arguments; the backend stores them as-is.
     local args = {}
     for _, a in ipairs({ arg1, arg2, arg3, arg4 }) do
       if a ~= nil then args[#args + 1] = a end
@@ -340,8 +340,8 @@ do
       t = (LoGetModelTime and LoGetModelTime()) or 0,
     }))
 
-    -- Un changement de slot ou une connexion modifie l'état des joueurs :
-    -- on rafraîchit tout de suite pour que l'UI reste cohérente.
+    -- A slot change or a connection changes the players' state:
+    -- we refresh right away so the UI stays consistent.
     if eventName == "change_slot" or eventName == "connect"
        or eventName == "disconnect" or eventName == "mission_end" then
       sendPlayers()
@@ -356,7 +356,7 @@ do
   function dcsmm.onPlayerDisconnect(id, code) sendPlayers() end
   function dcsmm.onPlayerChangeSlot(id) sendPlayers() end
 
-  -- Rafraîchissement périodique des statistiques, via le timer du simulateur.
+  -- Periodic refresh of statistics, via the simulator timer.
   local nextPlayersAt, nextSlotsAt
   function dcsmm.onSimulationFrame()
     local t = (LoGetModelTime and LoGetModelTime()) or 0
@@ -373,6 +373,6 @@ do
   end
 
   Sim.setUserCallbacks(dcsmm)
-  say("hooks chargés")
+  say("hooks loaded")
 end
 -- <<< DCSMM-END <<<

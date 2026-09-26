@@ -20,7 +20,7 @@ func openTemp(t *testing.T) *DB {
 func TestMissionLifecycle(t *testing.T) {
 	d := openTemp(t)
 
-	id, err := d.EnsureMission("Caucase libre", "Caucasus")
+	id, err := d.EnsureMission("Free Caucasus", "Caucasus")
 	if err != nil {
 		t.Fatalf("ensure: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestMissionLifecycle(t *testing.T) {
 		t.Fatalf("no open mission expected, got %d", got)
 	}
 
-	id3, err := d.EnsureMission("Suivante", "Caucasus")
+	id3, err := d.EnsureMission("Next", "Caucasus")
 	if err != nil {
 		t.Fatalf("ensure 3: %v", err)
 	}

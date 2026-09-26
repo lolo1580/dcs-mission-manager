@@ -1,87 +1,88 @@
-# Événements, joueurs et chat (Phase 2)
+# Events, players and chat (Phase 2)
 
-## Principe
+## Principle
 
-En plus du canal **UDP** (positions, Phase 1), le backend écoute un canal **TCP**
-sur lequel les hooks Lua poussent des messages **JSON, une ligne par message**.
+In addition to the **UDP** channel (positions, Phase 1), the backend listens on a
+**TCP** channel on which the Lua hooks push **JSON messages, one line per
+message**.
 
 ```
 DCS (Windows)                                    Backend
 Scripts/Hooks/dcsmm.lua
   onGameEvent ─┐
-  onChatMessage ┼─► TCP 7779, JSON ligne par ligne ─► internal/tcp
-  net.get_*   ─┘                                        │
-                                                        ├─► internal/live  (mémoire, UI temps réel)
-                                                        └─► internal/ingest ─► internal/db (SQLite)
+  onChatMessage ┼─► TCP 7779, JSON one line per message ─► internal/tcp
+  net.get_*   ─┘                                           │
+                                                           ├─► internal/live   (in-memory, real-time UI)
+                                                           └─► internal/ingest ─► internal/db (SQLite)
 ```
 
-Le choix du **JSON ligne par ligne** (NDJSON) plutôt qu'une trame binaire est
-délibéré : c'est débogable à l'œil, le parseur tient en quelques lignes, et le
-protocole peut évoluer sans casser les anciens clients.
+The choice of **line-by-line JSON** (NDJSON) rather than a binary frame is
+deliberate: it is debuggable by eye, the parser fits in a few lines, and the
+protocol can evolve without breaking older clients.
 
 ## Messages
 
-| `type` | Contenu | Émis par |
+| `type` | Content | Emitted by |
 |---|---|---|
 | `mission` | `phase` (`start`/`end`), `name`, `theatre`, `winner` | `onSimulationStart` / `onSimulationStop` |
 | `event` | `event`, `args[]`, `t` | `onGameEvent` |
-| `players` | `players[]` (id, UCID, nom, camp, slot, stats) | `net.get_player_list` + `net.get_stat` |
+| `players` | `players[]` (id, UCID, name, side, slot, stats) | `net.get_player_list` + `net.get_stat` |
 | `chat` | `from`, `message` | `onChatMessage` |
 
-### Événements capturés
+### Captured events
 
 `kill`, `friendly_fire`, `mission_end`, `self_kill`, `change_slot`, `connect`,
 `disconnect`, `crash`, `eject`, `takeoff`, `landing`, `pilot_death`.
 
-### Statistiques par joueur
+### Per-player statistics
 
-Exactement celles de l'API `net.get_stat` : ping, crashes, kills véhicules /
-avions / navires, score, atterrissages, éjections. Plus l'**UCID**, indispensable
-pour des statistiques de carrière qui survivent aux changements de pseudo.
+Exactly those of the `net.get_stat` API: ping, crashes, vehicle / aircraft /
+ship kills, score, landings, ejections. Plus the **UCID**, essential for career
+statistics that survive callsign changes.
 
-## Rafraîchissement
+## Refresh
 
-- **Événements** et **chat** : envoyés dès qu'ils surviennent.
-- **Joueurs** : rafraîchis toutes les `dcsmm_players_interval` secondes (défaut 5),
-  et immédiatement lors d'un `change_slot`, `connect`, `disconnect` ou `mission_end`.
-- Le rafraîchissement périodique passe par `onSimulationFrame`, donc il ne bloque
-  jamais une frame : aucun appel réseau bloquant n'est fait dans un callback.
+- **Events** and **chat**: sent as soon as they occur.
+- **Players**: refreshed every `dcsmm_players_interval` seconds (default 5), and
+  immediately on a `change_slot`, `connect`, `disconnect` or `mission_end`.
+- The periodic refresh goes through `onSimulationFrame`, so it never blocks a
+  frame: no blocking network call is made in a callback.
 
-## Robustesse côté Lua
+## Robustness on the Lua side
 
-- Connexion TCP **persistante** avec reconnexion automatique si le backend
-  redémarre ou est absent.
-- `settimeout(0.5)` : un backend injoignable ne fige pas le simulateur.
-- Chaque appel `net.*`/`Sim.*` est protégé par `pcall`.
-- `tcp-nodelay` activé pour un envoi immédiat des événements.
+- **Persistent** TCP connection with automatic reconnection if the backend
+  restarts or is absent.
+- `settimeout(0.5)`: an unreachable backend does not freeze the simulator.
+- Each `net.*`/`Sim.*` call is protected by `pcall`.
+- `tcp-nodelay` enabled for immediate sending of events.
 
-## API Web
+## Web API
 
 | Route | Description |
 |---|---|
-| `GET /api/game-events` | Événements récents (mémoire) |
-| `GET /api/players` | Joueurs connectés |
-| `GET /api/chat` | Chat récent ; `POST` réservé à l'envoi vers DCS (à venir) |
-| `GET /api/mission` | Mission en cours |
-| `GET /api/history/events` | Événements persistés (SQLite) |
-| `GET /api/history/chat` | Chat persisté |
-| `GET /api/history/missions` | Missions passées |
+| `GET /api/game-events` | Recent events (in memory) |
+| `GET /api/players` | Connected players |
+| `GET /api/chat` | Recent chat; `POST` reserved for sending to DCS (coming soon) |
+| `GET /api/mission` | Current mission |
+| `GET /api/history/events` | Persisted events (SQLite) |
+| `GET /api/history/chat` | Persisted chat |
+| `GET /api/history/missions` | Past missions |
 
-Les mêmes données arrivent en temps réel par **SSE** (`/api/events`) sous la forme
-d'une trame `{"type":"session", ...}` émise chaque seconde.
+The same data arrives in real time via **SSE** (`/api/events`) as a
+`{"type":"session", ...}` frame emitted every second.
 
-## Persistance
+## Persistence
 
-SQLite via **modernc.org/sqlite** (pur Go, sans CGO) : le binaire reste unique et
-cross-compilable pour le `.exe` Windows comme pour l'image Docker.
+SQLite via **modernc.org/sqlite** (pure Go, no CGO): the binary stays single and
+cross-compilable for both the Windows `.exe` and the Docker image.
 
-Tables : `missions`, `events`, `chat`, `players`, `player_stats`, `meta`.
-La persistance peut être coupée avec `DCSMM_DB_ENABLED=false` (tout reste en
-mémoire).
+Tables: `missions`, `events`, `chat`, `players`, `player_stats`, `meta`.
+Persistence can be disabled with `DCSMM_DB_ENABLED=false` (everything stays in
+memory).
 
-## Canal de commandes (à venir)
+## Command channel (coming soon)
 
-Le canal TCP est **bidirectionnel par construction** : le backend pourra pousser
-des commandes (kick, changement de mission, message de chat) que le hook Lua
-exécutera. L'endpoint `POST /api/chat` existe déjà et répond `501` explicitement
-tant que ce canal n'est pas câblé.
+The TCP channel is **bidirectional by construction**: the backend will be able to
+push commands (kick, mission change, chat message) that the Lua hook will
+execute. The `POST /api/chat` endpoint already exists and returns `501`
+explicitly as long as this channel is not wired up.

@@ -1,88 +1,88 @@
-# Fog of war (respect des options de mission)
+# Fog of war (respecting mission options)
 
-## Le problème
+## The problem
 
-Une mission DCS peut **limiter ce que la carte F10 révèle** (« F10 View Options »).
-Un outil de live map qui ignore ces options **dévoile ce que la mission cache** :
-c'est de la triche involontaire, en particulier sur un serveur multijoueur.
+A DCS mission can **limit what the F10 map reveals** (“F10 View Options”).
+A live map tool that ignores these options **reveals what the mission hides**:
+that is involuntary cheating, especially on a multiplayer server.
 
-C'est le seul écart que nous avions vis-à-vis de la référence (Bergison
-MovingMap, MizMap), et c'est un problème d'**intégrité**, pas de confort. Il est
-donc traité en priorité.
+It is the only gap we had compared to the reference (Bergison
+MovingMap, MizMap), and it is a problem of **integrity**, not comfort. It is
+therefore treated as a priority.
 
-## D'où viennent les valeurs
+## Where the values come from
 
-Directement de **DCS**, dans `MissionEditor/modules/Options/optionsDb.lua` :
+Directly from **DCS**, in `MissionEditor/modules/Options/optionsDb.lua`:
 
-| Valeur `optionsView` | Libellé DCS | Signification |
+| `optionsView` value | DCS label | Meaning |
 |---|---|---|
-| `optview_onlymap` | MAP ONLY | aucune unité |
-| `optview_myaircraft` | MY A/C | mon appareil seul |
-| `optview_allies` | **FOG OF WAR** | alliés + contacts détectés par les capteurs |
-| `optview_onlyallies` | ALLIES ONLY | alliés uniquement |
-| `optview_all` | ALL | tout |
+| `optview_onlymap` | MAP ONLY | no units |
+| `optview_myaircraft` | MY A/C | my aircraft only |
+| `optview_allies` | **FOG OF WAR** | allies + contacts detected by sensors |
+| `optview_onlyallies` | ALLIES ONLY | allies only |
+| `optview_all` | ALL | everything |
 
-Le hook Lua transmet `Sim.getMissionOptions()` au démarrage de mission ; le
-backend en déduit la politique de visibilité.
+The Lua hook transmits `Sim.getMissionOptions()` at mission start; the
+backend infers the visibility policy from it.
 
-## Principe : restrictif par défaut
+## Principle: restrictive by default
 
-`internal/visibility` applique une règle simple : **ne jamais montrer plus que
-ce que DCS montrerait**.
+`internal/visibility` applies a simple rule: **never show more than
+what DCS would show**.
 
-- `map_only` / `my_aircraft` → l'appareil du joueur uniquement ;
-- `allies` / `only_allies` → l'appareil du joueur + sa **coalition** ;
-- `all` → tout ;
-- **options non reçues** → traité comme `allies` (le cas sûr).
+- `map_only` / `my_aircraft` → the player's aircraft only;
+- `allies` / `only_allies` → the player's aircraft + their **coalition**;
+- `all` → everything;
+- **options not received** → treated as `allies` (the safe case).
 
-Deux choix explicites :
+Two explicit choices:
 
-- **Le filtrage est côté serveur.** Filtrer dans le navigateur serait
-  contournable : les données ne doivent jamais quitter le backend si la mission
-  les cache.
-- **« FOG OF WAR » est approximé en « alliés uniquement ».** Les contacts
-  réellement détectés dépendent des capteurs de chaque coalition à l'instant T,
-  que l'export Lua ne fournit pas. On prend donc le **sous-ensemble sûr** : on
-  sous-affiche plutôt que de sur-afficher.
+- **Filtering is server-side.** Filtering in the browser would be
+  bypassable: the data must never leave the backend if the mission
+  hides it.
+- **“FOG OF WAR” is approximated as “allies only”.** The contacts
+  actually detected depend on each coalition's sensors at time T,
+  which the Lua export does not provide. We therefore take the **safe subset**: we
+  under-display rather than over-display.
 
-L'appareil du joueur est **toujours** conservé : montrer sa propre position n'est
-jamais une fuite, et sans elle la carte serait inutilisable.
+The player's aircraft is **always** kept: showing one's own position is
+never a leak, and without it the map would be unusable.
 
 ## Configuration
 
-| Variable | Défaut | Effet |
+| Variable | Default | Effect |
 |---|---|---|
-| `DCSMM_REVEAL_ALL_UNITS` | `false` | `true` désactive le filtrage (usage solo / conception de mission) |
+| `DCSMM_REVEAL_ALL_UNITS` | `false` | `true` disables filtering (solo use / mission design) |
 
-Quand le filtrage est désactivé, l'interface l'indique clairement : c'est un mode
-« dieu », assumé et visible.
+When filtering is disabled, the interface clearly indicates it: it is a “god”
+mode, accepted and visible.
 
 ## API
 
 | Route | Description |
 |---|---|
-| `GET /api/visibility` | Politique active (mode, libellé, dérogation, note) |
+| `GET /api/visibility` | Active policy (mode, label, override, note) |
 
-La politique est aussi jointe à chaque trame d'état (`/api/state`, SSE) sous la
-clé `visibility`, et un événement `visibility` est diffusé à chaque changement.
+The policy is also attached to each state frame (`/api/state`, SSE) under the
+`visibility` key, and a `visibility` event is broadcast on each change.
 
 ## Interface
 
-Un bandeau apparaît sous l'en-tête dès que le filtrage est actif, avec le mode et
-sa limite (par exemple : « Fog of war (alliés) — les contacts détectés par les
-capteurs ne sont pas reproduits (restrictif) »).
+A banner appears below the header as soon as filtering is active, with the mode and
+its limit (for example: “Fog of war (allies) — contacts detected by
+sensors are not reproduced (restrictive)”).
 
-## Limites assumées
+## Accepted limitations
 
-- **Fog of war réel non reproduit** : sans les détections capteur, on ne peut pas
-  montrer les contacts ennemis détectés. C'est une limite de l'export Lua, pas un
-  choix de conception.
-- Le filtrage ne dépend que de la **coalition** ; il ne tient pas compte des
-  masques de couches par rôle (`visibleUnitLayersMask`), plus fins, que DCS
-  applique aussi.
+- **Real fog of war not reproduced**: without the sensor detections, we cannot
+  show the detected enemy contacts. This is a limitation of the Lua export, not a
+  design choice.
+- Filtering depends only on the **coalition**; it does not take into account the
+  per-role layer masks (`visibleUnitLayersMask`), which are finer, that DCS
+  also applies.
 
 ## Tests
 
-`internal/visibility` : correspondance des valeurs DCS, filtrage par mode,
-**non-fuite des unités ennemies et neutres** dans tous les modes restrictifs,
-dérogation, absence d'appareil joueur, description.
+`internal/visibility`: matching of DCS values, filtering by mode,
+**non-leakage of enemy and neutral units** in all restrictive modes,
+override, absence of player aircraft, description.

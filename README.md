@@ -1,53 +1,53 @@
 # DCS Mission Manager
 
-Un gestionnaire tout-en-un pour **DCS World** : live map en temps réel, lecture des
-débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**, soit en
-**image Docker** — à partir du **même projet**.
+🇬🇧 English | [🇫🇷 Français](README.fr.md)
 
-> ⚠️ **DCS World ne tourne jamais dans Docker.** Le simulateur reste sur Windows.
-> Le conteneur ne contient que le *manager* (backend + Web UI), qui communique avec
-> DCS par le réseau. Voir [Architecture](#architecture).
+An all-in-one manager for **DCS World**: real-time live map, debriefing reading, and advanced statistics. Deployable either as a **Windows `.exe`** or a **Docker image** — from the **same project**.
+
+> ⚠️ **DCS World never runs inside Docker.** The simulator stays on Windows.
+> The container only holds the *manager* (backend + Web UI), which communicates with
+> DCS over the network. See [Architecture](#architecture).
 
 ---
 
-## Sommaire
+## Table of contents
 
-- [Fonctionnalités](#fonctionnalités)
+- [Features](#features)
 - [Architecture](#architecture)
-- [Prérequis](#prérequis)
-- [Démarrage rapide (PoC Phase 0)](#démarrage-rapide-poc-phase-0)
+- [Prerequisites](#prerequisites)
+- [Quick start (PoC Phase 0)](#quick-start-poc-phase-0)
 - [Configuration](#configuration)
-- [Installation des scripts Lua dans DCS](#installation-des-scripts-lua-dans-dcs)
-- [Déploiement](#déploiement)
-- [Structure du projet](#structure-du-projet)
+- [Installing the Lua scripts into DCS](#installing-the-lua-scripts-into-dcs)
+- [Deployment](#deployment)
+- [Project structure](#project-structure)
 - [Roadmap](#roadmap)
-- [Licence](#licence)
+- [License](#license)
 
 ---
 
-## Fonctionnalités
+## Features
 
-| Fonction | État | Détail |
+| Feature | Status | Details |
 |---|---|---|
-| Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
-| Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
-| Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
-| Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
-| Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
-| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
-| Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
-| Aérodromes | ✅ Phase 6 | 21 terrains du Caucase : coordonnées, Tower, TACAN, ILS, cartes |
-| Fog of war | ✅ Phase 7 | Respect des options de mission F10 (filtrage côté serveur) |
+| Real-time live map | ✅ Phase 1 | All objects, categories, filters, trails, search |
+| Authentic DCS tiles | 📋 Planned | F10 tile exporter (`tiles/` folder) |
+| Events & players | ✅ Phase 2 | Kills, crashes, chat, players, SQLite history |
+| Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
+| Server control | 🚧 Partial | Chat to DCS (command channel) coming |
+| Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission) |
+| Analytical maps & sortie | ✅ Phase 4 bis | Heatmaps, trails, sortie analysis, ownship telemetry |
+| Aerodromes | ✅ Phase 6 | 21 Caucasus terrains: coordinates, Tower, TACAN, ILS, charts |
+| Fog of war | ✅ Phase 7 | Respects F10 mission options (server-side filtering) |
 
-### Statistiques avancées (prévues)
+### Advanced statistics (planned)
 
-- **Fiche pilote & carrière** — kills/morts/KD, éjections, crashes, temps de vol, par **UCID**
-- **Analyse d'armes** — efficacité par arme, matrice de kills, friendly-fire
-- **Cartes analytiques** — heatmaps kills/morts, traces de vol rejouables
-- **Balance & méta** — balance coalition, appareils joués, timeline de mission
-- **Analyse de sortie** — durée, distance, altitude/vitesse/G max (telemetry)
-- **Qualité réseau** — ping, déconnexions, codes d'erreur
-- **Analyse par engin** — granularité **type DCS exact** (`F-16C_50`, `T-72B`, `SA-10`…), plateforme + cible + matchups
+- **Pilot & career profile** — kills/deaths/KD, ejections, crashes, flight time, by **UCID**
+- **Weapon analysis** — effectiveness per weapon, kill matrix, friendly-fire
+- **Analytical maps** — kill/death heatmaps, replayable flight trails
+- **Balance & meta** — coalition balance, aircraft flown, mission timeline
+- **Sortie analysis** — duration, distance, altitude/speed/G max (telemetry)
+- **Network quality** — ping, disconnections, error codes
+- **Analysis by engine** — exact **DCS type** granularity (`F-16C_50`, `T-72B`, `SA-10`…), platform + target + matchups
 
 ---
 
@@ -56,167 +56,167 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 ```
      MACHINE A (Windows — DCS)                    MACHINE B (Linux/NAS — Docker)
 ┌──────────────────────────────┐            ┌──────────────────────────────────┐
-│ DCS World                     │  UDP + TCP │ Backend Go (conteneur)            │
-│  Config/dcsmm.cfg  ─ IP(B) ──┼───────────►│  • listener UDP (positions)       │
-│  Scripts/Export.lua  → pos    │◄───────────┼─ • canal TCP (events + commandes) │
-│  Scripts/Hooks/dcsmm.lua      │            │  • état + SQLite (volume)         │
-│   → events/joueurs/chat       │            │  • parse debrief (reçu réseau)    │
-│   → debrief.log (lu + envoyé) │            │  • REST + SSE                     │
+│ DCS World                     │  UDP + TCP │ Go backend (container)            │
+│  Config/dcsmm.cfg  ─ IP(B) ──┼───────────►│  • UDP listener (positions)       │
+│  Scripts/Export.lua  → pos    │◄───────────┼─ • TCP channel (events + commands) │
+│  Scripts/Hooks/dcsmm.lua      │            │  • state + SQLite (volume)        │
+│   → events/players/chat       │            │  • parse debrief (received over network) │
+│   → debrief.log (read + sent) │            │  • REST + SSE                     │
 └──────────────────────────────┘            └───────────────┬──────────────────┘
                                               HTTP/WS ──────┘
-                                       Navigateurs LAN (machine B ou autres)
+                                       LAN browsers (machine B or others)
 ```
 
-### Un seul projet, deux emballages
+### One project, two packagings
 
 ```
-              UN SEUL CODE SOURCE (Go + Svelte embarquée)
+              A SINGLE SOURCE CODE BASE (Go + embedded Svelte)
                               │
               ┌───────────────┴───────────────┐
               ▼                               ▼
-   Mode A : dcsmm.exe (machine A)     Mode B : image Docker (machine B)
-   même machine que DCS               Linux/NAS, accès LAN
-   IP backend = 127.0.0.1             IP backend = IP LAN de B
+   Mode A : dcsmm.exe (machine A)     Mode B : Docker image (machine B)
+   same machine as DCS               Linux/NAS, LAN access
+   backend IP = 127.0.0.1            backend IP = LAN IP of B
 ```
 
-**Stack :** Go (backend, binaire unique + UI embarquée) · Svelte + Vite + Leaflet (frontend) · SQLite (persistance).
+**Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite + Leaflet (frontend) · SQLite (persistence).
 
 ---
 
-## Prérequis
+## Prerequisites
 
-### Côté DCS (machine A, Windows)
+### DCS side (machine A, Windows)
 
-- DCS World (dernière version stable ou open beta)
-- Accès à `%USERPROFILE%\Saved Games\DCS\` (ou `DCS.openbeta`)
-- LuaSocket — fourni avec DCS, aucune installation requise
+- DCS World (latest stable version or open beta)
+- Access to `%USERPROFILE%\Saved Games\DCS\` (or `DCS.openbeta`)
+- LuaSocket — bundled with DCS, no installation required
 
-### Côté développement / manager
+### Development / manager side
 
 - **Go 1.22+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
-- **Node.js 20+** — <https://nodejs.org/> (uniquement pour builder le frontend)
+- **Node.js 20+** — <https://nodejs.org/> (only to build the frontend)
 - **Git**
 
-### Côté Docker (machine B, Linux/NAS)
+### Docker side (machine B, Linux/NAS)
 
-- Docker Engine 24+ et Docker Compose v2
-- Architecture `amd64` ou `arm64` (build multi-arch fourni)
+- Docker Engine 24+ and Docker Compose v2
+- `amd64` or `arm64` architecture (multi-arch build included)
 
 ---
 
-## Démarrage rapide (PoC Phase 0)
+## Quick start (PoC Phase 0)
 
-Le PoC valide toute la chaîne : **DCS → UDP → Go → SSE → navigateur**.
+The PoC validates the whole chain: **DCS → UDP → Go → SSE → browser**.
 
-### 1. Lancer le manager
+### 1. Start the manager
 
 ```powershell
-# Backend seul (sert aussi un placeholder si le frontend n'est pas buildé)
+# Backend only (also serves a placeholder if the frontend is not built)
 go run ./backend/cmd/dcsmm
 ```
 
-Par défaut, le backend écoute :
+By default, the backend listens on:
 
-- `127.0.0.1:7778` en **UDP** (positions)
-- `0.0.0.0:8080` en **HTTP** (Web UI + flux temps réel `GET /api/events` en SSE)
+- `127.0.0.1:7778` over **UDP** (positions)
+- `0.0.0.0:8080` over **HTTP** (Web UI + real-time stream `GET /api/events` via SSE)
 
-Ouvre ensuite <http://localhost:8080>.
+Then open <http://localhost:8080>.
 
-### 2. Installer les scripts Lua dans DCS
+### 2. Install the Lua scripts into DCS
 
-Copie les fichiers de `dcs-lua/` vers ton dossier Saved Games — voir
-[Installation des scripts Lua](#installation-des-scripts-lua-dans-dcs). Le PoC n'a besoin
-que de `Export.lua` et de `Config/dcsmm.cfg`.
+Copy the files from `dcs-lua/` into your Saved Games folder — see
+[Installing the Lua scripts into DCS](#installing-the-lua-scripts-into-dcs). The PoC only needs
+`Export.lua` and `Config/dcsmm.cfg`.
 
-### 3. Lancer DCS et une mission
+### 3. Launch DCS and a mission
 
-Ton appareil apparaît comme un point sur la carte, mis à jour une fois par seconde.
+Your aircraft appears as a point on the map, updated once per second.
 
-> En mode Docker sur une autre machine, remplace `127.0.0.1` par l'IP LAN de la machine B
-> dans `Saved Games\DCS\Config\dcsmm.cfg`.
+> In Docker mode on another machine, replace `127.0.0.1` with the LAN IP of machine B
+> in `Saved Games\DCS\Config\dcsmm.cfg`.
 
 ---
 
 ## Configuration
 
-Toute la configuration passe par **variables d'environnement** (préfixe `DCSMM_`) avec des
-défauts raisonnables — identique pour l'`.exe` et pour Docker.
+All configuration is done through **environment variables** (prefix `DCSMM_`) with sensible
+defaults — identical for the `.exe` and for Docker.
 
-| Variable | Défaut | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `DCSMM_HTTP_ADDR` | `0.0.0.0:8080` | Adresse d'écoute HTTP (Web UI + SSE) |
-| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (télémétrie Live map) |
-| `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
-| `DCSMM_DB_PATH` | `./data/dcsmm.db` | Chemin de la base SQLite |
-| `DCSMM_DB_ENABLED` | `true` | Activer la persistance (sinon tout en mémoire) |
-| `DCSMM_THEATRE` | `Caucasus` | Théâtre par défaut |
-| `DCSMM_UNIT_TTL` | `5` (secondes) | Délai avant qu'une unité silencieuse disparaisse |
-| `DCSMM_TILES_DIR` | `./tiles` | Dossier des tuiles de carte DCS |
-| `DCSMM_BASEMAP` | `satellite` | Fond par défaut : `satellite`, `topo`, `osm`, `dark` |
-| `DCSMM_BASEMAP_URL` | *(vide)* | Fond personnalisé optionnel (template `{z}/{x}/{y}`) |
-| `DCSMM_CATEGORIES` | `./categories.json` | Surcharge de classification des engins |
-| `DCSMM_MAX_UNITS` | `5000` | Nombre maximum d'unités suivies |
-| `DCSMM_TRACK_INTERVAL` | `3` (secondes) | Fréquence d'échantillonnage des positions |
-| `DCSMM_TRACK_GRACE` | `15` (secondes) | Absence avant de compter une unité comme perdue |
-| `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
-| `DCSMM_REVEAL_ALL_UNITS` | `false` | Désactive le fog of war (tout diffuser ; solo/conception) |
+| `DCSMM_HTTP_ADDR` | `0.0.0.0:8080` | HTTP listening address (Web UI + SSE) |
+| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | UDP listening address (Live map telemetry) |
+| `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
+| `DCSMM_DB_PATH` | `./data/dcsmm.db` | SQLite database path |
+| `DCSMM_DB_ENABLED` | `true` | Enable persistence (otherwise everything in memory) |
+| `DCSMM_THEATRE` | `Caucasus` | Default theatre |
+| `DCSMM_UNIT_TTL` | `5` (seconds) | Delay before a silent unit disappears |
+| `DCSMM_TILES_DIR` | `./tiles` | DCS map tiles folder |
+| `DCSMM_BASEMAP` | `satellite` | Default basemap: `satellite`, `topo`, `osm`, `dark` |
+| `DCSMM_BASEMAP_URL` | *(empty)* | Optional custom basemap (template `{z}/{x}/{y}`) |
+| `DCSMM_CATEGORIES` | `./categories.json` | Override for engine classification |
+| `DCSMM_MAX_UNITS` | `5000` | Maximum number of tracked units |
+| `DCSMM_TRACK_INTERVAL` | `3` (seconds) | Position sampling frequency |
+| `DCSMM_TRACK_GRACE` | `15` (seconds) | Absence before a unit counts as lost |
+| `DCSMM_TRACK_RETENTION` | `86400` (seconds) | History retention duration |
+| `DCSMM_REVEAL_ALL_UNITS` | `false` | Disables fog of war (broadcast everything; solo/design) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
-### Côté DCS — `Saved Games\DCS\Config\dcsmm.cfg`
+### DCS side — `Saved Games\DCS\Config\dcsmm.cfg`
 
 ```lua
--- Adresse du backend (IP LAN de la machine Docker, ou 127.0.0.1 en local)
+-- Backend address (LAN IP of the Docker machine, or 127.0.0.1 locally)
 dcsmm_host = "127.0.0.1"
 dcsmm_udp_port = 7778
 dcsmm_tcp_port = 7779
 
 -- Live map
-dcsmm_send_interval = 1.0    -- position du joueur (secondes)
-dcsmm_world_enabled = true   -- export de tous les objets
-dcsmm_world_interval = 2.0   -- liste des objets (secondes)
-dcsmm_world_radius = 0       -- filtre par rayon en km (0 = tout)
+dcsmm_send_interval = 1.0    -- player position (seconds)
+dcsmm_world_enabled = true   -- export all objects
+dcsmm_world_interval = 2.0   -- object list (seconds)
+dcsmm_world_radius = 0       -- radius filter in km (0 = all)
 ```
 
 ---
 
-## Installation des scripts Lua dans DCS
+## Installing the Lua scripts into DCS
 
-> ⚠️ **Toujours merger, jamais écraser.** `Export.lua` est très souvent déjà modifié par
-> Tacview, SRS, DCS-BIOS, etc. Sauvegarde le fichier existant avant toute modification.
+> ⚠️ **Always merge, never overwrite.** `Export.lua` is very often already modified by
+> Tacview, SRS, DCS-BIOS, etc. Back up the existing file before any modification.
 
-Les scripts se placent dans le dossier *Saved Games* de DCS :
+The scripts go into DCS's *Saved Games* folder:
 
 ```
-%USERPROFILE%\Saved Games\DCS\          (ou DCS.openbeta)
+%USERPROFILE%\Saved Games\DCS\          (or DCS.openbeta)
 ├─ Config\
-│   └─ dcsmm.cfg          ← configuration de l'adresse backend
+│   └─ dcsmm.cfg          ← backend address configuration
 └─ Scripts\
-    ├─ Export.lua         ← positions (live map) ; à MERGER avec l'existant
+    ├─ Export.lua         ← positions (live map); to MERGE with the existing one
     └─ Hooks\
-        └─ dcsmm.lua      ← événements, joueurs, chat (Phases 2+)
+        └─ dcsmm.lua      ← events, players, chat (Phases 2+)
 ```
 
-1. Copie `dcs-lua/Config/dcsmm.cfg` dans `Saved Games\DCS\Config\`.
-2. Si `Saved Games\DCS\Scripts\Export.lua` existe déjà : fais-en une copie
-   (`Export.lua.bak-AAAAMMJJ`), puis ajoute le bloc `do ... end` fourni dans
-   `dcs-lua/Export.lua` **à la fin** du fichier existant.
-3. Sinon, copie simplement `dcs-lua/Export.lua`.
-4. Redémarre DCS.
+1. Copy `dcs-lua/Config/dcsmm.cfg` into `Saved Games\DCS\Config\`.
+2. If `Saved Games\DCS\Scripts\Export.lua` already exists: make a copy of it
+   (`Export.lua.bak-YYYYMMDD`), then add the `do ... end` block provided in
+   `dcs-lua/Export.lua` **at the end** of the existing file.
+3. Otherwise, simply copy `dcs-lua/Export.lua`.
+4. Restart DCS.
 
 ---
 
-## Déploiement
+## Deployment
 
-### Mode A — `.exe` Windows (machine DCS)
+### Mode A — Windows `.exe` (DCS machine)
 
 ```powershell
-# 1. Builder le frontend et le backend
+# 1. Build the frontend and the backend
 .\build.ps1
 
-# 2. Installer les scripts côté DCS (fusion sûre dans Saved Games)
-.\install-dcs.ps1            # ajouter -DryRun pour simuler
+# 2. Install the scripts on the DCS side (safe merge into Saved Games)
+.\install-dcs.ps1            # add -DryRun to simulate
 
-# 3. Lancer
+# 3. Run
 .\dcsmm.exe
 ```
 
@@ -226,74 +226,75 @@ Les scripts se placent dans le dossier *Saved Games* de DCS :
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-Ports publiés : `8080/tcp` (UI), `7778/udp` (positions), `7779/tcp` (events + commandes).
-Un volume persiste la base SQLite.
+Published ports: `8080/tcp` (UI), `7778/udp` (positions), `7779/tcp` (events + commands).
+A volume persists the SQLite database.
 
-> Sur la machine A, pointe `dcsmm_host` vers l'**IP LAN de la machine B** (pas `127.0.0.1`)
-> et autorise les ports dans le pare-feu.
+> On machine A, point `dcsmm_host` to the **LAN IP of machine B** (not `127.0.0.1`)
+> and allow the ports in the firewall.
 
-Build multi-arch pour NAS ARM :
+Multi-arch build for ARM NAS:
 
 ```bash
 make docker-multiarch
-# ou directement :
+# or directly:
 docker buildx build --platform linux/amd64,linux/arm64 -f deploy/Dockerfile -t dcsmm:latest .
 ```
 
 ### CLI
 
 ```powershell
-dcsmm                 # lance le manager (interface web + réception DCS)
-dcsmm install-lua     # installe/fusionne les scripts Lua dans Saved Games
-dcsmm uninstall-lua   # retire le bloc installé (garde la config)
-dcsmm status          # installed / outdated / missing, par fichier
+dcsmm                 # starts the manager (web interface + DCS receive)
+dcsmm install-lua     # installs/merges the Lua scripts into Saved Games
+dcsmm uninstall-lua   # removes the installed block (keeps the config)
+dcsmm status          # installed / outdated / missing, per file
 dcsmm version
 ```
 
 ---
 
-## Structure du projet
+## Project structure
 
 ```
 DCS mission manager/
-├─ README.md
-├─ CHANGELOG.md
+├─ README.md                 # English (primary)
+├─ README.fr.md              # French
+├─ CHANGELOG.md / .fr.md
 ├─ VERSION
-├─ Makefile / build.ps1       # commandes de build
-├─ install-dcs.ps1           # installe les scripts Lua dans Saved Games
-├─ dcs-lua/                  # scripts à installer côté DCS
-│   ├─ Config/dcsmm.cfg      # modèle de configuration
+├─ Makefile / build.ps1       # build commands
+├─ install-dcs.ps1           # installs the Lua scripts into Saved Games
+├─ dcs-lua/                  # scripts to install on the DCS side
+│   ├─ Config/dcsmm.cfg      # configuration template
 │   ├─ Export.lua            # positions → UDP (live map)
-│   └─ Hooks/dcsmm.lua       # events / joueurs / chat
+│   └─ Hooks/dcsmm.lua       # events / players / chat
 ├─ backend/                  # Go
 │   ├─ go.mod
-│   ├─ cmd/dcsmm/main.go     # serveur + CLI (install/uninstall/status)
+│   ├─ cmd/dcsmm/main.go     # server + CLI (install/uninstall/status)
 │   └─ internal/
-│       ├─ config/           # chargement env + défauts
-│       ├─ install/          # injecteur Lua (fusion par marqueurs)
-│       ├─ aerodrome/        # aérodromes et fréquences (données embarquées)
-│       ├─ category/         # classification des engins (type DCS → famille)
-│       ├─ theatre/          # théâtres DCS et leurs emprises
-│       ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
-│       ├─ model/            # types échangés DCS ↔ backend
-│       ├─ lua/              # parseur de données Lua (debrief.log)
-│       ├─ debrief/          # analyse des débriefs
-│       ├─ debriefstore/     # réassemblage des transferts de débrief
-│       ├─ udp/              # récepteur positions (live map)
-│       ├─ tcp/              # récepteur événements / joueurs / chat
-│       ├─ live/             # état de session en mémoire
-│       ├─ ingest/           # pont live → base de données
-│       ├─ tracker/          # historique positions + détection de pertes
-│       ├─ db/               # persistance SQLite (pur Go)
-│       ├─ state/            # store unités (en mémoire)
-│       ├─ stats/            # agrégations statistiques
-│       └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
+│       ├─ config/           # env loading + defaults
+│       ├─ install/          # Lua injector (merge via markers)
+│       ├─ aerodrome/        # aerodromes and frequencies (embedded data)
+│       ├─ category/         # engine classification (DCS type → family)
+│       ├─ theatre/          # DCS theatres and their extents
+│       ├─ basemap/          # basemaps (satellite, relief, osm, dark)
+│       ├─ model/            # types exchanged DCS ↔ backend
+│       ├─ lua/              # Lua data parser (debrief.log)
+│       ├─ debrief/          # debrief analysis
+│       ├─ debriefstore/     # reassembly of debrief transfers
+│       ├─ udp/              # position receiver (live map)
+│       ├─ tcp/              # event / player / chat receiver
+│       ├─ live/             # in-memory session state
+│       ├─ ingest/           # live → database bridge
+│       ├─ tracker/          # position history + loss detection
+│       ├─ db/               # SQLite persistence (pure Go)
+│       ├─ state/            # unit store (in memory)
+│       ├─ stats/            # statistical aggregations
+│       └─ api/              # REST + SSE + tiles + embedded UI (dist/)
 ├─ frontend/                 # Svelte + Vite + Leaflet
 │   └─ src/
 │       ├─ App.svelte
-│       └─ lib/              # carte, panneaux, stores
-├─ tiles/                    # tuiles DCS par théâtre
-├─ tools/                    # émetteur de télémétrie de test, extracteur de tuiles
+│       └─ lib/              # map, panels, stores
+├─ tiles/                    # DCS tiles per theatre
+├─ tools/                    # test telemetry emitter, tile extractor
 ├─ deploy/                   # Dockerfile + docker-compose.yml
 └─ docs/                     # documentation
 ```
@@ -302,20 +303,20 @@ DCS mission manager/
 
 ## Roadmap
 
-- [x] **Phase 0 — PoC** : `Export.lua` (position joueur) → Go → carte Leaflet
-- [x] **Phase 1 — Live map** : tous les objets, catégories, filtres, traces, recherche, tuiles DCS
-- [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, historique SQLite
-- [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
-- [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
-- [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
-- [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, `.exe` + Docker multi-arch
-- [x] **Phase 6 — Aérodromes** : 21 terrains du Caucase (fréquences, cartes)
-- [x] **Phase 7 — Fog of war** : respect des options F10 de la mission (filtrage serveur)
+- [x] **Phase 0 — PoC**: `Export.lua` (player position) → Go → Leaflet map
+- [x] **Phase 1 — Live map**: all objects, categories, filters, trails, search, DCS tiles
+- [x] **Phase 2 — Events & players**: `onGameEvent`, chat, `net.get_stat`, SQLite history
+- [x] **Phase 3 — Debriefings**: network transfer of `debrief.log`, Lua parser, history
+- [x] **Phase 4 — Advanced stats**: overview, pilots, weapons, engines, balance, network
+- [x] **Phase 4 bis — Analytical maps & sortie**: heatmaps, trails, telemetry
+- [x] **Phase 5 — Packaging**: CLI, safe Lua injector, `.exe` + multi-arch Docker
+- [x] **Phase 6 — Aerodromes**: 21 Caucasus terrains (frequencies, charts)
+- [x] **Phase 7 — Fog of war**: respects the mission's F10 options (server filtering)
 
-Le plan complet et détaillé est disponible dans le fichier de plan du projet.
+The full, detailed plan is available in the project's plan file.
 
 ---
 
-## Licence
+## License
 
-À définir.
+To be defined.

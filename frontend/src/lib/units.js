@@ -26,20 +26,20 @@ export const EMPTY_FILTERS = {
 
 export const filters = writable({ ...EMPTY_FILTERS });
 
+/**
+ * Filter definitions. Labels are resolved through i18n at render time
+ * (`$t('category.' + id)`, `$t('coalition.' + id)`), so only the ids live here.
+ */
 export const CATEGORIES = [
-  { id: 'plane', label: 'Avions' },
-  { id: 'heli', label: 'Hélicoptères' },
-  { id: 'ground', label: 'Sol' },
-  { id: 'ship', label: 'Navires' },
-  { id: 'structure', label: 'Structures' },
-  { id: 'other', label: 'Autres' },
+  { id: 'plane' },
+  { id: 'heli' },
+  { id: 'ground' },
+  { id: 'ship' },
+  { id: 'structure' },
+  { id: 'other' },
 ];
 
-export const COALITIONS = [
-  { id: 'blue', label: 'Bleu' },
-  { id: 'red', label: 'Rouge' },
-  { id: 'neutral', label: 'Neutre' },
-];
+export const COALITIONS = [{ id: 'blue' }, { id: 'red' }, { id: 'neutral' }];
 
 function matches(u, f) {
   if (f.ownshipOnly && !u.ownship) return false;

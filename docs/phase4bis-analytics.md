@@ -1,71 +1,71 @@
-# Cartes analytiques & analyse de sortie (Phase 4 bis)
+# Analytical maps & sortie analysis (Phase 4 bis)
 
-## Principe : pas de projection par théâtre
+## Principle: no per-theatre projection
 
-Les modules 4.3 (cartes) et 4.5 (sortie) reposent sur l'**historique des
-positions**. Plutôt que d'utiliser les coordonnées internes `x/y` des débriefs
-(qui exigent une projection propre à chaque théâtre), le backend échantillonne les
-**positions lat/lng** déjà reçues pour la live map. Résultat : **aucun recalage
-géographique**, tous les théâtres fonctionnent de la même façon.
+Modules 4.3 (maps) and 4.5 (sortie) rely on the **position history**.
+Rather than using the debriefs' internal `x/y` coordinates
+(which require a projection specific to each theatre), the backend samples the
+**lat/lng positions** already received for the live map. Result: **no geographic
+calibration**, all theatres work the same way.
 
-## Collecte : `internal/tracker`
+## Collection: `internal/tracker`
 
-Un échantillonneur périodique (`DCSMM_TRACK_INTERVAL`, défaut 3 s) enregistre
-pour chaque unité : position, altitude, cap, vitesse, facteur de charge.
+A periodic sampler (`DCSMM_TRACK_INTERVAL`, default 3 s) records
+for each unit: position, altitude, heading, speed, load factor.
 
-- **Traces** : les déplacements, pour reconstituer les trajectoires.
-- **Pertes** : quand une unité **disparaît** du monde plus longtemps que
-  `DCSMM_TRACK_GRACE` (défaut 15 s), elle est enregistrée comme perte avec sa
-  dernière position connue. C'est une approximation honnête de « détruit ou
-  désactivé » — DCS n'envoie pas toujours d'événement explicite.
-- **Réapparition** : si l'unité revient, elle n'est plus comptée comme perte.
+- **Tracks**: the movements, to reconstruct the trajectories.
+- **Losses**: when a unit **disappears** from the world for longer than
+  `DCSMM_TRACK_GRACE` (default 15 s), it is recorded as a loss with its
+  last known position. This is an honest approximation of “destroyed or
+  deactivated” — DCS does not always send an explicit event.
+- **Reappearance**: if the unit returns, it is no longer counted as a loss.
 
-Si aucune mission n'a été annoncée (seul `Export.lua` installé), le tracker crée
-automatiquement une mission de session pour ne rien perdre.
+If no mission has been announced (only `Export.lua` installed), the tracker
+automatically creates a session mission so nothing is lost.
 
-## Rétention
+## Retention
 
-`DCSMM_TRACK_RETENTION` (défaut 24 h) : un passage horaire supprime les données
-plus anciennes, pour que la base ne grossisse pas indéfiniment sur un serveur qui
-tourne en continu.
+`DCSMM_TRACK_RETENTION` (default 24 h): an hourly pass deletes data
+older than that, so the database does not grow indefinitely on a server that
+runs continuously.
 
-## Télémétrie avancée (ownship)
+## Advanced telemetry (ownship)
 
-`Export.lua` enrichit le message du joueur avec, **si le serveur l'autorise**
-(`allow_ownship_export`) : vitesse vraie et indiquée, Mach, incidence, altitude
-sol, facteur de charge (`LoGetAccelerationUnits`). Sinon, seules les positions
-sont enregistrées — les colonnes vitesse/G restent vides plutôt que fausses.
+`Export.lua` enriches the player's message with, **if the server allows it**
+(`allow_ownship_export`): true and indicated airspeed, Mach, angle of attack, ground
+altitude, load factor (`LoGetAccelerationUnits`). Otherwise, only the positions
+are recorded — the speed/G columns stay empty rather than wrong.
 
 ## API
 
 | Route | Description |
 |---|---|
-| `GET /api/analytics/heatmap?source=positions\|losses&grid=0.05` | Points de chaleur agrégés (grille en degrés, sans projection) |
-| `GET /api/analytics/tracks` | Traces des appareils les plus actifs + stats de sortie |
-| `GET /api/analytics/sorties` | Stats de sortie seules |
+| `GET /api/analytics/heatmap?source=positions\|losses&grid=0.05` | Aggregated heat points (grid in degrees, no projection) |
+| `GET /api/analytics/tracks` | Tracks of the most active aircraft + sortie stats |
+| `GET /api/analytics/sorties` | Sortie stats only |
 
 ## Interface
 
-- Nouvel onglet **Analyse** : source de la carte de chaleur (Trafic / Pertes) et
-  tableau d'**analyse de sortie** par unité (durée, distance, altitude max,
-  vitesse max, G max, nombre de points).
-- Bouton **Historique** dans l'en-tête de la carte : superpose la carte de
-  chaleur et les traces enregistrées sur la carte en direct.
+- New **Analysis** tab: heat map source (Traffic / Losses) and
+  a **sortie analysis** table per unit (duration, distance, max altitude,
+  max speed, max G, number of points).
+- **History** button in the map header: overlays the heat map and the recorded
+  tracks on the live map.
 
-La distance est calculée par la formule de **haversine** (grand cercle), sur les
-points réellement enregistrés.
+The distance is computed with the **haversine** formula (great circle), on the
+points actually recorded.
 
-## Limites assumées
+## Accepted limitations
 
-- La détection de perte est **heuristique** (absence prolongée), pas un événement
-  DCS. Le couplage avec les événements `crash`/`pilot_death`/`kill` de la Phase 2
-  est possible mais volontairement laissé de côté pour ne pas compter deux fois.
-- La télémétrie (G, vitesse, incidence) n'est disponible que pour **son propre
-  appareil** en multi ; les autres unités n'ont que des positions.
-- L'échantillonnage à 3 s suffit pour une trajectoire lisible ; il est
-  configurable si besoin de plus de finesse.
+- Loss detection is **heuristic** (prolonged absence), not a DCS
+  event. Coupling with the Phase 2 `crash`/`pilot_death`/`kill` events
+  is possible but deliberately left aside to avoid double counting.
+- Telemetry (G, speed, angle of attack) is only available for **one's own
+  aircraft** in multiplayer; the other units only have positions.
+- Sampling at 3 s is enough for a readable trajectory; it is
+  configurable if more precision is needed.
 
 ## Tests
 
-`internal/tracker` couvre : échantillonnage, détection de perte (et non-duplication),
-réapparition, haversine, et l'analyse de sortie (extrêmes et distance).
+`internal/tracker` covers: sampling, loss detection (and non-duplication),
+reappearance, haversine, and sortie analysis (extremes and distance).

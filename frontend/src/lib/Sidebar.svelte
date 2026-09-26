@@ -10,6 +10,7 @@
     COALITIONS,
   } from './units.js';
   import { coalitionColor, CATEGORY_LABELS } from './icons.js';
+  import { t, lang } from './i18n.js';
 
   function toggle(list, id) {
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -22,20 +23,28 @@
   function toggleCoalition(id) {
     filters.update((f) => ({ ...f, coalitions: toggle(f.coalitions, id) }));
   }
+
+  // Labels come from the dictionaries, which are updated in i18n.js.
+  function categoryLabel(id) {
+    return $t(`category.${id}`);
+  }
+  function coalitionLabel(id) {
+    return $t(`coalition.${id}`);
+  }
 </script>
 
 <aside>
   <section>
-    <h2>Filtres</h2>
+    <h2>{$t('filters.title')}</h2>
     <input
       class="search"
       type="search"
-      placeholder="Rechercher (type, nom, pays)…"
+      placeholder={$t('filters.search')}
       value={$filters.search}
       on:input={(e) => filters.update((f) => ({ ...f, search: e.currentTarget.value }))}
     />
 
-    <div class="chips" role="group" aria-label="Coalitions">
+    <div class="chips" role="group" aria-label={$t('filters.coalitions')}>
       {#each COALITIONS as c}
         <button
           class="chip"
@@ -43,20 +52,20 @@
           style="--c:{coalitionColor(c.id)}"
           on:click={() => toggleCoalition(c.id)}
         >
-          <span class="swatch"></span>{c.label}
+          <span class="swatch"></span>{coalitionLabel(c.id)}
           <span class="n">{$summary.byCoalition?.[c.id] ?? 0}</span>
         </button>
       {/each}
     </div>
 
-    <div class="chips" role="group" aria-label="Catégories">
+    <div class="chips" role="group" aria-label={$t('filters.categories')}>
       {#each CATEGORIES as c}
         <button
           class="chip"
           class:active={$filters.categories.includes(c.id)}
           on:click={() => toggleCategory(c.id)}
         >
-          {c.label}
+          {categoryLabel(c.id)}
           <span class="n">{$summary.byCategory?.[c.id] ?? 0}</span>
         </button>
       {/each}
@@ -68,7 +77,7 @@
         checked={$filters.ownshipOnly}
         on:change={(e) => filters.update((f) => ({ ...f, ownshipOnly: e.currentTarget.checked }))}
       />
-      Mon appareil uniquement
+      {$t('filters.ownshipOnly')}
     </label>
 
     <label class="check">
@@ -77,15 +86,15 @@
         checked={$filters.showTrails}
         on:change={(e) => filters.update((f) => ({ ...f, showTrails: e.currentTarget.checked }))}
       />
-      Afficher les traces de vol
+      {$t('filters.showTrails')}
     </label>
 
-    <button class="reset" on:click={resetFilters}>Réinitialiser les filtres</button>
+    <button class="reset" on:click={resetFilters}>{$t('filters.reset')}</button>
   </section>
 
   <section class="list-section">
     <h2>
-      Unités <span class="count">{$visibleUnits.length} / {$units.length}</span>
+      {$t('filters.units')} <span class="count">{$visibleUnits.length} / {$units.length}</span>
     </h2>
     <ul>
       {#each $visibleUnits.slice(0, 300) as u (u.id)}
@@ -93,20 +102,19 @@
           <button class:selected={$selectedId === u.id} on:click={() => selectedId.set(u.id)}>
             <span class="dot" style="background:{coalitionColor(u.coalition)}"></span>
             <span class="type">{u.label || u.type}</span>
-            <span class="cat">{CATEGORY_LABELS[u.category] ?? u.category}</span>
+            <span class="cat">{categoryLabel(u.category)}</span>
           </button>
         </li>
       {/each}
       {#if $visibleUnits.length > 300}
-        <li class="more">+ {$visibleUnits.length - 300} autres…</li>
+        <li class="more">+ {$visibleUnits.length - 300} {$t('filters.more')}</li>
       {/if}
       {#if $visibleUnits.length === 0}
-        <li class="empty">Aucune unité</li>
+        <li class="empty">{$t('filters.none')}</li>
       {/if}
     </ul>
   </section>
 </aside>
-
 <style>
   aside {
     display: flex;
@@ -289,3 +297,4 @@
     font-size: 0.78rem;
   }
 </style>
+

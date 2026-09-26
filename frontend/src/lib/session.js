@@ -3,6 +3,7 @@
  * the backend over SSE. Mirrors the shape of lib/units.js.
  */
 import { writable, derived, get } from 'svelte/store';
+import { tNow } from './i18n.js';
 
 export const events = writable([]);
 export const players = writable([]);
@@ -12,18 +13,22 @@ export const mission = writable(null);
 /** Bumped whenever any session data changes, to drive "new data" indicators. */
 export const sessionRev = writable(0);
 
+/**
+ * Event filter definitions. Labels are resolved through i18n at render time
+ * (`$t('events.all')`, `$t('events.kills')`, …) so only ids live here.
+ */
 export const EVENT_FILTERS = [
-  { id: 'all', label: 'Tous' },
-  { id: 'kill', label: 'Kills' },
-  { id: 'friendly_fire', label: 'Friendly fire' },
-  { id: 'crash', label: 'Crashes' },
-  { id: 'eject', label: 'Éjections' },
-  { id: 'takeoff', label: 'Décollages' },
-  { id: 'landing', label: 'Atterrissages' },
-  { id: 'pilot_death', label: 'Morts' },
-  { id: 'change_slot', label: 'Slots' },
-  { id: 'connect', label: 'Connexions' },
-  { id: 'disconnect', label: 'Déconnexions' },
+  { id: 'all', key: 'events.all' },
+  { id: 'kill', key: 'events.kills' },
+  { id: 'friendly_fire', key: 'events.friendlyFire' },
+  { id: 'crash', key: 'events.crashes' },
+  { id: 'eject', key: 'events.ejections' },
+  { id: 'takeoff', key: 'events.takeoffs' },
+  { id: 'landing', key: 'events.landings' },
+  { id: 'pilot_death', key: 'events.deaths' },
+  { id: 'change_slot', key: 'events.slots' },
+  { id: 'connect', key: 'events.connections' },
+  { id: 'disconnect', key: 'events.disconnections' },
 ];
 
 export const eventFilter = writable('all');
@@ -46,12 +51,12 @@ export const COALITION_COLORS = {
   spectator: '#9aa4b2',
 };
 
-export const SIDE_LABELS = {
-  0: 'Spectateur',
-  1: 'Rouge',
-  2: 'Bleu',
-};
-
+/** Maps a DCS side id to a coalition key, for colouring and i18n labels. */
 export function sideKey(side) {
   return side === 1 ? 'red' : side === 2 ? 'blue' : 'spectator';
+}
+
+/** Translates a DCS side id through the i18n dictionaries. */
+export function sideLabel(side) {
+  return tNow(`coalition.${sideKey(side)}`);
 }

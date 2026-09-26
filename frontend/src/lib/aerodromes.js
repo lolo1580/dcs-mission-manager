@@ -2,6 +2,7 @@
  * Aerodrome store: reference airfields (coordinates, radio frequencies, charts).
  */
 import { writable, derived } from 'svelte/store';
+import { tNow } from './i18n.js';
 import { units } from './units.js';
 
 export const aerodromes = writable([]);
@@ -35,7 +36,7 @@ export async function loadAerodromes() {
     const body = await res.json();
     aerodromes.set(body.aerodromes ?? []);
   } catch (e) {
-    aerodromeError.set(`Aérodromes indisponibles : ${e.message}`);
+    aerodromeError.set(tNow('error.aerodromes', { detail: e.message }));
   }
 }
 
@@ -58,7 +59,7 @@ export async function loadNearest() {
     aerodromes.set(body.aerodromes ?? []);
     return true;
   } catch (e) {
-    aerodromeError.set(`Aérodromes indisponibles : ${e.message}`);
+    aerodromeError.set(tNow('error.aerodromes', { detail: e.message }));
     return false;
   }
 }

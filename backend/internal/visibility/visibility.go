@@ -62,21 +62,21 @@ func FromDCSOption(value string) Mode {
 	}
 }
 
-// Label is a human-readable French label for the mode.
+// Label is a human-readable label for the mode.
 func (m Mode) Label() string {
 	switch m {
 	case MapOnly:
-		return "Carte seule"
+		return "Map only"
 	case MyAircraft:
-		return "Mon appareil"
+		return "My aircraft"
 	case Allies:
-		return "Fog of war (alliés)"
+		return "Fog of war (allies)"
 	case OnlyAllies:
-		return "Alliés uniquement"
+		return "Allies only"
 	case All:
-		return "Tout"
+		return "All"
 	default:
-		return "Inconnu"
+		return "Unknown"
 	}
 }
 
@@ -183,14 +183,14 @@ func (p *Policy) Describe() Description {
 		Override: p.Override(),
 	}
 	if p.Override() {
-		d.Note = "filtrage désactivé : toutes les unités sont diffusées"
+		d.Note = "filtering disabled: all units are broadcast"
 		return d
 	}
 	switch mode {
 	case Allies:
-		d.Note = "les contacts détectés par les capteurs ne sont pas reproduits (restrictif)"
+		d.Note = "sensor-detected contacts are not reproduced (restrictive)"
 	case Unknown:
-		d.Note = "options de mission pas encore reçues ; filtrage restrictif appliqué"
+		d.Note = "mission options not received yet; restrictive filtering applied"
 	}
 	return d
 }

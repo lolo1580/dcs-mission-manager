@@ -1,46 +1,46 @@
-# Déploiement
+# Deployment
 
-Le manager se déploie **de deux façons, à partir du même projet** : un `.exe`
-Windows, ou une image Docker Linux. Le binaire et la configuration sont
-identiques ; seul l'emballage change.
+The manager deploys **in two ways, from the same project**: a Windows `.exe`,
+or a Linux Docker image. The binary and the configuration are
+identical; only the packaging changes.
 
-> ⚠️ **DCS World ne tourne jamais dans le conteneur.** Le simulateur est
-> Windows uniquement. Le conteneur ne contient que le *manager* et communique
-> avec DCS par le réseau.
+> ⚠️ **DCS World never runs inside the container.** The simulator is
+> Windows only. The container only contains the *manager* and communicates
+> with DCS over the network.
 
-## Mode A — `.exe` Windows
+## Mode A — Windows `.exe`
 
-Sur la machine qui fait tourner DCS.
+On the machine running DCS.
 
 ```powershell
 # 1. Builder (frontend + backend)
 .\build.ps1
 
-# 2. Installer les scripts côté DCS (fusion sûre dans Saved Games)
+# 2. Install the Lua scripts into DCS (safe merge in Saved Games)
 .\install-dcs.ps1            # ou .\install-dcs.ps1 -DryRun pour simuler
 
 # 3. Lancer le manager
 .\dcsmm.exe
 ```
 
-L'adresse backend par défaut est `127.0.0.1` : tout est sur la même machine.
+The default backend address is `127.0.0.1`: everything is on the same machine.
 
-### En service Windows (démarrage automatique)
+### As a Windows service (automatic start)
 
 ```powershell
-# Nécessite NSSM ou le planificateur de tâches. Exemple avec le planificateur :
+# Requires NSSM or the Task Scheduler. Example with the Task Scheduler:
 schtasks /create /tn "DCSMM" /tr "C:\chemin\dcsmm.exe" /sc onstart /ru SYSTEM
 ```
 
-## Mode B — Docker Linux (autre machine)
+## Mode B — Docker Linux (another machine)
 
-Sur un serveur/NAS Linux, avec DCS sur une **autre** machine.
+On a Linux server/NAS, with DCS on **another** machine.
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-### Build multi-arch (NAS ARM)
+### Multi-arch build (ARM NAS)
 
 ```bash
 docker buildx build \
@@ -48,63 +48,63 @@ docker buildx build \
   -f deploy/Dockerfile -t dcsmm:latest .
 ```
 
-### Le point à ne pas manquer
+### The point not to miss
 
-Les scripts Lua tournent sur **Windows**, donc dans `Saved Games\DCS\Config\dcsmm.cfg`
-il faut pointer vers l'**IP LAN de la machine Docker** — pas `127.0.0.1`, qui
-bouclerait sur l'hôte Windows :
+The Lua scripts run on **Windows**, so in `Saved Games\DCS\Config\dcsmm.cfg`
+you must point to the **LAN IP of the Docker machine** — not `127.0.0.1`, which
+would loop back to the Windows host:
 
 ```lua
-dcsmm_host = "192.168.1.50"   -- IP de la machine qui héberge le conteneur
+dcsmm_host = "192.168.1.50"   -- IP of the machine hosting the container
 dcsmm_udp_port = 7778
 dcsmm_tcp_port = 7779
 ```
 
-Et ouvrir les ports dans le pare-feu de la machine Docker :
+And open the ports in the Docker machine's firewall:
 
-| Port | Protocole | Usage |
+| Port | Protocol | Usage |
 |---|---|---|
-| 8080 | TCP | Interface web |
+| 8080 | TCP | Web interface |
 | 7778 | UDP | Positions (live map) |
-| 7779 | TCP | Événements, joueurs, chat, débriefs |
+| 7779 | TCP | Events, players, chat, debriefs |
 
-> Sur un NAS ou un Linux natif, aucun souci particulier. Sur **Docker Desktop
-> (Windows/WSL2)**, la publication UDP vers le LAN est parfois capricieuse ;
-> un `netsh portproxy` peut servir de secours.
+> On a NAS or native Linux, no particular problem. On **Docker Desktop
+> (Windows/WSL2)**, UDP publication to the LAN is sometimes temperamental;
+> a `netsh portproxy` can serve as a fallback.
 
-## Injecteur Lua : `dcsmm install-lua`
+## Lua injector: `dcsmm install-lua`
 
-L'installation côté DCS est **idempotente et sûre** :
+DCS-side installation is **idempotent and safe**:
 
-- elle **ne remplace jamais** un `Export.lua` existant (Tacview, SRS, DCS-BIOS…) ;
-- elle **fusionne** un bloc délimité par des marqueurs
-  (`>>> DCSMM-BEGIN >>>` … `<<< DCSMM-END <<<`) ;
-- elle crée une **sauvegarde horodatée** avant toute modification ;
-- relancer l'installation met simplement à jour le bloc en place.
+- it **never replaces** an existing `Export.lua` (Tacview, SRS, DCS-BIOS…);
+- it **merges** a block delimited by markers
+  (`>>> DCSMM-BEGIN >>>` … `<<< DCSMM-END <<<`);
+- it creates a **timestamped backup** before any modification;
+- re-running the installation simply updates the block in place.
 
 ```powershell
 dcsmm status          # installed / outdated / missing, par fichier
-dcsmm install-lua     # installe ou met à jour
+dcsmm install-lua     # installs or updates
 dcsmm uninstall-lua   # retire le bloc et Hooks/dcsmm.lua (garde la config)
 ```
 
-Fichiers concernés :
+Affected files:
 
-| Cible | Traitement |
+| Target | Handling |
 |---|---|
-| `Scripts\Export.lua` | **fusion par marqueurs** (jamais écrasé) |
-| `Scripts\Hooks\dcsmm.lua` | fichier propre au manager, copié/remplacé |
-| `Config\dcsmm.cfg` | créé s'il manque ; jamais écrasé (contient l'IP/les ports) |
+| `Scripts\Export.lua` | **merge by markers** (never overwritten) |
+| `Scripts\Hooks\dcsmm.lua` | file specific to the manager, copied/replaced |
+| `Config\dcsmm.cfg` | created if missing; never overwritten (holds the IP/ports) |
 
 ## Configuration
 
-Une seule base de configuration pour les deux modes : variables `DCSMM_*`
-(voir `README.md`) et `Saved Games\DCS\Config\dcsmm.cfg` côté DCS.
+A single configuration base for both modes: `DCSMM_*` variables
+(see `README.md`) and `Saved Games\DCS\Config\dcsmm.cfg` on the DCS side.
 
-## Vérifier que tout est branché
+## Checking that everything is connected
 
-1. Lancer le manager, ouvrir `http://<machine>:8080`.
-2. Dans DCS, charger une mission.
-3. L'en-tête doit passer à **« connecté »**, les unités apparaître sur la carte,
-   et l'onglet **Session** se remplir.
-4. En fin de mission, l'onglet **Débriefs** reçoit le `debrief.log`.
+1. Start the manager, open `http://<machine>:8080`.
+2. In DCS, load a mission.
+3. The header should switch to **“connected”**, the units should appear on the map,
+   and the **Session** tab should fill up.
+4. At the end of the mission, the **Debriefs** tab receives the `debrief.log`.

@@ -18,9 +18,11 @@ import (
 	"time"
 )
 
-// Markers delimiting the managed block.
+// Markers delimiting the managed block. These strings are load-bearing: they
+// are written into the user's Export.lua and must match byte-for-byte between
+// this constant and the `dcs-lua/` scripts.
 const (
-	BeginMarker = "-- >>> DCSMM-BEGIN (bloc géré automatiquement — ne pas éditer à la main) >>>"
+	BeginMarker = "-- >>> DCSMM-BEGIN (managed block — do not edit by hand) >>>"
 	EndMarker   = "-- <<< DCSMM-END <<<"
 )
 
@@ -89,7 +91,7 @@ func FindSavedGames() (string, error) {
 
 	// Not found: report the candidates so the user can pass --saved-games.
 	return "", fmt.Errorf(
-		"dossier Saved Games de DCS introuvable (essayé : %s). Utilise --saved-games <chemin>",
+		"DCS Saved Games folder not found (tried: %s). Use --saved-games <path>",
 		strings.Join(candidates, ", "))
 }
 

@@ -1,32 +1,32 @@
-# Aérodromes (Phase 6)
+# Aerodromes (Phase 6)
 
-## D'où viennent les données
+## Where the data comes from
 
-DCS **n'expose pas les fréquences radio à l'exécution** via son API Lua. La seule
-source fiable est la **documentation aérodrome officielle** (cartes
-d'approche/départ VAD, plans au sol GND), qui porte pour chaque terrain :
+DCS **does not expose radio frequencies at runtime** via its Lua API. The only
+reliable source is the **official aerodrome documentation** (VAD
+approach/departure charts, GND ground plans), which carries for each airfield:
 
-- les **coordonnées** (CRP, seuils de piste) ;
-- **Tower**, **Radar**, **Final/Precision** ;
-- **TACAN** (canal + identifiant, ex. `16X BTM`) ;
-- **ILS** par piste (ex. `110.30 MHz`).
+- the **coordinates** (CRP, runway thresholds);
+- **Tower**, **Radar**, **Final/Precision**;
+- **TACAN** (channel + identifier, e.g. `16X BTM`);
+- **ILS** per runway (e.g. `110.30 MHz`).
 
-Le jeu de données embarqué (`internal/aerodrome/data/*.json`) a été **extrait des
-cartes fournies** dans `maps_dcs/`, pas inventé. Chaque entrée référence les noms
-de fichiers de ses cartes, pour retrouver le document d'origine.
+The embedded dataset (`internal/aerodrome/data/*.json`) was **extracted from the
+charts provided** in `maps_dcs/`, not invented. Each entry references the file
+names of its charts, so the original document can be found again.
 
-## Périmètre actuel
+## Current scope
 
-**Caucase** : 21 terrains (Kobuleti, Senaki, Kutaisi, Batumi, Tbilissi Lochini et
+**Caucasus**: 21 airfields (Kobuleti, Senaki, Kutaisi, Batumi, Tbilissi Lochini and
 Soganlug, Vaziani, Gudauta, Sukhumi, Anapa, Gelendzhik, Maykop, Krasnodar
-Pashkovsky et Center, Novorossiysk, Krymsk, Mineralnye Vody, Nalchik, Beslan,
+Pashkovsky and Center, Novorossiysk, Krymsk, Mineralnye Vody, Nalchik, Beslan,
 Sochi-Adler, Mozdok).
 
-Le format est **générique** : ajouter un théâtre = déposer un
-`internal/aerodrome/data/<theatre>.json` sur le même modèle, rien d'autre à
-changer.
+The format is **generic**: adding a theatre = dropping a
+`internal/aerodrome/data/<theatre>.json` following the same model, nothing else to
+change.
 
-## Modèle
+## Model
 
 ```json
 {
@@ -48,40 +48,40 @@ changer.
 
 | Route | Description |
 |---|---|
-| `GET /api/aerodromes` | Tous les terrains (tous théâtres) |
-| `GET /api/aerodromes?theatre=Caucasus` | Filtré par théâtre |
-| `GET /api/aerodromes?lat=..&lng=..` | Annoté d'une **distance** et trié par proximité |
-| `GET /api/aerodromes/UGSB` | Un terrain par code (insensible à la casse) |
+| `GET /api/aerodromes` | All airfields (all theatres) |
+| `GET /api/aerodromes?theatre=Caucasus` | Filtered by theatre |
+| `GET /api/aerodromes?lat=..&lng=..` | Annotated with a **distance** and sorted by proximity |
+| `GET /api/aerodromes/UGSB` | A single airfield by code (case-insensitive) |
 
 ## Interface
 
-Nouvel onglet **Aérodromes** :
+New **Aerodromes** tab:
 
-- liste filtrable par **nom, code OACI ou TACAN** ;
-- bouton **« Proches de moi »** : trie par distance à l'appareil du joueur ;
-- fiche détaillée : coalition, coordonnées, élévation, piste, **Tower**, **TACAN**,
-  **ILS** par piste, et la liste des **cartes** disponibles ;
-- case **« Sur la carte »** : affiche les terrains comme marqueurs, avec les
-  fréquences en infobulle.
+- list filterable by **name, ICAO code or TACAN**;
+- **“Near me”** button: sorts by distance to the player's aircraft;
+- detail sheet: coalition, coordinates, elevation, runway, **Tower**, **TACAN**,
+  **ILS** per runway, and the list of available **charts**;
+- **“On the map”** checkbox: shows the airfields as markers, with the
+  frequencies in a tooltip.
 
-## Cartes
+## Charts
 
-Les scans ne sont **pas embarqués** dans le binaire (≈1,2 Go). Le JSON référence
-leur nom de fichier dans `maps_dcs/` ; c'est volontaire, pour garder le binaire
-léger et ne pas redistribuer des documents potentiellement sous droits.
+The scans are **not embedded** in the binary (≈1.2 GB). The JSON references
+their file name in `maps_dcs/`; this is deliberate, to keep the binary
+light and not redistribute documents potentially under copyright.
 
-## Limites assumées
+## Accepted limitations
 
-- Les fréquences **Radar** et **Final/Precision** sont présentes sur les cartes
-  mais souvent **vides** en 2012 (elles n'étaient pas encore attribuées) : les
-  entrées correspondantes sont omises plutôt que remplies arbitrairement.
-- Les coordonnées proviennent de la ligne `RWY` des cartes et ont été converties
-  en degrés décimaux ; le **CRP** (point de référence) peut différer légèrement du
-  centre visuel du terrain.
-- Seul le **Caucase** est renseigné pour l'instant.
+- **Radar** and **Final/Precision** frequencies are present on the charts
+  but often **empty** in 2012 (they had not yet been assigned): the
+  corresponding entries are omitted rather than filled arbitrarily.
+- The coordinates come from the `RWY` line of the charts and were converted
+  to decimal degrees; the **CRP** (reference point) may differ slightly from the
+  visual centre of the airfield.
+- Only the **Caucasus** is populated for now.
 
 ## Tests
 
-`internal/aerodrome` : chargement, terrain connu (Batumi : Tower 131.0, TACAN
-`16X BTM`, ILS 110.3), complétude (id/nom/théâtre/coordonnées/fréquence
-présents), tri par nom, filtrage par théâtre.
+`internal/aerodrome`: loading, known airfield (Batumi: Tower 131.0, TACAN
+`16X BTM`, ILS 110.3), completeness (id/name/theatre/coordinates/frequency
+present), sorting by name, filtering by theatre.

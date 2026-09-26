@@ -52,17 +52,17 @@ func (s *Server) handleAerodromes(w http.ResponseWriter, r *http.Request) {
 // handleAerodrome returns one airfield by id (case-insensitive).
 func (s *Server) handleAerodrome(w http.ResponseWriter, r *http.Request) {
 	if s.aerodromes == nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "données indisponibles"})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "data unavailable"})
 		return
 	}
 	id := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/api/aerodromes/"))
 	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "identifiant manquant"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing id"})
 		return
 	}
 	a, ok := s.aerodromes.ByID(id)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "aérodrome introuvable"})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "airfield not found"})
 		return
 	}
 	writeJSON(w, http.StatusOK, a)

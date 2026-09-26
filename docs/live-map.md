@@ -1,31 +1,31 @@
 # Live map
 
-## Ce qui est affiché
+## What is displayed
 
-La carte reçoit l'état complet des unités via **Server-Sent Events** (`GET /api/events`),
-rafraîchi côté serveur une fois par seconde. Chaque unité porte :
+The map receives the full state of units via **Server-Sent Events** (`GET /api/events`),
+refreshed server-side once per second. Each unit carries:
 
-| Champ | Description |
+| Field | Description |
 |---|---|
-| `id` | Identifiant runtime DCS (`ownship` pour le joueur) |
-| `type` | **Type DCS exact** (`F-16C_50`, `T-72B`, `SA-10`, `USS_Arleigh_Burke`…) |
-| `label` | Nom optionnel (pseudo du pilote pour l'appareil du joueur) |
-| `category` | Famille : `plane`, `heli`, `ground`, `ship`, `structure`, `other` |
+| `id` | DCS runtime identifier (`ownship` for the player) |
+| `type` | **Exact DCS type** (`F-16C_50`, `T-72B`, `SA-10`, `USS_Arleigh_Burke`…) |
+| `label` | Optional name (pilot's callsign for the player's aircraft) |
+| `category` | Family: `plane`, `heli`, `ground`, `ship`, `structure`, `other` |
 | `coalition` | `blue`, `red`, `neutral` |
-| `country` | Pays DCS |
+| `country` | DCS country |
 | `lat`, `lng`, `alt` | Position |
-| `heading` | Cap en degrés |
-| `ownship` | `true` pour l'appareil du joueur |
-| `ageMs` | Ancienneté de la dernière mise à jour |
+| `heading` | Heading in degrees |
+| `ownship` | `true` for the player's aircraft |
+| `ageMs` | Age of the last update |
 
-## Classification des engins
+## Vehicle classification
 
-La famille (`category`) est déduite du **type DCS** par des règles heuristiques
-(`backend/internal/category`). Ces règles couvrent l'essentiel, mais peuvent être
-**surchargées** précisément, par un fichier JSON :
+The family (`category`) is inferred from the **DCS type** by heuristic rules
+(`backend/internal/category`). These rules cover the essentials, but can be
+**overridden** precisely, via a JSON file:
 
 ```jsonc
-// categories.json (chemin via DCSMM_CATEGORIES, défaut ./categories.json)
+// categories.json (path via DCSMM_CATEGORIES, default ./categories.json)
 {
   "F-16C_50": "plane",
   "SA-10": "ground",
@@ -33,37 +33,37 @@ La famille (`category`) est déduite du **type DCS** par des règles heuristique
 }
 ```
 
-Un modèle est fourni : `categories.example.json`.
+A template is provided: `categories.example.json`.
 
-## Filtres et recherche
+## Filters and search
 
-- **Coalitions** : Bleu / Rouge / Neutre, avec compteurs en direct.
-- **Catégories** : Avions / Hélicoptères / Sol / Navires / Structures / Autres.
-- **Recherche** : porte sur le type, le nom et le pays.
-- **Mon appareil uniquement** : ne garde que le joueur.
-- **Traces de vol** : polylignes pour avions et hélicoptères.
+- **Coalitions**: Blue / Red / Neutral, with live counters.
+- **Categories**: Planes / Helicopters / Ground / Ships / Structures / Others.
+- **Search**: covers the type, the name and the country.
+- **My aircraft only**: keeps only the player.
+- **Flight trails**: polylines for planes and helicopters.
 
-Tous les filtres sont appliqués **côté navigateur** ; l'API expose aussi les mêmes
-critères en paramètres de requête (`?category=`, `?coalition=`, `?ownship=true`, `?q=`).
+All filters are applied **in the browser**; the API also exposes the same
+criteria as query parameters (`?category=`, `?coalition=`, `?ownship=true`, `?q=`).
 
-## Traces de vol
+## Flight trails
 
-Les traces sont conservées côté client (120 points glissants par appareil), donc
-elles se remplissent au fil de la session et ne survivent pas à un rechargement.
-L'historique persistant (rejouable) relève de la Phase 3/4.
+Trails are kept client-side (120 rolling points per aircraft), so
+they fill up over the session and do not survive a reload.
+Persistent (replayable) history belongs to Phase 3/4.
 
-## Tuiles de carte
+## Map tiles
 
-Par ordre de priorité :
+In priority order:
 
-1. **Tuiles DCS authentiques** — si un dossier `<tilesDir>/<theatre>/` existe, le
-   backend les sert via `/api/tiles/<theatre>/<z>/<x>/<y>.png` et la carte les utilise.
-2. **Fond de carte réel** — sinon, un fond OSM (ou l'URL de `DCSMM_BASEMAP_URL`) sert
-   de repli.
+1. **Authentic DCS tiles** — if a `<tilesDir>/<theatre>/` folder exists, the
+   backend serves it via `/api/tiles/<theatre>/<z>/<x>/<y>.png` and the map uses it.
+2. **Real basemap** — otherwise, an OSM basemap (or the URL from `DCSMM_BASEMAP_URL`) serves
+   as a fallback.
 
-L'extracteur `tools/export-tiles.py` découpe une image de carte géoréférencée en
-tuiles au format attendu. L'export direct depuis DCS (captures F10 multi-zoom) est
-prévu comme évolution.
+The `tools/export-tiles.py` extractor slices a georeferenced map image into
+tiles in the expected format. Direct export from DCS (multi-zoom F10 captures) is
+planned as an evolution.
 
 ```bash
 python tools/export-tiles.py \
@@ -72,9 +72,9 @@ python tools/export-tiles.py \
   --min-zoom 2 --max-zoom 6 --out ./tiles
 ```
 
-## Choix : SSE plutôt que WebSocket
+## Choice: SSE rather than WebSocket
 
-Les mises à jour de la Phase 1 sont **descendantes uniquement**. SSE s'intègre
-nativement au navigateur (`EventSource`), se reconnecte tout seul et évite la
-complexité d'un WebSocket. Le canal **bidirectionnel** (commandes vers DCS) arrivera
-en Phase 2 via un socket TCP dédié côté Lua.
+Phase 1 updates are **downstream only**. SSE integrates
+natively with the browser (`EventSource`), reconnects on its own and avoids the
+complexity of a WebSocket. The **bidirectional** channel (commands to DCS) will arrive
+in Phase 2 via a dedicated TCP socket on the Lua side.

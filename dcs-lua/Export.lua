@@ -1,34 +1,34 @@
 --[[
   DCS Mission Manager — Export.lua
   ------------------------------------------------------------------
-  Envoie au backend, en UDP/JSON :
-    - la position du joueur (message "ownship") ;
-    - la liste des objets du monde (message "world"), filtrée pour
-      ne garder que les unités utiles à la live map.
+  Sends to the backend, over UDP/JSON:
+    - the player position ("ownship" message);
+    - the list of world objects ("world" message), filtered to
+      keep only the units useful to the live map.
 
-  Tout est échantillonné à intervalle régulier via
-  LuaExportActivityNextEvent, sans jamais bloquer une frame.
+  Everything is sampled at a regular interval via
+  LuaExportActivityNextEvent, without ever blocking a frame.
 
-  Installation : `dcsmm install-lua` fusionne ce bloc dans ton Export.lua
-  existant (Tacview, SRS, DCS-BIOS…) en le plaçant entre les marqueurs DCSMM.
-  Ne supprime pas les marqueurs : ils servent à la mise à jour et à la
-  désinstallation (`dcsmm uninstall-lua`).
+  Installation: `dcsmm install-lua` merges this block into your existing
+  Export.lua (Tacview, SRS, DCS-BIOS...) by placing it between the DCSMM
+  markers. Do not remove the markers: they are used for updating and
+  uninstalling (`dcsmm uninstall-lua`).
 
-  Prérequis : Config/dcsmm.cfg présent dans Saved Games\DCS\Config\
+  Prerequisite: Config/dcsmm.cfg present in Saved Games\DCS\Config\
 
-  Options (dcsmm.cfg) :
-    dcsmm_send_interval   intervalle d'envoi du joueur, en secondes (défaut 1.0)
-    dcsmm_world_interval  intervalle d'envoi du monde, en secondes (défaut 2.0)
-    dcsmm_world_enabled   activer/désactiver l'export du monde (défaut true)
-    dcsmm_world_radius    rayon max en km autour du joueur (0 = pas de limite)
-    dcsmm_max_objects     nombre max d'objets par message (défaut 800)
-    dcsmm_coalitions      liste des coalitions à inclure (défaut {"blue","red"})
+  Options (dcsmm.cfg):
+    dcsmm_send_interval   player send interval, in seconds (default 1.0)
+    dcsmm_world_interval  world send interval, in seconds (default 2.0)
+    dcsmm_world_enabled   enable/disable the world export (default true)
+    dcsmm_world_radius    max radius in km around the player (0 = no limit)
+    dcsmm_max_objects     max number of objects per message (default 800)
+    dcsmm_coalitions      list of coalitions to include (default {"blue","red"})
 ]]
 
--- >>> DCSMM-BEGIN (bloc géré automatiquement — ne pas éditer à la main) >>>
+-- >>> DCSMM-BEGIN (managed block — do not edit by hand) >>>
 do
   ---------------------------------------------------------------------------
-  -- Journalisation défensive
+  -- Defensive logging
   ---------------------------------------------------------------------------
   local function say(msg)
     if log and log.write then
@@ -72,7 +72,7 @@ do
 
   local socket_ok, socket = pcall(require, "socket")
   if not socket_ok then
-    say("LuaSocket introuvable, export désactivé")
+    say("LuaSocket not found, export disabled")
     return
   end
 
@@ -81,7 +81,7 @@ do
 
   local function connect()
     conn = socket.udp()
-    conn:setpayloadsize(65507)          -- maximise la taille des datagrammes
+    conn:setpayloadsize(65507)          -- maximize datagram size
     conn:setpeername(host, udpPort)
   end
 
@@ -91,8 +91,8 @@ do
   end
 
   ---------------------------------------------------------------------------
-  -- Encodage JSON minimal (les chaînes DCS ne contiennent pas de caractères
-  -- exotiques, mais on échappe tout de même les caractères sensibles).
+  -- Minimal JSON encoding (DCS strings don't contain exotic characters,
+  -- but we still escape sensitive characters).
   ---------------------------------------------------------------------------
   local function jsonEscape(s)
     return tostring(s):gsub('[%z\1-\31\\"]', function(c)
@@ -106,10 +106,10 @@ do
   end
 
   ---------------------------------------------------------------------------
-  -- Position du joueur (+ télémétrie avancée si autorisée par le serveur)
+  -- Player position (+ advanced telemetry if allowed by the server)
   ---------------------------------------------------------------------------
-  -- L'export "ownship" (vitesse, G, incidence…) dépend d'une option serveur.
-  -- On teste sa disponibilité une fois et on l'utilise si possible.
+  -- The "ownship" export (speed, G, AoA...) depends on a server option.
+  -- We test its availability once and use it if possible.
   local ownshipExportAllowed = nil
   local function checkOwnshipExport()
     if ownshipExportAllowed ~= nil then return ownshipExportAllowed end
@@ -123,7 +123,7 @@ do
     return ownshipExportAllowed
   end
 
-  -- Accès défensif aux fonctions d'export (globales ou dans Export.).
+  -- Defensive access to export functions (global or inside Export.).
   local function exportFn(name)
     return _G[name] or (Export and Export[name])
   end
@@ -147,9 +147,9 @@ do
     ownshipLat = data.LatLongAlt.Lat
     ownshipLng = data.LatLongAlt.Long
 
-    -- Télémétrie avancée, uniquement si le serveur l'autorise. On construit la
-    -- charge JSON directement : les champs optionnels ne sont ajoutés que s'ils
-    -- sont réellement disponibles.
+    -- Advanced telemetry, only if the server allows it. We build the JSON
+    -- payload directly: optional fields are only added if they are actually
+    -- available.
     local extra = ""
     if checkOwnshipExport() then
       local tas = tryCall(exportFn("LoGetTrueAirSpeed"), 0)
@@ -185,9 +185,9 @@ do
   end
 
   ---------------------------------------------------------------------------
-  -- Objets du monde
+  -- World objects
   ---------------------------------------------------------------------------
-  -- Distance approximative en km (suffisante pour un filtre de rayon).
+  -- Approximate distance in km (good enough for a radius filter).
   local function approxDistanceKm(lat1, lng1, lat2, lng2)
     local dLat = (lat2 - lat1) * 111.0
     local dLng = (lng2 - lng1) * 111.0 * math.cos(math.rad(lat1))
@@ -195,13 +195,13 @@ do
   end
 
   local function sendWorld()
-    -- Selon l'état Lua, les fonctions d'export sont globales (LoGet…) ou
-    -- regroupées dans le namespace Export. ; on résout les deux.
+    -- Depending on the Lua state, the export functions are global (LoGet...) or
+    -- grouped in the Export. namespace; we resolve both.
     local getWorld = LoGetWorldObjects or (Export and Export.LoGetWorldObjects)
     local isAllowed = LoIsObjectExportAllowed or (Export and Export.LoIsObjectExportAllowed)
     if not getWorld then return end
 
-    -- En multijoueur, l'export d'objets dépend d'une option serveur.
+    -- In multiplayer, object export depends on a server option.
     if isAllowed then
       local ok, res = pcall(isAllowed)
       if ok and res == false then return end
@@ -250,7 +250,7 @@ do
   function LuaExportStart()
     if not enabled then return end
     pcall(connect)
-    say("export activé (" .. host .. ":" .. tostring(udpPort) .. ")")
+    say("export enabled (" .. host .. ":" .. tostring(udpPort) .. ")")
   end
 
   function LuaExportStop()
@@ -262,7 +262,7 @@ do
     pcall(sendOwnship)
 
     if worldEnabled then
-      -- On décale le premier envoi du monde pour ne pas tout envoyer d'un coup.
+      -- We delay the first world send so we don't send everything at once.
       if not nextWorldAt then nextWorldAt = t + 0.5 end
       if t >= nextWorldAt then
         pcall(sendWorld)

@@ -1,10 +1,10 @@
 // tools/send-debrief.mjs
 //
-// Envoie un debrief.log au backend via le canal TCP, comme le ferait
-// Hooks/dcsmm.lua à la fin d'une mission (découpage + base64).
+// Sends a debrief.log to the backend over the TCP channel, just like
+// Hooks/dcsmm.lua would at the end of a mission (chunking + base64).
 //
-// Usage :
-//   node tools/send-debrief.mjs [chemin] [host] [port]
+// Usage:
+//   node tools/send-debrief.mjs [path] [host] [port]
 //   node tools/send-debrief.mjs "%USERPROFILE%\Saved Games\DCS\Logs\debrief.log"
 //   node tools/send-debrief.mjs sample.debrief.log 127.0.0.1 7779
 
@@ -25,8 +25,8 @@ const host = process.argv[3] ?? '127.0.0.1';
 const port = Number(process.argv[4] ?? 7779);
 
 if (!fs.existsSync(file)) {
-  console.error(`Fichier introuvable : ${file}`);
-  console.error('Usage : node tools/send-debrief.mjs [chemin] [host] [port]');
+  console.error(`File not found: ${file}`);
+  console.error('Usage: node tools/send-debrief.mjs [path] [host] [port]');
   process.exit(1);
 }
 
@@ -36,7 +36,7 @@ const chunks = Math.ceil(data.length / CHUNK);
 const transferId = `cli-${Date.now()}`;
 const missionName = path.basename(file);
 
-console.log(`${file} → ${host}:${port} (${data.length} octets, ${chunks} morceau(x))`);
+console.log(`${file} → ${host}:${port} (${data.length} bytes, ${chunks} chunk(s))`);
 
 const socket = net.createConnection({ host, port }, () => {
   for (let i = 0; i < chunks; i++) {
@@ -56,8 +56,8 @@ const socket = net.createConnection({ host, port }, () => {
   socket.end();
 });
 
-socket.on('close', () => console.log('Envoyé.'));
+socket.on('close', () => console.log('Sent.'));
 socket.on('error', (err) => {
-  console.error(`Erreur : ${err.message}`);
+  console.error(`Error: ${err.message}`);
   process.exit(1);
 });

@@ -1,15 +1,15 @@
-# Dépendances et artefacts de build frontend
+# Frontend build dependencies and artifacts
 frontend/node_modules
 frontend/dist
 
-# Build Go
+# Go build output
 backend/dcsmm
 backend/dcsmm.exe
 
-# Données locales
+# Local data
 data
 
-# Divers
+# Misc
 .git
 .gitignore
 deploy/docker-compose.yml

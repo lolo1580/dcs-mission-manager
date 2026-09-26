@@ -23,18 +23,18 @@ func (s *Server) handleDebriefs(w http.ResponseWriter, r *http.Request) {
 // handleDebrief returns one debrief, including its raw text when ?raw=1.
 func (s *Server) handleDebrief(w http.ResponseWriter, r *http.Request) {
 	if s.db == nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "persistance désactivée"})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "persistence disabled"})
 		return
 	}
 	idText := strings.TrimPrefix(r.URL.Path, "/api/debriefs/")
 	id, err := strconv.ParseInt(idText, 10, 64)
 	if err != nil || id <= 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "identifiant invalide"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
 		return
 	}
 	rec, err := s.db.Debrief(id)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "débrief introuvable"})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "debrief not found"})
 		return
 	}
 	if r.URL.Query().Get("raw") == "1" {

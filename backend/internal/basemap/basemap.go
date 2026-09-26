@@ -30,7 +30,7 @@ var builtin = []Basemap{
 		ID:          "satellite",
 		Name:        "Satellite",
 		URL:         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-		Attribution: "Imagerie © Esri, Maxar, Earthstar Geographics",
+		Attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
 		MaxZoom:     19,
 	},
 	{
@@ -43,7 +43,7 @@ var builtin = []Basemap{
 	},
 	{
 		ID:          "osm",
-		Name:        "Routier",
+		Name:        "Road",
 		URL:         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 		Attribution: "© OpenStreetMap contributors",
 		MaxZoom:     19,
@@ -51,7 +51,7 @@ var builtin = []Basemap{
 	},
 	{
 		ID:          "dark",
-		Name:        "Sombre",
+		Name:        "Dark",
 		URL:         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 		Attribution: "© OpenStreetMap contributors",
 		MaxZoom:     19,
@@ -67,9 +67,9 @@ func All(customURL string) []Basemap {
 	if customURL != "" {
 		out = append(out, Basemap{
 			ID:          "custom",
-			Name:        "Personnalisé",
+			Name:        "Custom",
 			URL:         customURL,
-			Attribution: "Fond de carte personnalisé",
+			Attribution: "Custom basemap",
 			MaxZoom:     19,
 		})
 	}

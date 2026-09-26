@@ -59,17 +59,22 @@ export function unitIcon(L, unit) {
   });
 }
 
+/**
+ * Legacy label maps are kept for backward compatibility with components that
+ * still import them. Prefer `$t('category.' + id)` / `$t('coalition.' + id)`
+ * so labels follow the selected language.
+ */
 export const CATEGORY_LABELS = {
-  plane: 'Avion',
-  heli: 'Hélicoptère',
-  ground: 'Véhicule',
-  ship: 'Navire',
+  plane: 'Aircraft',
+  heli: 'Helicopter',
+  ground: 'Vehicle',
+  ship: 'Ship',
   structure: 'Structure',
-  other: 'Objet',
+  other: 'Object',
 };
 
 export const COALITION_LABELS = {
-  blue: 'Bleu',
-  red: 'Rouge',
-  neutral: 'Neutre',
+  blue: 'Blue',
+  red: 'Red',
+  neutral: 'Neutral',
 };

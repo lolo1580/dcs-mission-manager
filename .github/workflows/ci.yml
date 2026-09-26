@@ -36,7 +36,7 @@ jobs:
         run: |
           unformatted="$(gofmt -l .)"
           if [ -n "$unformatted" ]; then
-            echo "::error::Ces fichiers ne sont pas formatés (gofmt) :"
+            echo "::error::These files are not gofmt-formatted:"
             echo "$unformatted"
             exit 1
           fi
@@ -123,5 +123,5 @@ jobs:
           curl -fsS http://127.0.0.1:8080/api/health
           # The embedded UI must be served, not the fallback page.
           curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="app">'
-          echo "OK: interface embarquée servie"
+          echo "OK: embedded UI is served"
           kill $DCSMM_PID

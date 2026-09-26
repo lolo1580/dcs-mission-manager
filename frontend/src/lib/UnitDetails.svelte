@@ -1,6 +1,7 @@
 <script>
   import { selectedUnit, selectedId } from './units.js';
-  import { coalitionColor, CATEGORY_LABELS, COALITION_LABELS } from './icons.js';
+  import { coalitionColor } from './icons.js';
+  import { t } from './i18n.js';
 
   function fmt(v, digits = 0) {
     return typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: digits }) : '—';
@@ -13,20 +14,20 @@
     <header>
       <span class="dot" style="background:{coalitionColor(u.coalition)}"></span>
       <strong>{u.label || u.type}</strong>
-      <button class="close" title="Fermer" on:click={() => selectedId.set(null)}>×</button>
+      <button class="close" title={$t('unit.close')} on:click={() => selectedId.set(null)}>×</button>
     </header>
 
     <dl>
-      <div><dt>Type</dt><dd>{u.type}</dd></div>
-      <div><dt>Catégorie</dt><dd>{CATEGORY_LABELS[u.category] ?? u.category}</dd></div>
-      <div><dt>Coalition</dt><dd>{COALITION_LABELS[u.coalition] ?? u.coalition}</dd></div>
-      {#if u.country}<div><dt>Pays</dt><dd>{u.country}</dd></div>{/if}
-      <div><dt>Latitude</dt><dd>{fmt(u.lat, 5)}</dd></div>
-      <div><dt>Longitude</dt><dd>{fmt(u.lng, 5)}</dd></div>
-      <div><dt>Altitude</dt><dd>{fmt(u.alt)} m</dd></div>
-      <div><dt>Cap</dt><dd>{fmt(u.heading)}°</dd></div>
-      <div><dt>Mise à jour</dt><dd>{u.ageMs} ms</dd></div>
-      {#if u.ownship}<div><dt>Rôle</dt><dd>Mon appareil</dd></div>{/if}
+      <div><dt>{$t('unit.type')}</dt><dd>{u.type}</dd></div>
+      <div><dt>{$t('unit.category')}</dt><dd>{$t('category.' + u.category)}</dd></div>
+      <div><dt>{$t('unit.coalition')}</dt><dd>{$t('coalition.' + u.coalition)}</dd></div>
+      {#if u.country}<div><dt>{$t('unit.country')}</dt><dd>{u.country}</dd></div>{/if}
+      <div><dt>{$t('unit.latitude')}</dt><dd>{fmt(u.lat, 5)}</dd></div>
+      <div><dt>{$t('unit.longitude')}</dt><dd>{fmt(u.lng, 5)}</dd></div>
+      <div><dt>{$t('unit.altitude')}</dt><dd>{fmt(u.alt)} m</dd></div>
+      <div><dt>{$t('unit.heading')}</dt><dd>{fmt(u.heading)}°</dd></div>
+      <div><dt>{$t('unit.updated')}</dt><dd>{u.ageMs} ms</dd></div>
+      {#if u.ownship}<div><dt>{$t('unit.role')}</dt><dd>{$t('unit.ownship')}</dd></div>{/if}
     </dl>
   </div>
 {/if}

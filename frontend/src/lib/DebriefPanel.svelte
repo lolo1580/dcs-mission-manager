@@ -11,6 +11,7 @@
     loadDebrief,
     fmtTime,
   } from './debriefs.js';
+  import { t } from './i18n.js';
 
   onMount(loadDebriefList);
 
@@ -38,27 +39,27 @@
     }
   }
 
-  function describe(e) {
+  function describe(tr, e) {
     const who = e.initiatorPilot || '?';
     switch (e.type) {
       case 'takeoff':
-        return `${who} a décollé de ${e.placeDisplayName || e.place || '?'}`;
+        return tr('events.tookOff', { pilot: who, place: e.placeDisplayName || e.place || '?' });
       case 'land':
       case 'landing':
-        return `${who} a atterri à ${e.placeDisplayName || e.place || '?'}`;
+        return tr('events.landed', { pilot: who, place: e.placeDisplayName || e.place || '?' });
       case 'kill':
       case 'shot down':
-        return `${who} a détruit ${e.target || '?'} (${e.weapon || '?'})`;
+        return tr('debriefs.killed', { pilot: who, target: e.target || '?', weapon: e.weapon || '?' });
       case 'crash':
-        return `${who} a crashé`;
+        return tr('debriefs.crashed', { pilot: who });
       case 'eject':
-        return `${who} s'est éjecté`;
+        return tr('debriefs.ejected', { pilot: who });
       case 'pilot dead':
-        return `${who} est mort`;
+        return tr('debriefs.died', { pilot: who });
       case 'engine shutdown':
-        return `${who} a coupé les moteurs à ${e.placeDisplayName || e.place || '?'}`;
+        return tr('debriefs.engineShutdown', { pilot: who, place: e.placeDisplayName || e.place || '?' });
       case 'mission end':
-        return `Fin de mission — ${e.comment || ''}`;
+        return tr('debriefs.missionEnd', { comment: e.comment || '' });
       default:
         return who !== '?' ? `${who}` : '';
     }
@@ -68,9 +69,9 @@
 <section class="debriefs">
   <header>
     <h2>
-      Débriefs <span class="count">{$debriefList.length}</span>
+      {$t('debriefs.title')} <span class="count">{$debriefList.length}</span>
     </h2>
-    <button class="refresh" on:click={loadDebriefList}>Rafraîchir</button>
+    <button class="refresh" on:click={loadDebriefList}>{$t('debriefs.refresh')}</button>
   </header>
 
   {#if $debriefError}
@@ -79,8 +80,7 @@
 
   {#if $debriefList.length === 0}
     <p class="empty">
-      Aucun débrief enregistré. À la fin d'une mission, <code>Hooks/dcsmm.lua</code>
-      envoie <code>debrief.log</code> au backend.
+      {$t('debriefs.none')}
     </p>
   {:else}
     <div class="split">
@@ -88,9 +88,9 @@
         {#each $debriefList as d (d.id)}
           <li>
             <button class:selected={$debrief?.id === d.id} on:click={() => loadDebrief(d.id)}>
-              <span class="name">{d.mission || d.parsed?.callsign || `Débrief #${d.id}`}</span>
+              <span class="name">{d.mission || d.parsed?.callsign || $t('debriefs.label', { id: d.id })}</span>
               <span class="sub">
-                {dateOf(d.createdAt)} · {d.parsed?.summary?.kills ?? 0} kills ·
+                {dateOf(d.createdAt)} · {d.parsed?.summary?.kills ?? 0} {$t('debriefs.kills')} ·
                 {fmtTime(d.parsed?.missionTime ?? 0)}
               </span>
             </button>
@@ -100,26 +100,26 @@
 
       <div class="detail">
         {#if $debriefLoading}
-          <p class="empty">Chargement…</p>
+          <p class="empty">{$t('debriefs.loading')}</p>
         {:else if $debrief}
           {@const s = $debrief.parsed?.summary}
-          <h3>{$debrief.mission || $debrief.parsed?.callsign || `Débrief #${$debrief.id}`}</h3>
+          <h3>{$debrief.mission || $debrief.parsed?.callsign || $t('debriefs.label', { id: $debrief.id })}</h3>
 
           <div class="stats">
-            <div><span>{s?.takeoffs ?? 0}</span>Décollages</div>
-            <div><span>{s?.landings ?? 0}</span>Atterrissages</div>
-            <div><span>{s?.kills ?? 0}</span>Kills</div>
-            <div><span>{s?.crashes ?? 0}</span>Crashes</div>
-            <div><span>{s?.ejections ?? 0}</span>Éjections</div>
-            <div><span>{fmtTime($debrief.parsed?.missionTime ?? 0)}</span>Durée</div>
+            <div><span>{s?.takeoffs ?? 0}</span>{$t('debriefs.takeoffs')}</div>
+            <div><span>{s?.landings ?? 0}</span>{$t('debriefs.landings')}</div>
+            <div><span>{s?.kills ?? 0}</span>{$t('debriefs.kills')}</div>
+            <div><span>{s?.crashes ?? 0}</span>{$t('debriefs.crashes')}</div>
+            <div><span>{s?.ejections ?? 0}</span>{$t('debriefs.ejections')}</div>
+            <div><span>{fmtTime($debrief.parsed?.missionTime ?? 0)}</span>{$t('debriefs.duration')}</div>
           </div>
 
           {#if s?.pilots?.length}
-            <p class="pilots">Pilotes : {s.pilots.join(', ')}</p>
+            <p class="pilots">{$t('debriefs.pilots')}: {s.pilots.join(', ')}</p>
           {/if}
 
           <h4>
-            Chronologie
+            {$t('debriefs.timeline')}
             <span class="count">{$debriefEvents.length}</span>
           </h4>
           <ol>
@@ -128,12 +128,12 @@
                 <span class="t">{fmtTime(e.t)}</span>
                 <span class="bar" style="background:{eventColor(e.type)}"></span>
                 <span class="kind">{e.type}</span>
-                <span class="desc">{describe(e)}</span>
+                <span class="desc">{describe($t, e)}</span>
               </li>
             {/each}
           </ol>
         {:else}
-          <p class="empty">Sélectionne un débrief pour voir sa chronologie.</p>
+          <p class="empty">{$t('debriefs.select')}</p>
         {/if}
       </div>
     </div>

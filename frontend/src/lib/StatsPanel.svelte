@@ -16,7 +16,19 @@
     loadStats,
     fmtNum,
   } from './stats.js';
-  import { CATEGORY_LABELS } from './icons.js';
+  import { t } from './i18n.js';
+
+  const STAT_TAB_KEYS = {
+    pilots: 'stats.pilots',
+    weapons: 'stats.weapons',
+    engines: 'stats.engines',
+    balance: 'stats.balance',
+    network: 'stats.network',
+  };
+
+  function statTabKey(id) {
+    return STAT_TAB_KEYS[id] ?? id;
+  }
 
   onMount(loadStats);
 
@@ -32,16 +44,16 @@
 
 <section class="stats">
   <header>
-    <h2>Statistiques</h2>
+    <h2>{$t('stats.title')}</h2>
     <div class="scope">
       <button class:active={$scopeMode === 'career'} on:click={() => onScopeChange('career')}>
-        Carrière
+        {$t('stats.career')}
       </button>
       <button class:active={$scopeMode === 'mission'} on:click={() => onScopeChange('mission')}>
-        Mission
+        {$t('stats.mission')}
       </button>
     </div>
-    <button class="refresh" on:click={loadStats} disabled={$statsLoading}>Rafraîchir</button>
+    <button class="refresh" on:click={loadStats} disabled={$statsLoading}>{$t('stats.refresh')}</button>
   </header>
 
   {#if $statsError}
@@ -51,32 +63,32 @@
   {#if $statsOverview}
     {@const o = $statsOverview}
     <div class="cards">
-      <div><span>{o.missions}</span>Missions</div>
-      <div><span>{o.players}</span>Pilotes</div>
-      <div><span>{o.kills}</span>Kills</div>
-      <div><span>{o.deaths}</span>Morts</div>
-      <div><span>{o.crashes}</span>Crashes</div>
-      <div><span>{o.ejections}</span>Éjections</div>
-      <div class:warn={o.friendlyFire > 0}><span>{o.friendlyFire}</span>Friendly fire</div>
+      <div><span>{o.missions}</span>{$t('stats.missions')}</div>
+      <div><span>{o.players}</span>{$t('stats.pilots')}</div>
+      <div><span>{o.kills}</span>{$t('events.kills')}</div>
+      <div><span>{o.deaths}</span>{$t('stats.deaths')}</div>
+      <div><span>{o.crashes}</span>{$t('stats.crashes')}</div>
+      <div><span>{o.ejections}</span>{$t('stats.ejections')}</div>
+      <div class:warn={o.friendlyFire > 0}><span>{o.friendlyFire}</span>{$t('events.friendlyFire')}</div>
     </div>
   {/if}
 
   <nav class="subtabs">
-    {#each STAT_TABS as t (t.id)}
-      <button class:active={$statTab === t.id} on:click={() => statTab.set(t.id)}>{t.label}</button>
+    {#each STAT_TABS as tab (tab.id)}
+      <button class:active={$statTab === tab.id} on:click={() => statTab.set(tab.id)}>{$t(statTabKey(tab.id))}</button>
     {/each}
   </nav>
 
   <div class="panel">
     {#if $statTab === 'pilots'}
       {#if $statsPilots.length === 0}
-        <p class="empty">Aucune donnée de pilote.</p>
+        <p class="empty">{$t('stats.noPilot')}</p>
       {:else}
         <table>
           <thead>
             <tr>
-              <th></th><th>Pilote</th><th>Score</th><th>Kills</th><th>Morts</th>
-              <th>K/D</th><th>Att.</th><th>Éject.</th><th>Crash</th><th>FF</th><th>Ping</th>
+              <th></th><th>{$t('players.pilot')}</th><th>{$t('players.score')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.deaths')}</th>
+              <th>K/D</th><th>{$t('stats.landings')}</th><th>{$t('stats.ejections')}</th><th>{$t('stats.crashes')}</th><th>{$t('stats.friendlyFire')}</th><th>{$t('stats.ping')}</th>
             </tr>
           </thead>
           <tbody>
@@ -100,11 +112,11 @@
       {/if}
     {:else if $statTab === 'weapons'}
       {#if $statsWeapons.length === 0}
-        <p class="empty">Aucune donnée d'arme. Les armes proviennent des événements de kill.</p>
+        <p class="empty">{$t('stats.noWeapon')}</p>
       {:else}
         <table>
           <thead>
-            <tr><th>Arme</th><th>Kills</th><th>FF</th><th>Cibles</th></tr>
+            <tr><th>{$t('stats.weapon')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.friendlyFire')}</th><th>{$t('stats.targets')}</th></tr>
           </thead>
           <tbody>
             {#each $statsWeapons as w (w.weapon)}
@@ -126,16 +138,16 @@
       <div class="cats">
         {#each ['plane', 'heli', 'ground', 'ship', 'structure', 'other'] as c (c)}
           <button class:active={$engineCategory === c} on:click={() => engineCategory.set(c)}>
-            {CATEGORY_LABELS[c] ?? c}
+            {$t('category.' + c)}
           </button>
         {/each}
       </div>
       {#if $enginesByCategory.length === 0}
-        <p class="empty">Aucun engin dans cette catégorie.</p>
+        <p class="empty">{$t('stats.noEngine')}</p>
       {:else}
         <table>
           <thead>
-            <tr><th>Type DCS</th><th>Kills</th><th>Pertes</th><th>Sorties</th><th>K/D</th></tr>
+            <tr><th>{$t('stats.type')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.losses')}</th><th>{$t('stats.sorties')}</th><th>K/D</th></tr>
           </thead>
           <tbody>
             {#each $enginesByCategory as e (e.typeId)}
@@ -152,31 +164,31 @@
       {/if}
     {:else if $statTab === 'balance'}
       {#if !$statsOverview?.coalitions?.length}
-        <p class="empty">Aucune donnée de coalition.</p>
+        <p class="empty">{$t('stats.noCoalition')}</p>
       {:else}
         {#each $statsOverview.coalitions as c (c.coalition)}
           {@const total = Math.max(...$statsOverview.coalitions.map((x) => x.score), 1)}
           <div class="balance-row">
-            <span class="side {c.coalition}">{c.coalition}</span>
+            <span class="side {c.coalition}">{$t('coalition.' + c.coalition)}</span>
             <div class="bar">
               <div
                 class="fill {c.coalition}"
                 style="width:{(c.score / total) * 100}%"
               ></div>
             </div>
-            <span class="num">{c.score} pts</span>
-            <span class="num">{c.kills} kills</span>
-            <span class="num">{c.players} joueurs</span>
+            <span class="num">{c.score} {$t('stats.points')}</span>
+            <span class="num">{c.kills} {$t('stats.killsCol')}</span>
+            <span class="num">{c.players} {$t('players.title')}</span>
           </div>
         {/each}
       {/if}
     {:else if $statTab === 'network'}
       {#if $statsNetwork.length === 0}
-        <p class="empty">Aucune donnée réseau.</p>
+        <p class="empty">{$t('stats.noNetwork')}</p>
       {:else}
         <table>
           <thead>
-            <tr><th>Pilote</th><th>Échantillons</th><th>Ping moyen</th><th>Ping max</th></tr>
+            <tr><th>{$t('players.pilot')}</th><th>{$t('stats.samples')}</th><th>{$t('stats.avgPing')}</th><th>{$t('stats.maxPing')}</th></tr>
           </thead>
           <tbody>
             {#each $statsNetwork as n (n.name)}

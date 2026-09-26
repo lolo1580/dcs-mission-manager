@@ -10,6 +10,7 @@
     fmtMHz,
     fmtCoords,
   } from './aerodromes.js';
+  import { t } from './i18n.js';
 
   let selected = null;
   let nearestFirst = false;
@@ -23,8 +24,8 @@
 
 <section class="aerodromes">
   <header>
-    <h2>Aérodromes <span class="count">{$filteredAerodromes.length}</span></h2>
-    <button class="refresh" on:click={loadAerodromes}>Rafraîchir</button>
+    <h2>{$t('aerodromes.title')} <span class="count">{$filteredAerodromes.length}</span></h2>
+    <button class="refresh" on:click={loadAerodromes}>{$t('aerodromes.refresh')}</button>
   </header>
 
   {#if $aerodromeError}
@@ -34,16 +35,16 @@
   <div class="controls">
     <input
       type="search"
-      placeholder="Rechercher (nom, code OACI, TACAN)…"
+      placeholder={$t('aerodromes.search')}
       value={$search}
       on:input={(e) => search.set(e.currentTarget.value)}
     />
-    <button class="nearest" on:click={useNearest} title="Trier par distance à mon appareil">
-      {nearestFirst ? 'Par distance' : 'Proches de moi'}
+    <button class="nearest" on:click={useNearest} title={$t('aerodromes.byDistance')}>
+      {nearestFirst ? $t('aerodromes.byDistance') : $t('aerodromes.nearest')}
     </button>
     <label class="onmap">
       <input type="checkbox" bind:checked={$showOnMap} />
-      Sur la carte
+      {$t('aerodromes.onMap')}
     </label>
   </div>
 
@@ -61,7 +62,7 @@
         </li>
       {/each}
       {#if $filteredAerodromes.length === 0}
-        <li class="empty">Aucun aérodrome</li>
+        <li class="empty">{$t('aerodromes.none')}</li>
       {/if}
     </ul>
 
@@ -69,11 +70,11 @@
       {#if selected}
         <h3>{selected.name} <span class="icao">{selected.id}</span></h3>
         <dl>
-          <div><dt>Coalition</dt><dd>{selected.coalition}</dd></div>
-          <div><dt>Coordonnées</dt><dd>{fmtCoords(selected)}</dd></div>
-          <div><dt>Élévation</dt><dd>{selected.elevationM} m</dd></div>
-          <div><dt>Piste</dt><dd>{selected.runway}</dd></div>
-          <div class="hl"><dt>Tower</dt><dd>{fmtMHz(selected.tower)}</dd></div>
+          <div><dt>{$t('aerodromes.coalition')}</dt><dd>{$t('coalition.' + selected.coalition)}</dd></div>
+          <div><dt>{$t('aerodromes.coordinates')}</dt><dd>{fmtCoords(selected)}</dd></div>
+          <div><dt>{$t('aerodromes.elevation')}</dt><dd>{selected.elevationM} m</dd></div>
+          <div><dt>{$t('aerodromes.runway')}</dt><dd>{selected.runway}</dd></div>
+          <div class="hl"><dt>{$t('aerodromes.tower')}</dt><dd>{fmtMHz(selected.tower)}</dd></div>
           {#if selected.tacan}
             <div class="hl"><dt>TACAN</dt><dd>{selected.tacan}</dd></div>
           {/if}
@@ -85,19 +86,18 @@
         </dl>
 
         {#if selected.charts?.length}
-          <h4>Cartes disponibles</h4>
+          <h4>{$t('aerodromes.charts')}</h4>
           <ul class="charts">
             {#each selected.charts as c (c)}
               <li>{c}</li>
             {/each}
           </ul>
           <p class="hint">
-            Les cartes se trouvent dans <code>maps_dcs/</code> (non embarquées
-            dans le binaire).
+            {$t('aerodromes.chartsHint')}
           </p>
         {/if}
       {:else}
-        <p class="empty">Sélectionne un aérodrome pour voir ses fréquences.</p>
+        <p class="empty">{$t('aerodromes.select')}</p>
       {/if}
     </div>
   </div>

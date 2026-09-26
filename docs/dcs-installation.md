@@ -1,8 +1,8 @@
-# Installation côté DCS
+# DCS-side installation
 
-## Où sont les fichiers
+## Where the files are
 
-DCS charge deux familles de scripts depuis le dossier *Saved Games* :
+DCS loads two families of scripts from the *Saved Games* folder:
 
 ```
 %USERPROFILE%\Saved Games\DCS\          (ou DCS.openbeta)
@@ -11,12 +11,12 @@ DCS charge deux familles de scripts depuis le dossier *Saved Games* :
 └─ Scripts\
     ├─ Export.lua         ← positions (live map)
     └─ Hooks\
-        └─ dcsmm.lua      ← événements, joueurs, chat
+        └─ dcsmm.lua      ← events, players, chat
 ```
 
-## Étape 1 — Configuration
+## Step 1 — Configuration
 
-Copie `dcs-lua/Config/dcsmm.cfg` vers `Saved Games\DCS\Config\dcsmm.cfg`, puis adapte :
+Copy `dcs-lua/Config/dcsmm.cfg` to `Saved Games\DCS\Config\dcsmm.cfg`, then adapt:
 
 ```lua
 dcsmm_host = "127.0.0.1"   -- IP LAN de la machine du manager si Docker ailleurs
@@ -26,57 +26,57 @@ dcsmm_enabled = true
 dcsmm_send_interval = 1.0
 ```
 
-## Étape 2 — Export.lua (live map)
+## Step 2 — Export.lua (live map)
 
-> ⚠️ **Ne jamais écraser** un `Export.lua` existant. Tacview, SRS et DCS-BIOS y
-> ajoutent tous leur propre code.
+> ⚠️ **Never overwrite** an existing `Export.lua`. Tacview, SRS and DCS-BIOS all
+> add their own code to it.
 
-### Cas A — tu n'as pas encore de `Saved Games\DCS\Scripts\Export.lua`
+### Case A — you don't yet have a `Saved Games\DCS\Scripts\Export.lua`
 
-Copie simplement `dcs-lua/Export.lua` à cet emplacement.
+Simply copy `dcs-lua/Export.lua` to that location.
 
-### Cas B — un `Export.lua` existe déjà
+### Case B — an `Export.lua` already exists
 
-1. Fais une sauvegarde horodatée :
+1. Make a timestamped backup:
    ```powershell
    Copy-Item "$env:USERPROFILE\Saved Games\DCS\Scripts\Export.lua" `
              "$env:USERPROFILE\Saved Games\DCS\Scripts\Export.lua.bak-$(Get-Date -Format yyyyMMdd)"
    ```
-2. Ouvre `dcs-lua/Export.lua` et copie **tout le bloc `do ... end`** (lignes internes,
-   sans les commentaires d'en-tête).
-3. Colle-le **à la fin** de ton `Export.lua` existant.
-4. Vérifie qu'il n'y a qu'une seule paire de fonctions `LuaExportStart` /
-   `LuaExportActivityNextEvent` active. Si ton fichier en définit déjà, fusionne
-   le contenu de `sendOwnship()` dans les tiennes.
+2. Open `dcs-lua/Export.lua` and copy **the entire `do ... end` block** (inner lines,
+   without the header comments).
+3. Paste it **at the end** of your existing `Export.lua`.
+4. Check that there is only one pair of active `LuaExportStart` /
+   `LuaExportActivityNextEvent` functions. If your file already defines one, merge
+   the content of `sendOwnship()` into it.
 
-## Étape 3 — Hooks (Phase 2, optionnel pour l'instant)
+## Step 3 — Hooks (Phase 2, optional for now)
 
-Copie `dcs-lua/Hooks/dcsmm.lua` vers `Saved Games\DCS\Scripts\Hooks\dcsmm.lua`.
-DCS charge automatiquement tous les `.lua` de ce dossier, triés par nom.
+Copy `dcs-lua/Hooks/dcsmm.lua` to `Saved Games\DCS\Scripts\Hooks\dcsmm.lua`.
+DCS automatically loads all the `.lua` files in this folder, sorted by name.
 
-## Étape 4 — Redémarrer DCS
+## Step 4 — Restart DCS
 
-Lance une mission. Dans les logs DCS, tu devrais voir :
+Start a mission. In the DCS logs, you should see:
 
 ```
-DCSMM: export des positions activé (127.0.0.1:7778)
+DCSMM: position export enabled (127.0.0.1:7778)
 ```
 
-## Dépannage
+## Troubleshooting
 
-| Symptôme | Piste |
+| Symptom | Clue |
 |---|---|
-| Rien dans les logs | `dcsmm.cfg` absent ou mal placé (doit être dans `Config\`) |
-| `LuaSocket introuvable` | Installation DCS incomplète ; LuaSocket est fourni avec DCS |
-| Le point n'apparaît pas | Backend non lancé, pare-feu, ou mauvais `dcsmm_host` (Docker) |
-| Le point saccadé en jeu | Augmenter `dcsmm_send_interval` |
+| Nothing in the logs | `dcsmm.cfg` missing or misplaced (it must be in `Config\`) |
+| `LuaSocket introuvable` | Incomplete DCS installation; LuaSocket ships with DCS |
+| The dot does not appear | Backend not started, firewall, or wrong `dcsmm_host` (Docker) |
+| The dot is jerky in game | Increase `dcsmm_send_interval` |
 
-## Test sans DCS
+## Test without DCS
 
-Un émetteur de test est fourni :
+A test emitter is provided:
 
 ```bash
 node tools/send-telemetry.mjs 127.0.0.1 7778
 ```
 
-Il simule quatre appareils tournant autour du Caucase.
+It simulates four aircraft flying around the Caucasus.

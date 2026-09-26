@@ -28,11 +28,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			Message string `json:"message"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil || body.Message == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "message manquant"})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing message"})
 			return
 		}
 		writeJSON(w, http.StatusNotImplemented, map[string]string{
-			"error": "envoi vers DCS pas encore disponible (canal de commandes à venir)",
+			"error": "sending to DCS not yet available (command channel coming soon)",
 		})
 		return
 	}

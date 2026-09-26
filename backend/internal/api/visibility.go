@@ -23,7 +23,7 @@ func (s *Server) ApplyMissionOptions(options map[string]any) {
 
 	s.visibility.SetMode(mode)
 	if s.visibility.Override() {
-		log.Printf("visibility: optionsView=%q -> %s (filtrage désactivé)", raw, mode)
+		log.Printf("visibility: optionsView=%q -> %s (filtering disabled)", raw, mode)
 		return
 	}
 	log.Printf("visibility: optionsView=%q -> %s", raw, mode)

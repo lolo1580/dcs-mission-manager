@@ -40,5 +40,9 @@
 .DS_Store
 Thumbs.db
 
+# Python bytecode (tools/)
+__pycache__/
+*.pyc
+
 # Local DCS scripts (never commit personal paths)
 dcs-lua/Config/dcsmm.local.cfg

@@ -42,7 +42,7 @@ func (s *Server) handleHeatmap(w http.ResponseWriter, r *http.Request) {
 		source = "positions"
 	}
 	if source != "positions" && source != "losses" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "source invalide"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid source"})
 		return
 	}
 	grid := 0.05

@@ -1,6 +1,7 @@
 <script>
-  import { players, sideKey, SIDE_LABELS } from './session.js';
+  import { players, sideKey } from './session.js';
   import { coalitionColor } from './icons.js';
+  import { t } from './i18n.js';
 
   function fmt(v) {
     return typeof v === 'number' ? v.toLocaleString() : '—';
@@ -9,20 +10,20 @@
 
 <section>
   <h2>
-    Joueurs <span class="count">{$players.length}</span>
+    {$t('players.title')} <span class="count">{$players.length}</span>
   </h2>
 
   {#if $players.length === 0}
-    <p class="empty">Aucun joueur connecté</p>
+    <p class="empty">{$t('players.none')}</p>
   {:else}
     <table>
       <thead>
         <tr>
-          <th>Pilote</th>
-          <th title="Score">Score</th>
-          <th title="Kills air / sol / navire">K/A/S</th>
-          <th title="Atterrissages">Att.</th>
-          <th title="Ping (ms)">Ping</th>
+          <th>{$t('players.pilot')}</th>
+          <th title={$t('players.score')}>{$t('players.score')}</th>
+          <th title={$t('players.killsTitle')}>{$t('players.kills')}</th>
+          <th title={$t('players.landings')}>{$t('players.landings')}</th>
+          <th title={$t('players.pingTitle')}>{$t('players.ping')}</th>
         </tr>
       </thead>
       <tbody>

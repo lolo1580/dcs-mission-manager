@@ -20,6 +20,7 @@
   } from './lib/units.js';
   import { players, events, mission } from './lib/session.js';
   import { loadAnalytics } from './lib/analytics.js';
+  import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
 
   let mapView;
   let tab = 'map';
@@ -35,22 +36,22 @@
 
 <div class="layout">
   <header>
-    <strong>DCS Mission Manager</strong>
+    <strong>{$t('app.title')}</strong>
     <span class="live">
       <span class="dot" class:on={$connected}></span>
-      {$connected ? 'connecté' : 'hors ligne'}
+      {$connected ? $t('app.connected') : $t('app.offline')}
     </span>
 
     <nav class="tabs">
-      <button class:active={tab === 'map'} on:click={() => (tab = 'map')}>Carte</button>
+      <button class:active={tab === 'map'} on:click={() => (tab = 'map')}>{$t('tab.map')}</button>
       <button class:active={tab === 'session'} on:click={() => (tab = 'session')}>
-        Session
+        {$t('tab.session')}
         {#if $players.length}<span class="badge">{$players.length}</span>{/if}
       </button>
-      <button class:active={tab === 'debriefs'} on:click={() => (tab = 'debriefs')}>Débriefs</button>
-      <button class:active={tab === 'stats'} on:click={() => (tab = 'stats')}>Statistiques</button>
-      <button class:active={tab === 'analytics'} on:click={() => (tab = 'analytics')}>Analyse</button>
-      <button class:active={tab === 'aerodromes'} on:click={() => (tab = 'aerodromes')}>Aérodromes</button>
+      <button class:active={tab === 'debriefs'} on:click={() => (tab = 'debriefs')}>{$t('tab.debriefs')}</button>
+      <button class:active={tab === 'stats'} on:click={() => (tab = 'stats')}>{$t('tab.stats')}</button>
+      <button class:active={tab === 'analytics'} on:click={() => (tab = 'analytics')}>{$t('tab.analytics')}</button>
+      <button class:active={tab === 'aerodromes'} on:click={() => (tab = 'aerodromes')}>{$t('tab.aerodromes')}</button>
     </nav>
 
     {#if $mission}
@@ -60,14 +61,20 @@
     {/if}
 
     {#if tab === 'map'}
-      <span class="meta">{$units.length} unité{$units.length === 1 ? '' : 's'}</span>
-      <span class="meta">{$visibleUnits.length} affichée{$visibleUnits.length === 1 ? '' : 's'}</span>
+      <span class="meta">
+        {$units.length}
+        {$units.length === 1 ? ($lang === 'fr' ? 'unité suivie' : 'unit tracked') : ($lang === 'fr' ? 'unités suivies' : 'units tracked')}
+      </span>
+      <span class="meta">
+        {$visibleUnits.length}
+        {$visibleUnits.length === 1 ? ($lang === 'fr' ? 'affichée' : 'shown') : ($lang === 'fr' ? 'affichées' : 'shown')}
+      </span>
       {#if $lastUpdate}
-        <span class="meta">maj {$lastUpdate.toLocaleTimeString()}</span>
+        <span class="meta">{$lang === 'fr' ? 'maj' : 'updated'} {$lastUpdate.toLocaleTimeString()}</span>
       {/if}
       {#if $basemaps.length}
         <label class="basemap">
-          Fond
+          {$t('app.basemap')}
           <select bind:value={$basemapId}>
             {#each $basemaps as b (b.id)}
               <option value={b.id}>{b.name}</option>
@@ -75,33 +82,44 @@
           </select>
         </label>
       {/if}
-      <button class="action" on:click={() => mapView?.recenter()} title="Recentrer la carte">
-        Recentrer
+      <button class="action" on:click={() => mapView?.recenter()} title={$t('app.recenterTitle')}>
+        {$t('app.recenter')}
       </button>
       <button
         class="action"
         class:on={history}
         on:click={toggleHistory}
-        title="Superposer la carte de chaleur et les traces enregistrées"
+        title={$t('app.historyTitle')}
       >
-        Historique
+        {$t('app.history')}
       </button>
     {:else if tab === 'session'}
-      <span class="meta">{$events.length} événement{$events.length === 1 ? '' : 's'}</span>
+      <span class="meta">
+        {$events.length}
+        {$events.length === 1 ? ($lang === 'fr' ? 'événement' : 'event') : ($lang === 'fr' ? 'événements' : 'events')}
+      </span>
     {:else if tab === 'debriefs'}
-      <span class="meta">Historique des missions</span>
+      <span class="meta">{$t('tab.missionHistory')}</span>
     {/if}
+
+    <label class="lang">
+      <select value={$lang} on:change={(e) => setLang(e.currentTarget.value)} aria-label="Language">
+        {#each LANGUAGES as l (l.id)}
+          <option value={l.id}>{l.label}</option>
+        {/each}
+      </select>
+    </label>
   </header>
 
   {#if $visibility && $visibility.mode !== 'all' && !$visibility.override}
     <div
       class="fog-banner"
-      title={$visibility.note || ''}
+      title={$t(`visibility.note.${$visibility.mode}`)}
       class:fog={$visibility.mode === 'unknown'}
     >
       <span class="fog-icon">◐</span>
-      Visibilité : {$visibility.label}
-      {#if $visibility.note}— <span class="fog-note">{$visibility.note}</span>{/if}
+      {$t('visibility.prefix')}: {$t(`visibility.mode.${$visibility.mode}`)}
+      — <span class="fog-note">{$t(`visibility.note.${$visibility.mode}`)}</span>
     </div>
   {/if}
 
@@ -269,6 +287,25 @@
   }
 
   .basemap select:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
+  .lang {
+    margin-left: 0.5rem;
+  }
+
+  .lang select {
+    padding: 0.3rem 0.45rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .lang select:focus {
     outline: none;
     border-color: var(--blue);
   }

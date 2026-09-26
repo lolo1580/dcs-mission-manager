@@ -1,8 +1,8 @@
-# Installation de DCS Mission Manager côté DCS (Windows).
+# DCS Mission Manager installation on the DCS (Windows) side.
 #
-# Usage :
-#   .\install-dcs.ps1                 # détecte Saved Games et installe
-#   .\install-dcs.ps1 -DryRun         # montre ce qui serait fait
+# Usage:
+#   .\install-dcs.ps1                 # detects Saved Games and installs
+#   .\install-dcs.ps1 -DryRun         # shows what would be done
 #   .\install-dcs.ps1 -SavedGames "D:\Saved Games\DCS"
 
 param(
@@ -15,7 +15,7 @@ $root = $PSScriptRoot
 
 $exe = Join-Path $root 'dcsmm.exe'
 if (-not (Test-Path $exe)) {
-    Write-Host "dcsmm.exe introuvable. Compile d'abord : .\build.ps1" -ForegroundColor Red
+    Write-Host "dcsmm.exe not found. Build it first: .\build.ps1" -ForegroundColor Red
     exit 1
 }
 

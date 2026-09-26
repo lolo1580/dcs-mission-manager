@@ -71,27 +71,27 @@ func usage() {
 	fmt.Print(`DCS Mission Manager
 
 Usage:
-  dcsmm                 Lance le manager (interface web + réception DCS)
-  dcsmm install-lua     Installe les scripts Lua dans Saved Games
-  dcsmm uninstall-lua   Retire les scripts installés
-  dcsmm status          Indique si les scripts sont installés / à jour
-  dcsmm version         Affiche la version
+  dcsmm                 Run the manager (web UI + DCS ingestion)
+  dcsmm install-lua     Install the Lua scripts into Saved Games
+  dcsmm uninstall-lua   Remove the installed scripts
+  dcsmm status          Report whether the scripts are installed / up to date
+  dcsmm version         Print the version
 
-Options de install-lua / uninstall-lua / status :
-  --saved-games <dir>   Dossier Saved Games de DCS (détecté automatiquement)
-  --lua-dir <dir>       Dossier dcs-lua de la distribution (détecté automatiquement)
-  --dry-run             Montre ce qui serait fait, sans rien écrire
+Options for install-lua / uninstall-lua / status:
+  --saved-games <dir>   DCS Saved Games directory (auto-detected)
+  --lua-dir <dir>       dcs-lua directory of the distribution (auto-detected)
+  --dry-run             Show what would be done, without writing anything
 
-Configuration du serveur : variables d'environnement DCSMM_* (voir README).
+Server configuration: DCSMM_* environment variables (see README).
 `)
 }
 
 // runLuaCommand implements install-lua / uninstall-lua / status.
 func runLuaCommand(args []string, mode string) int {
 	fs := flag.NewFlagSet(mode, flag.ExitOnError)
-	savedGames := fs.String("saved-games", "", "dossier Saved Games de DCS")
-	luaDir := fs.String("lua-dir", "", "dossier dcs-lua de la distribution")
-	dryRun := fs.Bool("dry-run", false, "ne rien écrire, montrer les actions")
+	savedGames := fs.String("saved-games", "", "DCS Saved Games directory")
+	luaDir := fs.String("lua-dir", "", "dcs-lua directory of the distribution")
+	dryRun := fs.Bool("dry-run", false, "write nothing, show the actions")
 	_ = fs.Parse(args)
 
 	// Resolve the Lua source directory: explicit flag, next to the executable,
@@ -101,7 +101,7 @@ func runLuaCommand(args []string, mode string) int {
 		resolvedLua = findLuaDir()
 	}
 	if resolvedLua == "" {
-		fmt.Fprintln(os.Stderr, "dossier dcs-lua introuvable. Utilise --lua-dir <chemin>")
+		fmt.Fprintln(os.Stderr, "dcs-lua directory not found. Use --lua-dir <path>")
 		return 1
 	}
 
@@ -122,7 +122,7 @@ func runLuaCommand(args []string, mode string) int {
 	fmt.Printf("Scripts  : %s\n", resolvedLua)
 	fmt.Printf("DCS      : %s\n", resolvedSG)
 	if *dryRun {
-		fmt.Println("Mode      : simulation (aucune écriture)")
+		fmt.Println("Mode      : dry run (no writes)")
 	}
 	fmt.Println()
 
@@ -139,22 +139,22 @@ func runLuaCommand(args []string, mode string) int {
 		results = ins.Status(install.DefaultTargets())
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "erreur : %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
 
 	printResults(results)
 	if mode == "install" && !*dryRun {
 		fmt.Println()
-		fmt.Println("Pense à redémarrer DCS pour que les scripts soient rechargés.")
-		fmt.Println("Adresse du backend : voir Saved Games\\DCS\\Config\\dcsmm.cfg")
+		fmt.Println("Remember to restart DCS so the scripts are reloaded.")
+		fmt.Println("Backend address: see Saved Games\\DCS\\Config\\dcsmm.cfg")
 	}
 	return 0
 }
 
 func printResults(results []install.Result) {
 	if len(results) == 0 {
-		fmt.Println("Rien à faire.")
+		fmt.Println("Nothing to do.")
 		return
 	}
 	for _, r := range results {
@@ -164,7 +164,7 @@ func printResults(results []install.Result) {
 		}
 		backup := ""
 		if r.Backup != "" {
-			backup = "  [sauvegarde : " + r.Backup + "]"
+			backup = "  [backup: " + r.Backup + "]"
 		}
 		fmt.Printf("  %-14s %-36s%s%s\n", r.Action, r.DestRel, note, backup)
 	}
@@ -260,9 +260,9 @@ func runServer() {
 	}
 	visibilityPolicy := visibility.New(cfg.RevealAllUnits)
 	if cfg.RevealAllUnits {
-		log.Printf("visibility: filtrage désactivé (DCSMM_REVEAL_ALL_UNITS=true)")
+		log.Printf("visibility: filtering disabled (DCSMM_REVEAL_ALL_UNITS=true)")
 	} else {
-		log.Printf("visibility: fog of war respecté (restrictif)")
+		log.Printf("visibility: fog of war enforced (restrictive)")
 	}
 	srv := api.New(cfg, store, liveStore, database, statsService, airfields, visibilityPolicy)
 	// The mission's F10 view options drive fog-of-war filtering.
@@ -298,7 +298,7 @@ func runServer() {
 		track.SetMissionID(database.OpenMissionID())
 		track.SetMissionIDFunc(database.OpenMissionID)
 		track.SetEnsureMission(func() int64 {
-			id, err := database.EnsureMission("Session sans mission", cfg.Theatre)
+			id, err := database.EnsureMission("Session without mission", cfg.Theatre)
 			if err != nil {
 				log.Printf("tracker: ensure mission: %v", err)
 				return 0

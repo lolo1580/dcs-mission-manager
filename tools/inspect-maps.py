@@ -67,23 +67,23 @@ def slug(text: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Inspecte des scans de cartes DCS.")
+    parser = argparse.ArgumentParser(description="Inspects DCS map scans.")
     parser.add_argument("--dir", type=Path, default=Path("maps_dcs"))
     parser.add_argument("--out", type=Path, default=Path("corners"))
     parser.add_argument("--fraction", type=float, default=0.16,
-                        help="fraction de l'image capturée à chaque coin")
-    parser.add_argument("--crops", action="store_true", help="écrire les crops de coins")
-    parser.add_argument("--json", action="store_true", help="sortie JSON")
+                        help="fraction of the image captured at each corner")
+    parser.add_argument("--crops", action="store_true", help="write the corner crops")
+    parser.add_argument("--json", action="store_true", help="JSON output")
     args = parser.parse_args()
 
     root = args.dir
     if not root.is_dir():
-        print(f"dossier introuvable : {root}")
+        print(f"directory not found: {root}")
         return 1
 
     images = sorted(p for p in root.rglob("*") if p.suffix.lower() in IMAGE_SUFFIXES)
     if not images:
-        print(f"aucune image sous {root}")
+        print(f"no images under {root}")
         return 1
 
     if args.crops:
@@ -96,13 +96,13 @@ def main() -> int:
             d["crops"] = corner_crops(path, slug(path.stem), args.out, args.fraction)
         results.append(d)
         if not args.json:
-            print(f"{d['path']}: {d.get('size')} {d.get('mb')} Mo exif={d.get('exif_tags')}")
+            print(f"{d['path']}: {d.get('size')} {d.get('mb')} MB exif={d.get('exif_tags')}")
 
     if args.json:
         print(json.dumps(results, ensure_ascii=False, indent=2))
 
     total = sum(r["mb"] for r in results)
-    print(f"\n{len(results)} images, {total:.0f} Mo au total")
+    print(f"\n{len(results)} images, {total:.0f} MB total")
     return 0
 
 

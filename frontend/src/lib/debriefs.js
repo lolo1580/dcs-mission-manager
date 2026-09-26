@@ -2,6 +2,7 @@
  * Debrief store: fetches stored debriefs and exposes the selected one.
  */
 import { writable, derived } from 'svelte/store';
+import { tNow } from './i18n.js';
 
 export const debriefList = writable([]);
 export const debrief = writable(null);
@@ -23,7 +24,7 @@ export async function loadDebriefList() {
     const body = await res.json();
     debriefList.set(body.debriefs ?? []);
   } catch (e) {
-    debriefError.set(`Liste indisponible : ${e.message}`);
+    debriefError.set(tNow('error.debriefList', { detail: e.message }));
   }
 }
 
@@ -35,7 +36,7 @@ export async function loadDebrief(id) {
     if (!res.ok) throw new Error(`${res.status}`);
     debrief.set(await res.json());
   } catch (e) {
-    debriefError.set(`Débrief indisponible : ${e.message}`);
+    debriefError.set(tNow('error.debrief', { detail: e.message }));
     debrief.set(null);
   } finally {
     debriefLoading.set(false);

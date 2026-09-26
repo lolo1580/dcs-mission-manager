@@ -4,6 +4,7 @@
  * Scope is "career" (all missions) or "mission" (one mission).
  */
 import { writable, derived } from 'svelte/store';
+import { tNow } from './i18n.js';
 
 export const scopeMode = writable('career');
 
@@ -15,12 +16,13 @@ export const statsNetwork = writable([]);
 export const statsError = writable('');
 export const statsLoading = writable(false);
 
+/** Statistics sub-views. Labels are resolved through i18n at render time. */
 export const STAT_TABS = [
-  { id: 'pilots', label: 'Pilotes' },
-  { id: 'weapons', label: 'Armes' },
-  { id: 'engines', label: 'Engins' },
-  { id: 'balance', label: 'Balance' },
-  { id: 'network', label: 'Réseau' },
+  { id: 'pilots', key: 'stats.pilots' },
+  { id: 'weapons', key: 'stats.weapons' },
+  { id: 'engines', key: 'stats.engines' },
+  { id: 'balance', key: 'stats.balance' },
+  { id: 'network', key: 'stats.network' },
 ];
 
 export const statTab = writable('pilots');
@@ -55,7 +57,7 @@ export async function loadStats() {
     statsEngines.set(engines.engines ?? []);
     statsNetwork.set(network.network ?? []);
   } catch (e) {
-    statsError.set(`Statistiques indisponibles : ${e.message}`);
+    statsError.set(tNow('error.stats', { detail: e.message }));
   } finally {
     statsLoading.set(false);
   }

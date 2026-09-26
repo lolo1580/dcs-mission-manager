@@ -1,65 +1,65 @@
-# Cartes de référence (scans)
+# Reference charts (scans)
 
-Ce dossier contient des **scans de cartes aéronautiques** (JNC/ONC) de plusieurs
-théâtres DCS, à différentes résolutions. Ils **ne sont pas versionnés** dans git
-(~1,3 Go) et restent locaux.
+This folder contains **scans of aeronautical charts** (JNC/ONC) of several
+DCS theatres, at different resolutions. They are **not versioned** in git
+(~1.3 GB) and remain local.
 
-## Contenu
+## Contents
 
-### Cartes générales (scans pleine page)
+### General charts (full-page scans)
 
-| Dossier | Thématique |
+| Folder | Theme |
 |---|---|
-| `DCS Caucasus Maps/` | Caucase (le scan principal couvre en réalité une zone bien plus large) |
+| `DCS Caucasus Maps/` | Caucasus (the main scan actually covers a much larger area) |
 | `DCS Nevada Maps/` | Nevada / NTTR |
-| `DCS Normandy Maps/` | Normandie |
-| `DCS PersianGulfMaps/` | Golfe Persique |
-| `DCS_Syria_High_Detail_Maps/` | Syrie |
-| `DCS_The_Channel_High_Detail_Map/` | La Manche |
-| `Marianas_High_Detail_Maps/` | Mariannes (contient aussi `The Channel 8M.jpg`) |
+| `DCS Normandy Maps/` | Normandy |
+| `DCS PersianGulfMaps/` | Persian Gulf |
+| `DCS_Syria_High_Detail_Maps/` | Syria |
+| `DCS_The_Channel_High_Detail_Map/` | The Channel |
+| `Marianas_High_Detail_Maps/` | Marianas (also contains `The Channel 8M.jpg`) |
 
-### Cartes aérodromes et procédures (Caucase)
+### Aerodrome and procedure charts (Caucasus)
 
-`DCS Caucasus Maps/` contient en plus une série de cartes **par aérodrome** :
+`DCS Caucasus Maps/` also contains a series of charts **per aerodrome**:
 
-- `00_*` : carte générale et légendes.
-- `NN_GND_*` : plans au sol (*ground movement*).
-- `NN_VAD_*` : cartes d'approche/départ à vue (*Visual Operation Chart*).
-- `NN_PAR_*` : procédures.
+- `00_*`: general chart and legends.
+- `NN_GND_*`: ground plans (*ground movement*).
+- `NN_VAD_*`: visual approach/departure charts (*Visual Operation Chart*).
+- `NN_PAR_*`: procedures.
 
-Chaque carte indique les coordonnées (CRP), fréquences (Tower, Radar, TACAN, ILS)
-et la piste. Utile pour une future section **briefings / charts** — ce ne sont pas
-des fonds de carte.
+Each chart indicates the coordinates (CRP), frequencies (Tower, Radar, TACAN, ILS)
+and the runway. Useful for a future **briefings / charts** section — these are not
+basemaps.
 
-## Important : ces scans ne sont pas utilisables tels quels
+## Important: these scans are not usable as is
 
-1. **Non géoréférencés** — aucune métadonnée de calibration (pas de `.jgw`, pas de
-   GeoTIFF). Les coordonnées des coins sont inconnues du logiciel.
-2. **Projection conique** (type Lambert) — les bords sont courbes, alors que
-   Leaflet attend du **Web Mercator (EPSG:3857)**. Une superposition directe est
-   impossible sans reprojection.
-3. **Cartes du monde réel** — ce ne sont pas les tuiles F10 de DCS. Le rendu
-   correspond approximativement, mais pas au pixel.
+1. **Not georeferenced** — no calibration metadata (no `.jgw`, no
+   GeoTIFF). The coordinates of the corners are unknown to the software.
+2. **Conic projection** (Lambert type) — the edges are curved, whereas
+   Leaflet expects **Web Mercator (EPSG:3857)**. A direct overlay is
+   impossible without reprojection.
+3. **Real-world charts** — these are not the F10 tiles of DCS. The rendering
+   matches approximately, but not pixel for pixel.
 
-### Cartes aérodromes et procédures
+### Aerodrome and procedure charts
 
-Les cartes d'aérodrome (`NN_VAD_*`, `NN_GND_*`) sont des **documents** à consulter,
-pas des fonds de carte géoréférencés. Une future section « briefings / charts »
-pourra les afficher telles quelles. `tools/inspect-maps.py` peut les recenser.
+The aerodrome charts (`NN_VAD_*`, `NN_GND_*`) are **documents** to consult,
+not georeferenced basemaps. A future “briefings / charts” section
+could display them as is. `tools/inspect-maps.py` can list them.
 
-## Voies d'utilisation
+## Avenues of use
 
-- **A. GeoTIFF** — si tu obtiens ces cartes en GeoTIFF géoréférencé (EPSG:4326 ou
-  3857), elles se transforment en tuiles proprement (gdal2tiles ou un script dédié).
-- **B. Image + calibration** — fournir **4 coins (lat/lng)** par image permet un
-  mapping linéaire via `tools/export-tiles.py`. Suffisant pour un fond indicatif,
-  insuffisant pour corriger la courbure conique.
-- **C. Fond de carte réel** — c'est ce qui est actif aujourd'hui dans l'UI
-  (Satellite, Relief, Routier, Sombre) : aucun pré-traitement, suffisamment précis
-  pour superposer les unités.
+- **A. GeoTIFF** — if you obtain these charts as georeferenced GeoTIFF (EPSG:4326 or
+  3857), they turn into tiles cleanly (gdal2tiles or a dedicated script).
+- **B. Image + calibration** — providing **4 corners (lat/lng)** per image allows a
+  linear mapping via `tools/export-tiles.py`. Enough for an indicative basemap,
+  not enough to correct the conic curvature.
+- **C. Real basemap** — this is what is currently active in the UI
+  (Satellite, Relief, Road, Dark): no pre-processing, accurate enough
+  to overlay the units.
 
-## Droits
+## Rights
 
-Les cartes aéronautiques scannées peuvent être soumises à des droits d'auteur ou à
-des conditions d'utilisation selon leur source. Elles restent **locales** et ne sont
-ni redistribuées ni intégrées au binaire. Vérifie la licence avant tout partage.
+The scanned aeronautical charts may be subject to copyright or
+terms of use depending on their source. They remain **local** and are
+neither redistributed nor integrated into the binary. Check the licence before any sharing.

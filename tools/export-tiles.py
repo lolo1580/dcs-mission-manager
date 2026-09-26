@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""DCS Mission Manager — extracteur de tuiles de carte.
+"""DCS Mission Manager — map tile extractor.
 
-Produit des tuiles PNG à partir d'une image de carte géoréférencée, pour un
-théâtre donné, dans l'arborescence attendue par le backend :
+Produces PNG tiles from a georeferenced map image, for a given
+theatre, into the directory tree expected by the backend:
 
     <tilesDir>/<theatre>/<z>/<x>/<y>.png
 
-Deux modes sont prévus :
+Two modes are planned:
 
-1. **Mode image** (implémenté) : découpe une grande image de carte (par
-   exemple une capture de la carte F10) en tuiles façon slippy-map, en
-   mappant l'emprise géographique fournie sur toute l'image.
+1. **Image mode** (implemented): slices a large map image (for
+   example a capture of the F10 map) into slippy-map tiles, mapping
+   the provided geographic extent over the whole image.
 
-2. **Mode DCS** (à venir) : pilote DCS World en autopilote pour capturer la
-   carte F10 in-game à plusieurs niveaux de zoom, façon Olympus, puis
-   assemble les captures. Cela requiert une session DCS scriptée et sort du
-   périmètre de ce script.
+2. **DCS mode** (coming): drives DCS World on autopilot to capture the
+   in-game F10 map at several zoom levels, Olympus-style, then
+   assembles the captures. This requires a scripted DCS session and is
+   outside the scope of this script.
 
-Usage (mode image) :
+Usage (image mode):
     python tools/export-tiles.py --image caucasus.png --theatre Caucasus \
         --bounds 41.0,36.5,45.5,45.0 --min-zoom 2 --max-zoom 6 --out ./tiles
 
-Les bornes sont données comme : minLat,minLng,maxLat,maxLng (degrés décimaux).
-Elles doivent correspondre à l'emprise couverte par l'image.
+Bounds are given as: minLat,minLng,maxLat,maxLng (decimal degrees).
+They must match the extent covered by the image.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from pathlib import Path
 try:
     from PIL import Image
 except ImportError:  # pragma: no cover - depends on the user's environment
-    print("Pillow est requis : pip install Pillow", file=sys.stderr)
+    print("Pillow is required: pip install Pillow", file=sys.stderr)
     raise SystemExit(2)
 
 
@@ -45,15 +45,15 @@ TILE_SIZE = 256
 def parse_bounds(value: str) -> tuple[float, float, float, float]:
     parts = [float(p) for p in value.split(",")]
     if len(parts) != 4:
-        raise argparse.ArgumentTypeError("bounds attendu : minLat,minLng,maxLat,maxLng")
+        raise argparse.ArgumentTypeError("expected bounds: minLat,minLng,maxLat,maxLng")
     min_lat, min_lng, max_lat, max_lng = parts
     if not (min_lat < max_lat and min_lng < max_lng):
-        raise argparse.ArgumentTypeError("bounds invalides (min doit être < max)")
+        raise argparse.ArgumentTypeError("invalid bounds (min must be < max)")
     return min_lat, min_lng, max_lat, max_lng
 
 
 def deg2num(lat: float, lng: float, z: int) -> tuple[float, float]:
-    """Convertit des coordonnées géographiques en coordonnées de tuile (Web Mercator)."""
+    """Converts geographic coordinates to tile coordinates (Web Mercator)."""
     lat_rad = math.radians(lat)
     n = 2.0**z
     x = (lng + 180.0) / 360.0 * n
@@ -121,23 +121,23 @@ def extract(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Extrait des tuiles de carte DCS.")
-    parser.add_argument("--image", type=Path, required=True, help="image source (PNG/JPG)")
-    parser.add_argument("--theatre", required=True, help="identifiant du théâtre (ex. Caucasus)")
+    parser = argparse.ArgumentParser(description="Extracts DCS map tiles.")
+    parser.add_argument("--image", type=Path, required=True, help="source image (PNG/JPG)")
+    parser.add_argument("--theatre", required=True, help="theatre identifier (e.g. Caucasus)")
     parser.add_argument("--bounds", type=parse_bounds, required=True,
-                        help="minLat,minLng,maxLat,maxLng de l'image")
+                        help="minLat,minLng,maxLat,maxLng of the image")
     parser.add_argument("--min-zoom", type=int, default=2)
     parser.add_argument("--max-zoom", type=int, default=6)
     parser.add_argument("--out", type=Path, default=Path("./tiles"))
     args = parser.parse_args()
 
     if not args.image.exists():
-        print(f"image introuvable : {args.image}", file=sys.stderr)
+        print(f"image not found: {args.image}", file=sys.stderr)
         return 1
 
     written = extract(args.image, args.theatre, args.bounds,
                       args.min_zoom, args.max_zoom, args.out)
-    print(f"{written} tuiles écrites dans {args.out / args.theatre}")
+    print(f"{written} tiles written to {args.out / args.theatre}")
     return 0
 
 

@@ -1,17 +1,17 @@
 # Architecture — DCS Mission Manager
 
-## Principe
+## Principle
 
-DCS World ne peut pas tourner dans Docker (Windows uniquement, GPU + rendu requis).
-Le projet est donc conçu en **deux composants** qui communiquent par le réseau :
+DCS World cannot run in Docker (Windows only, GPU + rendering required).
+The project is therefore designed as **two components** that communicate over the network:
 
-1. **Les scripts Lua côté DCS** (machine Windows) — collectent et envoient les données.
-2. **Le manager** (backend Go + Web UI) — reçoit, stocke, agrège et affiche.
+1. **The Lua scripts on the DCS side** (Windows machine) — collect and send the data.
+2. **The manager** (Go backend + Web UI) — receives, stores, aggregates and displays.
 
-Le même manager se déploie en `.exe` Windows ou en image Docker Linux, **sans
-modification du code**.
+The same manager deploys as a Windows `.exe` or a Linux Docker image, **with no
+changes to the code**.
 
-## Flux de données
+## Data flow
 
 ```
                           WINDOWS (machine A)
@@ -19,7 +19,7 @@ modification du code**.
 │ DCS World                                                 │
 │                                                           │
 │  Scripts/Export.lua        Hooks/dcsmm.lua                │
-│   (live map)               (événements/joueurs)           │
+│   (live map)               (events/players)           │
 │        │                          │                       │
 │        │ UDP/JSON                 │ TCP/JSON              │
 └────────┼──────────────────────────┼───────────────────────┘
@@ -31,7 +31,7 @@ modification du code**.
 │  internal/udp  ──► internal/state ──► internal/api        │
 │                                        ├─ REST /api/*      │
 │                                        ├─ SSE  /api/events │
-│                                        └─ Web UI embarquée │
+│                                        └─ Embedded web UI │
 │                                                           │
 │  internal/debrief (Phase 3)                               │
 │  internal/stats   (Phase 4)                               │
@@ -39,39 +39,39 @@ modification du code**.
 └──────────────────────────────────────────────────────────┘
 ```
 
-## Composants du backend
+## Backend components
 
-| Package | Rôle |
+| Package | Role |
 |---|---|
-| `internal/config` | Configuration via variables `DCSMM_*` |
-| `internal/udp` | Réception et décodage des datagrammes de télémétrie |
-| `internal/state` | Store en mémoire des unités, avec péremption (TTL) |
-| `internal/api` | REST, Server-Sent Events, service de l'UI embarquée |
-| `internal/theatre` | Projection `lat/lng ↔ coordonnées DCS` (Phase 1) |
-| `internal/debrief` | Parseur de `debrief.log` (Phase 3) |
-| `internal/stats` | Agrégations statistiques (Phase 4) |
+| `internal/config` | Configuration via `DCSMM_*` variables |
+| `internal/udp` | Reception and decoding of telemetry datagrams |
+| `internal/state` | In-memory store of units, with expiry (TTL) |
+| `internal/api` | REST, Server-Sent Events, serving of the embedded UI |
+| `internal/theatre` | `lat/lng ↔ DCS coordinates` projection (Phase 1) |
+| `internal/debrief` | `debrief.log` parser (Phase 3) |
+| `internal/stats` | Statistical aggregations (Phase 4) |
 
 ## Frontend
 
-Svelte + Vite + Leaflet. Le build est écrit dans
-`backend/internal/api/dist/` (non versionné), puis embarqué dans le binaire Go via
-`//go:embed`. Résultat : **un seul exécutable** contient le backend et l'interface.
-Si le frontend n'a pas été buildé, une page de repli est servie automatiquement.
+Svelte + Vite + Leaflet. The build is written to
+`backend/internal/api/dist/` (not versioned), then embedded into the Go binary via
+`//go:embed`. Result: **a single executable** contains the backend and the interface.
+If the frontend has not been built, a fallback page is served automatically.
 
-## Choix temps réel : SSE plutôt que WebSocket
+## Real-time choice: SSE rather than WebSocket
 
-Pour la Phase 0/1, les mises à jour sont **descendantes uniquement** (serveur → client).
-Le **Server-Sent Events** suffit, s'intègre nativement au navigateur (`EventSource`),
-et évite la complexité d'un WebSocket. Un WebSocket bidirectionnel pourra être ajouté
-en Phase 2 pour le canal de commandes (kick, changement de mission…), mais ce canal
-passera par le socket TCP dédié côté Lua, pas par le navigateur.
+For Phase 0/1, updates are **downstream only** (server → client).
+**Server-Sent Events** is enough, integrates natively with the browser (`EventSource`),
+and avoids the complexity of a WebSocket. A bidirectional WebSocket could be added
+in Phase 2 for the command channel (kick, mission change…), but that channel
+will go through the dedicated TCP socket on the Lua side, not through the browser.
 
 ## Invariants
 
-- DCS reste sur Windows ; le conteneur ne contient que le manager.
-- En Docker sur une autre machine, les scripts Lua ciblent l'**IP LAN** du conteneur,
-  jamais `127.0.0.1` (qui bouclerait sur l'hôte Windows).
-- L'export Lua est **throttlé** (`LuaExportActivityNextEvent`) : on ne bloque jamais
-  une frame du simulateur.
-- Les scripts Lua fournis sont **additifs** : ne jamais écraser un `Export.lua`
-  existant (Tacview, SRS, DCS-BIOS…).
+- DCS stays on Windows; the container only contains the manager.
+- In Docker on another machine, the Lua scripts target the container's **LAN IP**,
+  never `127.0.0.1` (which would loop back to the Windows host).
+- The Lua export is **throttled** (`LuaExportActivityNextEvent`): a simulator
+  frame is never blocked.
+- The provided Lua scripts are **additive**: never overwrite an existing
+  `Export.lua` (Tacview, SRS, DCS-BIOS…).

@@ -1,20 +1,20 @@
-# Débriefs (Phase 3)
+# Debriefs (Phase 3)
 
-## Le fichier `debrief.log`
+## The `debrief.log` file
 
-À la fin de chaque mission, DCS écrit
-`%USERPROFILE%\Saved Games\DCS\Logs\debrief.log`. C'est un **dump de table Lua**,
-pas du JSON. Il contient notamment :
+At the end of each mission, DCS writes
+`%USERPROFILE%\Saved Games\DCS\Logs\debrief.log`. It is a **Lua table dump**,
+not JSON. It notably contains:
 
-| Clé | Contenu |
+| Key | Content |
 |---|---|
-| `mission_file_path` | Chemin du `.miz` joué |
-| `mission_time` | Durée de la mission (secondes) |
-| `result` | Résultat |
-| `world_state` | **État final** de toutes les unités (type, coalition, x/y, alt, mort ou non) |
-| `events` | **Chronologie ordonnée** : `mission start`, `takeoff`, `land`, `engine shutdown`, `mission end`, et selon les missions `kill`, `crash`, `eject`, `pilot dead`… |
+| `mission_file_path` | Path of the `.miz` played |
+| `mission_time` | Mission duration (seconds) |
+| `result` | Result |
+| `world_state` | **Final state** of all units (type, coalition, x/y, alt, dead or not) |
+| `events` | **Ordered timeline**: `mission start`, `takeoff`, `land`, `engine shutdown`, `mission end`, and depending on the mission `kill`, `crash`, `eject`, `pilot dead`… |
 
-Exemple d'événement :
+Example event:
 
 ```lua
 [4] =
@@ -30,64 +30,64 @@ Exemple d'événement :
 },
 ```
 
-### Précision importante
+### Important clarification
 
-DCS écrit ce fichier **à la fin de la mission**, et il est **écrasé** à chaque
-nouvelle mission. C'est pourquoi le hook Lua le capture et l'envoie
-immédiatement : sinon l'historique serait perdu.
+DCS writes this file **at the end of the mission**, and it is **overwritten** on each
+new mission. That is why the Lua hook captures it and sends it
+immediately: otherwise the history would be lost.
 
 ## Parsing
 
-`debrief.log` n'est pas du JSON, donc plutôt qu'une expression régulière fragile,
-le backend embarque un **parseur Lua minimal** (`internal/lua`) : il lit les
-assignations `nom = valeur` et les tables imbriquées, **sans exécuter de Lua**.
-C'est sûr (aucune évaluation de code) et suffisant pour ce format.
+`debrief.log` is not JSON, so rather than a fragile regular expression,
+the backend embeds a **minimal Lua parser** (`internal/lua`): it reads the
+`name = value` assignments and the nested tables, **without executing any Lua**.
+It is safe (no code evaluation) and sufficient for this format.
 
-Le paquet `internal/debrief` transforme ensuite la table brute en structure
-typée (événements, état du monde, agrégats) via `ToModel()`.
+The `internal/debrief` package then turns the raw table into a typed
+structure (events, world state, aggregates) via `ToModel()`.
 
-## Transport réseau
+## Network transport
 
-Le fichier peut dépasser 1 Mo. Il est envoyé en **morceaux** :
+The file can exceed 1 MB. It is sent in **chunks**:
 
 ```
 Hooks/dcsmm.lua                      Backend
   lit debrief.log
-  → découpe en morceaux de 32 Ko
+  → splits into 32 KB chunks
   → base64 par morceau
   → {"type":"debrief", transferId, chunk, chunks, size, data}
-                                    → internal/debriefstore réassemble
+                                    → internal/debriefstore reassembles
                                     → internal/debrief parse
                                     → SQLite (internal/db)
 ```
 
-- **base64** : garantit que n'importe quel octet traverse le canal NDJSON intact.
-- **`transferId`** : plusieurs transferts peuvent être en cours sans se mélanger.
-- **Réassemblage dans l'ordre des chunks**, même s'ils arrivent désordonnés.
-- Un morceau invalide est journalisé et ignoré : il ne fait jamais planter le backend.
+- **base64**: guarantees that any byte crosses the NDJSON channel intact.
+- **`transferId`**: several transfers can be in progress without getting mixed up.
+- **Reassembly in chunk order**, even if they arrive out of order.
+- An invalid chunk is logged and ignored: it never makes the backend crash.
 
-## Stockage
+## Storage
 
-Table `debriefs` : métadonnées + `parsed` (JSON structuré) + `raw` (texte
-original, pour re-parser plus tard si le format évolue).
+Table `debriefs`: metadata + `parsed` (structured JSON) + `raw` (original
+text, to re-parse later if the format evolves).
 
-## API Web
+## Web API
 
 | Route | Description |
 |---|---|
-| `GET /api/debriefs` | Liste des débriefs (métadonnées) |
-| `GET /api/debriefs/{id}` | Débrief complet (structuré) |
-| `GET /api/debriefs/{id}?raw=1` | Ajoute le texte original |
+| `GET /api/debriefs` | List of debriefs (metadata) |
+| `GET /api/debriefs/{id}` | Full debrief (structured) |
+| `GET /api/debriefs/{id}?raw=1` | Adds the original text |
 
 ## Interface
 
-L'onglet **Débriefs** affiche la liste à gauche et, pour le débrief sélectionné :
+The **Debriefs** tab shows the list on the left and, for the selected debrief:
 
-- des compteurs (décollages, atterrissages, kills, crashes, éjections, durée) ;
-- la liste des pilotes ;
-- la **chronologie** minute par minute, colorée par type d'événement.
+- counters (takeoffs, landings, kills, crashes, ejections, duration);
+- the list of pilots;
+- the minute-by-minute **timeline**, colored by event type.
 
-## Test sans DCS
+## Test without DCS
 
 ```bash
 node tools/send-debrief.mjs
@@ -95,9 +95,9 @@ node tools/send-debrief.mjs
 node tools/send-debrief.mjs "%USERPROFILE%\Saved Games\DCS\Logs\debrief.log" 127.0.0.1 7779
 ```
 
-## Limites connues
+## Known limitations
 
-- Le `debrief.log` ne contient pas toujours les kills (cela dépend de la mission
-  et de la version) ; les événements temps réel de la Phase 2 comblent ce manque,
-  ce qui justifie la **fusion des deux sources** prévue pour les statistiques.
-- Le fichier est écrit en fin de mission uniquement : pas de débrief « en cours ».
+- The `debrief.log` does not always contain the kills (it depends on the mission
+  and the version); Phase 2 real-time events fill this gap,
+  which justifies the **merging of the two sources** planned for the statistics.
+- The file is written only at the end of the mission: no “in progress” debrief.

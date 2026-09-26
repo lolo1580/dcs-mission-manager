@@ -2,6 +2,7 @@
  * Analytics store: heatmap points, flight trails and sortie stats.
  */
 import { writable, derived } from 'svelte/store';
+import { tNow } from './i18n.js';
 
 export const heatPoints = writable([]);
 // Default to traffic: loss clusters are often empty early in a mission.
@@ -37,7 +38,7 @@ export async function loadAnalytics() {
     trails.set(track.trails ?? {});
     sortieStats.set(track.stats ?? []);
   } catch (e) {
-    analyticsError.set(`Analyse indisponible : ${e.message}`);
+    analyticsError.set(tNow('error.analytics', { detail: e.message }));
   }
 }
 
@@ -49,7 +50,7 @@ export async function reloadHeat() {
     const heat = await fetch(`/api/analytics/heatmap?source=${source}`).then((r) => r.json());
     heatPoints.set(heat.points ?? []);
   } catch (e) {
-    analyticsError.set(`Heatmap indisponible : ${e.message}`);
+    analyticsError.set(tNow('error.heatmap', { detail: e.message }));
   }
 }
 

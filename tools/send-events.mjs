@@ -1,10 +1,10 @@
 // tools/send-events.mjs
 //
-// Émetteur d'événements de test : simule ce que DCS enverrait via Hooks/dcsmm.lua
-// sur le canal TCP. Permet de valider la Phase 2 (joueurs, événements, chat)
-// sans lancer DCS.
+// Test event sender: simulates what DCS would send via Hooks/dcsmm.lua
+// on the TCP channel. Lets you validate Phase 2 (players, events, chat)
+// without launching DCS.
 //
-// Usage :
+// Usage:
 //   node tools/send-events.mjs [host] [port]
 //   node tools/send-events.mjs 127.0.0.1 7779
 
@@ -14,12 +14,12 @@ const host = process.argv[2] ?? '127.0.0.1';
 const port = Number(process.argv[3] ?? 7779);
 
 const socket = net.createConnection({ host, port }, () => {
-  console.log(`Connecté à ${host}:${port}`);
+  console.log(`Connected to ${host}:${port}`);
   start();
 });
 
 socket.on('error', (err) => {
-  console.error(`Erreur: ${err.message}`);
+  console.error(`Error: ${err.message}`);
   process.exit(1);
 });
 
@@ -88,7 +88,7 @@ function start() {
 
     // Occasional chat.
     if (t % 7 === 0) {
-      send({ type: 'chat', from: pilots[t % pilots.length].name, message: `Message de test #${t}` });
+      send({ type: 'chat', from: pilots[t % pilots.length].name, message: `Test message #${t}` });
     }
   }, 1000);
 }
@@ -125,7 +125,7 @@ function emit(kind, actor, victim) {
       break;
   }
   send({ type: 'event', event: kind, args, t });
-  console.log(`événement ${kind}: ${actor.name}${victim && kind === 'kill' ? ' → ' + victim.name : ''}`);
+  console.log(`event ${kind}: ${actor.name}${victim && kind === 'kill' ? ' → ' + victim.name : ''}`);
 }
 
 process.on('SIGINT', () => {

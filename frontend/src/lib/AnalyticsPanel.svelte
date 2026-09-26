@@ -12,6 +12,7 @@
     fmtSpeed,
     fmtDuration,
   } from './analytics.js';
+  import { t } from './i18n.js';
 
   onMount(loadAnalytics);
 
@@ -23,8 +24,8 @@
 
 <section class="analytics">
   <header>
-    <h2>Analyse</h2>
-    <button class="refresh" on:click={loadAnalytics}>Rafraîchir</button>
+    <h2>{$t('analytics.title')}</h2>
+    <button class="refresh" on:click={loadAnalytics}>{$t('stats.refresh')}</button>
   </header>
 
   {#if $analyticsError}
@@ -33,41 +34,37 @@
 
   <div class="block">
     <h3>
-      Carte de chaleur
-      <span class="count">{$heatTotal} pts ({$heatSource === 'positions' ? 'trafic' : 'pertes'})</span>
+      {$t('analytics.heatmap')}
+      <span class="count">{$heatTotal} {$t('stats.points')} ({$heatSource === 'positions' ? $t('analytics.traffic') : $t('analytics.losses')})</span>
     </h3>
     <p class="hint">
-      Agrégation des positions suivies. « Pertes » met en évidence les zones où
-      des unités ont disparu ; « Trafic » montre où l'activité se concentre.
-      Utilise le bouton <strong>Historique</strong> de l'en-tête pour superposer
-      la carte de chaleur et les traces sur la carte.
+      {$t('analytics.hint')}
     </p>
     <div class="sources">
       <button class:active={$heatSource === 'losses'} on:click={() => changeSource('losses')}>
-        Pertes
+        {$t('analytics.losses')}
       </button>
       <button class:active={$heatSource === 'positions'} on:click={() => changeSource('positions')}>
-        Trafic
+        {$t('analytics.traffic')}
       </button>
     </div>
   </div>
 
   <div class="block">
     <h3>
-      Analyse de sortie
+      {$t('analytics.sortie')}
       <span class="count">{$sortieStats.length}</span>
     </h3>
     {#if $sortieStats.length === 0}
       <p class="empty">
-        Aucune trace enregistrée pour l'instant. Les positions sont échantillonnées
-        pendant la mission.
+        {$t('analytics.noTrack')}
       </p>
     {:else}
       <table>
         <thead>
           <tr>
-            <th>Unité</th><th>Durée</th><th>Distance</th>
-            <th>Alt. max</th><th>Vit. max</th><th>G max</th><th>Points</th>
+            <th>{$t('analytics.unit')}</th><th>{$t('analytics.duration')}</th><th>{$t('analytics.distance')}</th>
+            <th>{$t('analytics.maxAlt')}</th><th>{$t('analytics.maxSpeed')}</th><th>{$t('analytics.maxG')}</th><th>{$t('analytics.points')}</th>
           </tr>
         </thead>
         <tbody>

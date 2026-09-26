@@ -1,6 +1,25 @@
 <script>
   import { visibleEvents, eventFilter, eventFilter as filterStore, eventCounts, EVENT_FILTERS } from './session.js';
   import { coalitionColor } from './icons.js';
+  import { t } from './i18n.js';
+
+  const FILTER_KEYS = {
+    all: 'events.all',
+    kill: 'events.kills',
+    friendly_fire: 'events.friendlyFire',
+    crash: 'events.crashes',
+    eject: 'events.ejections',
+    takeoff: 'events.takeoffs',
+    landing: 'events.landings',
+    pilot_death: 'events.deaths',
+    change_slot: 'events.slots',
+    connect: 'events.connections',
+    disconnect: 'events.disconnections',
+  };
+
+  function filterKey(id) {
+    return FILTER_KEYS[id] ?? id;
+  }
 
   function timeOf(e) {
     return new Date(e.realTs).toLocaleTimeString();
@@ -25,32 +44,32 @@
   }
 
   /** Build a readable one-line summary from the raw DCS event arguments. */
-  function describe(e) {
+  function describe(tr, e) {
     const a = e.args ?? [];
     switch (e.event) {
       case 'kill':
-        return `#${a[0]} a détruit #${a[3]} (${a[6] ?? '?'})`;
+        return tr('events.killedBy', { killer: a[0], victim: a[3], weapon: a[6] ?? '?' });
       case 'friendly_fire':
         // DCS: "friendly_fire", playerID, weaponName, victimPlayerID
-        return `#${a[0]} → allié #${a[2]} (${a[1] ?? '?'})`;
+        return tr('events.friendlyFired', { actor: a[0], victim: a[2], weapon: a[1] ?? '?' });
       case 'crash':
-        return `#${a[0]} a crashé (unité ${a[1]})`;
+        return tr('events.crashed', { pilot: a[0], unit: a[1] });
       case 'eject':
-        return `#${a[0]} s'est éjecté (unité ${a[1]})`;
+        return tr('events.ejected', { pilot: a[0], unit: a[1] });
       case 'pilot_death':
-        return `#${a[0]} est mort (unité ${a[1]})`;
+        return tr('events.died', { pilot: a[0], unit: a[1] });
       case 'takeoff':
-        return `#${a[0]} a décollé de ${a[2] ?? '?'}`;
+        return tr('events.tookOff', { pilot: a[0], place: a[2] ?? '?' });
       case 'landing':
-        return `#${a[0]} a atterri à ${a[2] ?? '?'}`;
+        return tr('events.landed', { pilot: a[0], place: a[2] ?? '?' });
       case 'change_slot':
-        return `#${a[0]} a changé de slot`;
+        return tr('events.changedSlot', { pilot: a[0] });
       case 'connect':
-        return `${a[1] ?? '#' + a[0]} connecté`;
+        return tr('events.connected', { name: a[1] ?? '#' + a[0] });
       case 'disconnect':
-        return `${a[1] ?? '#' + a[0]} déconnecté`;
+        return tr('events.disconnected', { name: a[1] ?? '#' + a[0] });
       case 'mission_end':
-        return `Mission terminée — gagnant : ${a[0] ?? '?'}`;
+        return tr('events.missionEnded', { winner: a[0] ?? '?' });
       default:
         return a.length ? a.join(' · ') : '';
     }
@@ -59,7 +78,7 @@
 
 <section class="events">
   <h2>
-    Événements <span class="count">{$visibleEvents.length}</span>
+    {$t('events.title')} <span class="count">{$visibleEvents.length}</span>
   </h2>
 
   <div class="chips">
@@ -69,7 +88,7 @@
         class:active={$eventFilter === f.id}
         on:click={() => filterStore.set(f.id)}
       >
-        {f.label}
+        {$t(filterKey(f.id))}
         {#if f.id !== 'all' && ($eventCounts[f.id] ?? 0) > 0}
           <span class="n">{$eventCounts[f.id]}</span>
         {/if}
@@ -83,11 +102,11 @@
         <span class="t">{timeOf(e)}</span>
         <span class="bar" style="background:{eventColor(e)}"></span>
         <span class="kind">{e.event}</span>
-        <span class="desc">{describe(e)}</span>
+        <span class="desc">{describe($t, e)}</span>
       </li>
     {/each}
     {#if $visibleEvents.length === 0}
-      <li class="empty">Aucun événement</li>
+      <li class="empty">{$t('events.none')}</li>
     {/if}
   </ul>
 </section>
