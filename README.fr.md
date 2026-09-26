@@ -162,6 +162,7 @@ défauts raisonnables — identique pour l'`.exe` et pour Docker.
 | `DCSMM_TRACK_GRACE` | `15` (secondes) | Absence avant de compter une unité comme perdue |
 | `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
 | `DCSMM_REVEAL_ALL_UNITS` | `false` | Désactive le fog of war (tout diffuser ; solo/conception) |
+| `DCSMM_SOURCE` | *(auto)* | Force la source de la session : `live` ou `test` (voir plus bas) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ### Côté DCS — `Saved Games\DCS\Config\dcsmm.cfg`
@@ -249,8 +250,39 @@ dcsmm                 # lance le manager (interface web + réception DCS)
 dcsmm install-lua     # installe/fusionne les scripts Lua dans Saved Games
 dcsmm uninstall-lua   # retire le bloc installé (garde la config)
 dcsmm status          # installed / outdated / missing, par fichier
+dcsmm purge           # supprime des sessions enregistrées (destructif)
 dcsmm version
 ```
+
+### Sessions de test et `purge`
+
+Les outils de test (`tools/send-telemetry.mjs`, …) parlent exactement le même
+protocole que DCS : une session enregistrée pendant qu'ils tournent est
+indiscernable d'un vrai vol. Chaque session porte donc une **source** :
+
+- `live` — enregistrée depuis DCS. Les statistiques les comptent.
+- `test` — enregistrée depuis les outils de test. Conservée sur disque, mais
+  **exclue des statistiques, de l'analyse et du tableau de bord** sauf demande
+  explicite.
+
+La détection est automatique : le backend reconnaît les indicatifs des fixtures
+de `tools/send-telemetry.mjs`. Utilisez `DCSMM_SOURCE=test` (ou `live`) pour
+forcer le verdict avec vos propres fixtures.
+
+```powershell
+dcsmm purge --source test            # supprime uniquement les sessions simulées
+dcsmm purge --mission-id 3           # supprime une mission et tout ce qui y est lié
+dcsmm purge --all                    # supprime toutes les sessions enregistrées
+dcsmm purge --source test --dry-run  # affiche ce qui serait supprimé, sans rien faire
+```
+
+Les statistiques acceptent `?includeTest=1` pour inclure volontairement les
+sessions simulées.
+
+> En migrant depuis une version antérieure, les missions **existantes** sont
+> étiquetées `live` (la migration ne peut pas savoir qu'elles étaient simulées).
+> Pour effacer des données enregistrées avant cette fonction, utilisez
+> `dcsmm purge --mission-id <n>` ou `--all`.
 
 ---
 

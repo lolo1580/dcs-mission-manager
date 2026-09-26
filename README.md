@@ -160,6 +160,7 @@ defaults — identical for the `.exe` and for Docker.
 | `DCSMM_TRACK_GRACE` | `15` (seconds) | Absence before a unit counts as lost |
 | `DCSMM_TRACK_RETENTION` | `86400` (seconds) | History retention duration |
 | `DCSMM_REVEAL_ALL_UNITS` | `false` | Disables fog of war (broadcast everything; solo/design) |
+| `DCSMM_SOURCE` | *(auto)* | Force the session source: `live` or `test` (see below) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ### DCS side — `Saved Games\DCS\Config\dcsmm.cfg`
@@ -247,8 +248,36 @@ dcsmm                 # starts the manager (web interface + DCS receive)
 dcsmm install-lua     # installs/merges the Lua scripts into Saved Games
 dcsmm uninstall-lua   # removes the installed block (keeps the config)
 dcsmm status          # installed / outdated / missing, per file
+dcsmm purge           # deletes recorded sessions (destructive)
 dcsmm version
 ```
+
+### Test sessions and `purge`
+
+The test tools (`tools/send-telemetry.mjs`, …) speak exactly the same protocol as
+DCS, so a session recorded while they are running is indistinguishable from a real
+flight. Every session is therefore tagged with a **source**:
+
+- `live` — recorded from DCS. Statistics count these.
+- `test` — recorded from the test tools. Kept on disk, but **excluded from
+  statistics, analytics and the dashboard** unless explicitly requested.
+
+Detection is automatic: the backend recognises the fixture callsigns used by
+`tools/send-telemetry.mjs`. Set `DCSMM_SOURCE=test` (or `live`) to force the
+verdict when you use your own fixtures.
+
+```powershell
+dcsmm purge --source test          # delete simulated sessions only
+dcsmm purge --mission-id 3         # delete one mission and everything linked to it
+dcsmm purge --all                  # delete every recorded session
+dcsmm purge --source test --dry-run  # show what would be deleted, delete nothing
+```
+
+Statistics accept `?includeTest=1` to include simulated sessions deliberately.
+
+> Upgrading from an older version tags **existing** missions as `live` (the
+> migration cannot know they were simulated). To clear data recorded before this
+> feature, use `dcsmm purge --mission-id <n>` or `--all`.
 
 ---
 

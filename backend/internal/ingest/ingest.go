@@ -21,13 +21,39 @@ type Writer struct {
 	db   *db.DB
 	live *live.Store
 
-	mu        sync.Mutex
+	mu sync.Mutex
+	// sourceFn reports the source of the running session ("live" or "test").
+	// It is a function rather than a value because the live UDP path may only
+	// discover that a session is simulated after it has started.
+	sourceFn func() string
+	// missionID is the mission written to, or 0 when none is open.
 	missionID int64
 }
 
 // New creates a writer backed by the given database and live store.
 func New(database *db.DB, store *live.Store) *Writer {
 	return &Writer{db: database, live: store}
+}
+
+// SetSourceFunc installs the callback reporting the running session's source.
+// Until it is set, sessions are attributed to SourceLive.
+func (w *Writer) SetSourceFunc(fn func() string) {
+	w.mu.Lock()
+	w.sourceFn = fn
+	w.mu.Unlock()
+}
+
+func (w *Writer) currentSource() string {
+	w.mu.Lock()
+	fn := w.sourceFn
+	w.mu.Unlock()
+	if fn == nil {
+		return db.SourceLive
+	}
+	if s := fn(); db.ValidSource(s) {
+		return s
+	}
+	return db.SourceLive
 }
 
 // Handle persists a single message. Errors are logged, never returned: losing a
@@ -51,7 +77,7 @@ func (w *Writer) handleMission(m model.Message) {
 		if theatre == "" {
 			theatre = "Caucasus"
 		}
-		id, err := w.db.EnsureMission(m.Name, theatre)
+		id, err := w.db.EnsureMissionTagged(m.Name, theatre, w.currentSource())
 		if err != nil {
 			log.Printf("ingest: ensure mission: %v", err)
 			return
@@ -68,7 +94,9 @@ func (w *Writer) handleMission(m model.Message) {
 }
 
 func (w *Writer) handleEvent(m model.Message) {
-	if err := w.db.SaveEvent(w.missionIDFor(m), model.Event{
+	missionID := w.missionIDFor(m)
+	w.upgradeSource(missionID)
+	if err := w.db.SaveEvent(missionID, model.Event{
 		Event:  m.Event,
 		Args:   m.Args,
 		Detail: m.Detail,
@@ -80,7 +108,9 @@ func (w *Writer) handleEvent(m model.Message) {
 }
 
 func (w *Writer) handleChat(m model.Message) {
-	if err := w.db.SaveChat(w.missionIDFor(m), model.Chat{
+	missionID := w.missionIDFor(m)
+	w.upgradeSource(missionID)
+	if err := w.db.SaveChat(missionID, model.Chat{
 		From:    m.From,
 		Message: m.Message,
 		RealTS:  time.Now().UnixMilli(),
@@ -91,6 +121,7 @@ func (w *Writer) handleChat(m model.Message) {
 
 func (w *Writer) handlePlayers(m model.Message) {
 	missionID := w.missionIDFor(m)
+	w.upgradeSource(missionID)
 	for _, p := range m.Players {
 		pid, err := w.db.UpsertPlayer(p.UCID, p.Name)
 		if err != nil {
@@ -108,6 +139,18 @@ func (w *Writer) handlePlayers(m model.Message) {
 	}
 }
 
+// upgradeSource promotes a mission to "test" when the running session has been
+// recognised as simulated. It is called before writing, because the mission may
+// have been opened while it still looked real.
+func (w *Writer) upgradeSource(missionID int64) {
+	if missionID == 0 {
+		return
+	}
+	if err := w.db.UpgradeMissionSource(missionID, w.currentSource()); err != nil {
+		log.Printf("ingest: upgrade mission source: %v", err)
+	}
+}
+
 // missionIDFor returns the id of the open mission, opening a default one when
 // DCS did not announce a mission start (for example a mid-mission reconnect).
 func (w *Writer) missionIDFor(m model.Message) int64 {
@@ -118,7 +161,7 @@ func (w *Writer) missionIDFor(m model.Message) int64 {
 	if name == "" {
 		name = "Unknown mission"
 	}
-	id, err := w.db.EnsureMission(name, "Caucasus")
+	id, err := w.db.EnsureMissionTagged(name, "Caucasus", w.currentSource())
 	if err != nil {
 		log.Printf("ingest: ensure mission: %v", err)
 		return 0

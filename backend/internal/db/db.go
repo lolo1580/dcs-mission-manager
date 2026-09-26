@@ -5,6 +5,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -57,6 +58,10 @@ CREATE TABLE IF NOT EXISTS missions (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	name       TEXT NOT NULL,
 	theatre    TEXT,
+	-- source separates real DCS sessions ("live") from simulated ones
+	-- ("test"). Test data is kept but excluded from statistics by default, so a
+	-- development session can never silently flatter a real career.
+	source     TEXT NOT NULL DEFAULT 'live',
 	started_at INTEGER NOT NULL,
 	ended_at   INTEGER,
 	winner     TEXT
@@ -171,7 +176,69 @@ CREATE TABLE IF NOT EXISTS losses (
 CREATE INDEX IF NOT EXISTS idx_losses_mission ON losses(mission_id);
 CREATE INDEX IF NOT EXISTS idx_losses_ts ON losses(real_ts);
 `
-	_, err := d.sql.Exec(schema)
+
+	// Indexes are created after the additive migrations, because an index may
+	// reference a column that only exists once a migration has added it (which
+	// is the case for idx_missions_source on databases predating the column).
+	const indexes = `
+CREATE INDEX IF NOT EXISTS idx_missions_source ON missions(source);
+`
+
+	if _, err := d.sql.Exec(schema); err != nil {
+		return err
+	}
+	if err := d.migrations(); err != nil {
+		return err
+	}
+	_, err := d.sql.Exec(indexes)
+	return err
+}
+
+// migrations applies additive schema changes to databases created by an older
+// version. `CREATE TABLE IF NOT EXISTS` never alters an existing table, so a
+// database written before a column existed must be upgraded here.
+func (d *DB) migrations() error {
+	if err := d.ensureColumn("missions", "source", "TEXT NOT NULL DEFAULT 'live'"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensureColumn adds a column to a table when it is missing. It is a no-op on
+// databases that already have it, which makes it safe to run on every start.
+func (d *DB) ensureColumn(table, column, definition string) error {
+	rows, err := d.sql.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	found := false
+	for rows.Next() {
+		var (
+			cid       int
+			name      string
+			ctype     string
+			notNull   int
+			dfltValue sql.NullString
+			pk        int
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notNull, &dfltValue, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == column {
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	if found {
+		return nil
+	}
+	_, err = d.sql.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition))
 	return err
 }
 

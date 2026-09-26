@@ -25,14 +25,31 @@ type Scope struct {
 	MissionID int64
 	// Mode is "mission" or "career".
 	Mode string
+	// IncludeTest also counts missions recorded from the test tools. Off by
+	// default: simulated sessions must never flatter a real career.
+	IncludeTest bool
 }
 
 // filter returns the SQL fragment and args restricting a query to the scope.
+//
+// Every statistics query funnels through here, so this is the one place that
+// decides whether test sessions are visible. Because the fragment is built into
+// the WHERE clause, it also holds for the sub-queries used by the per-player and
+// per-coalition aggregates.
 func (sc Scope) filter(column string) (string, []any) {
+	frag := ""
+	var args []any
+
 	if sc.Mode == "mission" && sc.MissionID > 0 {
-		return " AND " + column + " = ?", []any{sc.MissionID}
+		frag += " AND " + column + " = ?"
+		args = append(args, sc.MissionID)
 	}
-	return "", nil
+	if !sc.IncludeTest {
+		// Rows with a NULL mission id (unattributed data) are excluded too,
+		// since NULL never matches an IN sub-query.
+		frag += " AND " + column + " IN (SELECT id FROM missions WHERE source <> 'test')"
+	}
+	return frag, args
 }
 
 // Service exposes statistics queries.
@@ -471,6 +488,8 @@ func (s *Service) Overview(sc Scope) (Overview, error) {
 	if err := s.db.SQL().QueryRow(`SELECT COUNT(*) FROM missions WHERE 1=1`+mWhere, mArgs...).Scan(&o.Missions); err != nil {
 		return o, err
 	}
+	// Players is a count of identities, not sessions: player rows survive a
+	// purge and carry no source of their own, so it is not filtered here.
 	if err := s.db.SQL().QueryRow(`SELECT COUNT(*) FROM players`).Scan(&o.Players); err != nil {
 		return o, err
 	}

@@ -36,6 +36,7 @@ import (
 	"dcsmm/internal/install"
 	"dcsmm/internal/live"
 	"dcsmm/internal/model"
+	"dcsmm/internal/source"
 	"dcsmm/internal/state"
 	"dcsmm/internal/stats"
 	"dcsmm/internal/tcp"
@@ -56,6 +57,8 @@ func main() {
 			os.Exit(runLuaCommand(os.Args[2:], "uninstall"))
 		case "status":
 			os.Exit(runLuaCommand(os.Args[2:], "status"))
+		case "purge":
+			os.Exit(runPurgeCommand(os.Args[2:]))
 		case "version", "--version", "-v":
 			fmt.Printf("dcsmm %s\n", Version)
 			return
@@ -75,12 +78,19 @@ Usage:
   dcsmm install-lua     Install the Lua scripts into Saved Games
   dcsmm uninstall-lua   Remove the installed scripts
   dcsmm status          Report whether the scripts are installed / up to date
+  dcsmm purge           Delete recorded sessions (destructive; see options)
   dcsmm version         Print the version
 
 Options for install-lua / uninstall-lua / status:
   --saved-games <dir>   DCS Saved Games directory (auto-detected)
   --lua-dir <dir>       dcs-lua directory of the distribution (auto-detected)
   --dry-run             Show what would be done, without writing anything
+
+Options for purge (exactly one is required):
+  --source test         Delete sessions recorded from the test tools
+  --source live         Delete sessions recorded from DCS
+  --mission-id <n>      Delete one mission and everything linked to it
+  --all                 Delete every recorded session (keeps schema and players)
 
 Server configuration: DCSMM_* environment variables (see README).
 `)
@@ -151,6 +161,111 @@ func runLuaCommand(args []string, mode string) int {
 		fmt.Println("Backend address: see Saved Games\\DCS\\Config\\dcsmm.cfg")
 	}
 	return 0
+}
+
+// runPurgeCommand implements the destructive `purge` subcommand. Exactly one
+// scope must be given, so a mistyped command can never delete more than asked.
+func runPurgeCommand(args []string) int {
+	fs := flag.NewFlagSet("purge", flag.ExitOnError)
+	source := fs.String("source", "", "delete missions of this source: live|test")
+	missionID := fs.Int64("mission-id", 0, "delete this mission and its data")
+	all := fs.Bool("all", false, "delete every recorded session")
+	dbPath := fs.String("db", "", "database path (defaults to DCSMM_DB_PATH)")
+	dryRun := fs.Bool("dry-run", false, "report what would be deleted, delete nothing")
+	_ = fs.Parse(args)
+
+	chosen := 0
+	if *source != "" {
+		chosen++
+	}
+	if *missionID != 0 {
+		chosen++
+	}
+	if *all {
+		chosen++
+	}
+	if chosen != 1 {
+		fmt.Fprintln(os.Stderr, "purge: pass exactly one of --source <live|test>, --mission-id <n> or --all")
+		fmt.Fprintln(os.Stderr, "       run `dcsmm help` for the full usage")
+		return 2
+	}
+	if *source != "" && !db.ValidSource(*source) {
+		fmt.Fprintf(os.Stderr, "purge: --source must be live or test, got %q\n", *source)
+		return 2
+	}
+
+	path := *dbPath
+	if path == "" {
+		path = config.Load().DBPath
+	}
+	if path == "" {
+		path = "./data/dcsmm.db"
+	}
+
+	database, err := db.Open(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "purge: open %s: %v\n", path, err)
+		return 1
+	}
+	defer database.Close()
+
+	fmt.Printf("Database : %s\n", path)
+
+	liveCount, err := database.CountMissions(db.SourceLive)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "purge: %v\n", err)
+		return 1
+	}
+	testCount, err := database.CountMissions(db.SourceTest)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "purge: %v\n", err)
+		return 1
+	}
+	fmt.Printf("Sessions : %d live, %d test\n", liveCount, testCount)
+
+	if *dryRun {
+		fmt.Println("Mode     : dry run (nothing is deleted)")
+		switch {
+		case *all:
+			fmt.Println("Would delete every recorded session and all tracking data.")
+		case *source != "":
+			fmt.Printf("Would delete the %d %s session(s) and their data.\n", countFor(*source, liveCount, testCount), *source)
+		default:
+			fmt.Printf("Would delete mission #%d and its data.\n", *missionID)
+		}
+		return 0
+	}
+
+	var res db.PurgeResult
+	switch {
+	case *all:
+		res, err = database.PurgeAll()
+	case *source != "":
+		res, err = database.PurgeSource(*source)
+	default:
+		res, err = database.PurgeMission(*missionID)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "purge: %v\n", err)
+		return 1
+	}
+
+	fmt.Println()
+	fmt.Printf("  removed  missions        %d\n", res.Missions)
+	for _, table := range []string{"track_positions", "losses", "events", "chat", "player_stats", "debriefs"} {
+		if n, ok := res.Deleted[table]; ok {
+			fmt.Printf("  removed  %-15s %d\n", table, n)
+		}
+	}
+	fmt.Printf("\nDone: %d row(s) deleted.\n", res.Total())
+	return 0
+}
+
+func countFor(source string, live, test int) int {
+	if source == db.SourceTest {
+		return test
+	}
+	return live
 }
 
 func printResults(results []install.Result) {
@@ -230,6 +345,25 @@ func runServer() {
 		}
 	}
 
+	// ---- Session source: DCS or the test tools ---------------------------
+	// The tools speak the same protocol as DCS, so detection happens on the
+	// wire. The resulting source is shared by both persistence paths so a test
+	// session is tagged no matter which one creates the mission.
+	detector := source.NewDetector()
+	forcedSource := source.Forced()
+	sessionSource := func() string {
+		if forcedSource != "" {
+			return forcedSource
+		}
+		if detector.Observed() {
+			return db.SourceTest
+		}
+		return db.SourceLive
+	}
+	if forcedSource != "" {
+		log.Printf("source: forced to %q by DCSMM_SOURCE", forcedSource)
+	}
+
 	// ---- UDP: unit positions ---------------------------------------------
 	udpConn, err := udp.Listen(cfg.UDPAddr)
 	if err != nil {
@@ -237,6 +371,13 @@ func runServer() {
 	}
 	defer udpConn.Close()
 	listener := udp.NewListener(store, classifier)
+	listener.SetSourceDetector(func(payload []byte) bool {
+		fired := detector.Observe(payload)
+		if fired && forcedSource == "" {
+			log.Printf("source: simulated telemetry detected, the session will be recorded as %q", db.SourceTest)
+		}
+		return fired
+	})
 	go listener.Serve(udpConn)
 	log.Printf("udp: listening on %s", cfg.UDPAddr)
 
@@ -271,6 +412,7 @@ func runServer() {
 
 	// Persist messages as they arrive, and mirror them over SSE.
 	writer := ingest.New(database, liveStore)
+	writer.SetSourceFunc(sessionSource)
 	debriefs := debriefstore.New(database)
 	debriefs.OnDebrief = func(d model.Debrief) {
 		srv.BroadcastMessage(map[string]any{"type": "debrief", "debrief": d})
@@ -298,8 +440,9 @@ func runServer() {
 	if database != nil {
 		track.SetMissionID(database.OpenMissionID())
 		track.SetMissionIDFunc(database.OpenMissionID)
+		track.SetMissionSource(sessionSource)
 		track.SetEnsureMission(func() int64 {
-			id, err := database.EnsureMission("Session without mission", cfg.Theatre)
+			id, err := database.EnsureMissionTagged("Session without mission", cfg.Theatre, sessionSource())
 			if err != nil {
 				log.Printf("tracker: ensure mission: %v", err)
 				return 0

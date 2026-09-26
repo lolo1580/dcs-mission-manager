@@ -9,24 +9,10 @@ import (
 )
 
 // EnsureMission returns the id of the open (not ended) mission, creating one
-// from the given details if none exists.
+// from the given details if none exists. New missions are tagged SourceLive;
+// use EnsureMissionTagged when the session is known to be simulated.
 func (d *DB) EnsureMission(name, theatre string) (int64, error) {
-	var id int64
-	err := d.sql.QueryRow(`SELECT id FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`).Scan(&id)
-	if err == nil {
-		return id, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, err
-	}
-	res, err := d.sql.Exec(
-		`INSERT INTO missions(name, theatre, started_at) VALUES(?, ?, ?)`,
-		name, theatre, time.Now().UnixMilli(),
-	)
-	if err != nil {
-		return 0, err
-	}
-	return res.LastInsertId()
+	return d.EnsureMissionTagged(name, theatre, SourceLive)
 }
 
 // OpenMissionID returns the current open mission id, or 0 if none.
@@ -172,26 +158,7 @@ func (d *DB) RecentChat(limit int) ([]model.Chat, error) {
 
 // Missions returns recent missions, newest first.
 func (d *DB) Missions(limit int) ([]model.Mission, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	rows, err := d.sql.Query(
-		`SELECT id, name, COALESCE(theatre,''), started_at, COALESCE(ended_at,0), COALESCE(winner,'')
-		 FROM missions ORDER BY id DESC LIMIT ?`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []model.Mission
-	for rows.Next() {
-		var m model.Mission
-		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.StartedAt, &m.EndedAt, &m.Winner); err != nil {
-			return nil, err
-		}
-		out = append(out, m)
-	}
-	return out, rows.Err()
+	return d.MissionsWithSource("", limit)
 }
 
 func nullInt(v int64) any {

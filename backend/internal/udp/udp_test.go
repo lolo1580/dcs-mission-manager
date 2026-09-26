@@ -90,3 +90,36 @@ func TestHandleUnknownType(t *testing.T) {
 		t.Fatalf("unknown messages should not create units, got %d", n)
 	}
 }
+
+// TestSourceDetectorSeesRawPayload checks that the detector is invoked with the
+// datagram as received, and only for ownship messages. The detector relies on
+// the raw bytes, so the listener must not hand it a re-serialised message.
+func TestSourceDetectorSeesRawPayload(t *testing.T) {
+	store := state.New(time.Minute, 0)
+	l := NewListener(store, category.New(""))
+
+	var seen [][]byte
+	l.SetSourceDetector(func(payload []byte) bool {
+		seen = append(seen, payload)
+		return true
+	})
+
+	ownship := []byte(`{"type":"ownship","name":"Viper 1-1","lat":42}`)
+	world := []byte(`{"type":"world","units":[{"id":"1","type":"T-72B"}]}`)
+
+	l.dispatch(ownship, &Message{Type: "ownship", Name: "Viper 1-1"})
+	l.dispatch(world, &Message{Type: "world"})
+
+	if len(seen) != 1 {
+		t.Fatalf("detector should run once (ownship only), got %d calls", len(seen))
+	}
+	if string(seen[0]) != string(ownship) {
+		t.Fatalf("detector should receive the raw payload, got %q", seen[0])
+	}
+
+	// A world snapshot never reaches the detector, whatever its content.
+	l.dispatch([]byte(`{"type":"world","units":[{"id":"2","type":"Viper 1-1"}]}`), &Message{Type: "world"})
+	if len(seen) != 1 {
+		t.Fatalf("detector should not run on world snapshots, got %d calls", len(seen))
+	}
+}

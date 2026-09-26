@@ -9,6 +9,33 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Ajouté
+
+- **Suivi de la source des sessions (`live` / `test`) et commande `dcsmm purge`.**
+  Une session enregistrée pendant que les outils de test tournent est
+  indiscernable d'un vrai vol, car ces outils parlent exactement le même
+  protocole que DCS. Chaque mission porte désormais une `source`, détectée
+  automatiquement à partir des indicatifs des fixtures (`DCSMM_SOURCE` force le
+  verdict), et les statistiques excluent les sessions `test` sauf avec
+  `?includeTest=1`. Nouvelles commandes CLI et HTTP (`dcsmm purge`,
+  `DELETE /api/maintenance/purge`) pour supprimer des sessions, ce qui n'avait
+  jusqu'ici aucune option en dehors de la suppression du fichier de base.
+
+### Corrigé
+
+- **Missions fantômes vides.** Le tracker de positions ouvrait une « Session
+  without mission » dès son premier tick, même si aucune unité n'avait jamais été
+  signalée : un backend inactif accumulait donc des sessions vides dans
+  l'interface. Une mission n'est maintenant créée qu'après l'échantillonnage
+  d'une vraie position.
+- **Une session détectée comme simulée en cours de vol restait comptée comme
+  réelle.** Le tracker peut ouvrir une mission avant l'arrivée du premier paquet
+  de test ; la mission est maintenant promue en `test` aux ticks suivants, et ne
+  peut jamais redevenir `live`.
+- **L'analyse pouvait s'ouvrir sur une session simulée.** La heatmap et les
+  traces se basent par défaut sur la mission `live` la plus récente, et non plus
+  sur la plus récente toutes sources confondues.
+
 ### À venir
 
 - Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,

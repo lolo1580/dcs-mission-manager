@@ -18,6 +18,9 @@ func (s *Server) scopeFromRequest(r *http.Request) stats.Scope {
 	if sc.Mode == "" {
 		sc.Mode = "career"
 	}
+	// Test sessions are excluded unless explicitly requested, so the dashboard
+	// never presents simulated data as a real career.
+	sc.IncludeTest = q.Get("includeTest") == "1"
 	if sc.Mode == "mission" {
 		if id, err := strconv.ParseInt(q.Get("missionId"), 10, 64); err == nil && id > 0 {
 			sc.MissionID = id

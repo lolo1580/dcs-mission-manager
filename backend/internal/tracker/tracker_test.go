@@ -25,6 +25,59 @@ func setup(t *testing.T) (*Tracker, *db.DB, *state.Store) {
 	return tr, database, store
 }
 
+// TestTickPromotesMissionSourceWhenDetectedLate covers the regression found by
+// end-to-end testing: the tracker opens the mission at its first tick, which can
+// happen *before* the UDP listener recognises the test tools. The mission would
+// then stay tagged "live" for the whole session unless a later tick promotes it.
+func TestTickPromotesMissionSourceWhenDetectedLate(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("db: %v", err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	store := state.New(time.Minute, 0)
+	tr := New(database, store, Options{SampleEvery: time.Second, Grace: time.Millisecond})
+
+	// The session starts looking real: the tracker opens a default mission.
+	source := db.SourceLive
+	tr.SetMissionSource(func() string { return source })
+	store.Update(&state.Unit{ID: "1", Type: "F-16C_50", Category: "plane",
+		Coalition: "blue", Lat: 42, Lng: 41, Alt: 5000})
+	tr.Tick()
+
+	id := tr.currentMissionID()
+	if id == 0 {
+		t.Fatal("the tracker should have opened a mission")
+	}
+	if got := missionSourceOf(t, database, id); got != db.SourceLive {
+		t.Fatalf("mission should start as %q, got %q", db.SourceLive, got)
+	}
+
+	// The test tools are then recognised, and a later tick must promote it.
+	source = db.SourceTest
+	tr.Tick()
+	if got := missionSourceOf(t, database, id); got != db.SourceTest {
+		t.Fatalf("a late detection must promote the mission to %q, got %q", db.SourceTest, got)
+	}
+
+	// And it must never fall back to live.
+	source = db.SourceLive
+	tr.Tick()
+	if got := missionSourceOf(t, database, id); got != db.SourceTest {
+		t.Fatalf("the promotion must not be undone, got %q", got)
+	}
+}
+
+func missionSourceOf(t *testing.T, d *db.DB, id int64) string {
+	t.Helper()
+	var source string
+	if err := d.SQL().QueryRow(`SELECT source FROM missions WHERE id = ?`, id).Scan(&source); err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	return source
+}
+
 func TestTickSamplesPositions(t *testing.T) {
 	tr, database, store := setup(t)
 

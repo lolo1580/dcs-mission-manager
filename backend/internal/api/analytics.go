@@ -4,11 +4,17 @@ import (
 	"net/http"
 	"strconv"
 
+	"dcsmm/internal/db"
 	"dcsmm/internal/tracker"
 )
 
 // analyticsMissionID returns the mission to analyse: ?missionId=N, otherwise the
 // open mission. 0 means "all missions".
+//
+// A request that names no mission falls back to the newest *live* mission, so
+// analytics never opens on a simulated session by default. An explicit
+// ?missionId still works, whatever that mission's source, and ?includeTest=1
+// restores the old "newest mission" behaviour.
 func (s *Server) analyticsMissionID(r *http.Request) int64 {
 	q := r.URL.Query()
 	if q.Get("all") == "1" {
@@ -21,7 +27,11 @@ func (s *Server) analyticsMissionID(r *http.Request) int64 {
 		if id := s.db.OpenMissionID(); id != 0 {
 			return id
 		}
-		if list, err := s.db.Missions(1); err == nil && len(list) > 0 {
+		source := db.SourceLive
+		if q.Get("includeTest") == "1" {
+			source = ""
+		}
+		if list, err := s.db.MissionsWithSource(source, 1); err == nil && len(list) > 0 {
 			return list[0].ID
 		}
 	}

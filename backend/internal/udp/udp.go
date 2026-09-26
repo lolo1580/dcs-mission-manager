@@ -61,11 +61,22 @@ type World struct {
 type Listener struct {
 	store      *state.Store
 	classifier *category.Classifier
+	// detectSource reports whether a payload was recognised as coming from the
+	// test tools. Optional; nil disables detection.
+	detectSource func(payload []byte) bool
 }
 
 // NewListener creates a listener updating store, classifying types with c.
 func NewListener(store *state.Store, c *category.Classifier) *Listener {
 	return &Listener{store: store, classifier: c}
+}
+
+// SetSourceDetector installs a callback invoked with the raw payload of every
+// datagram that marks a unit as the local player. It lets the caller notice the
+// test tools (which speak the same protocol as DCS) and tag the session
+// accordingly. The callback must be cheap and non-blocking.
+func (l *Listener) SetSourceDetector(fn func(payload []byte) bool) {
+	l.detectSource = fn
 }
 
 // Listen opens a UDP socket bound to addr.
@@ -96,8 +107,19 @@ func (l *Listener) Serve(conn *net.UDPConn) {
 			log.Printf("udp: decode: %v", err)
 			continue
 		}
-		l.handle(&m)
+		l.dispatch(buf[:n], &m)
 	}
+}
+
+// dispatch handles one decoded datagram. payload is the raw datagram, passed to
+// the source detector before interpretation.
+func (l *Listener) dispatch(payload []byte, m *Message) {
+	// Detect simulated traffic before handling: only the ownship message is
+	// checked, so the (much larger) world snapshots carry no cost.
+	if l.detectSource != nil && m.Type == "ownship" {
+		l.detectSource(payload)
+	}
+	l.handle(m)
 }
 
 func (l *Listener) handle(m *Message) {

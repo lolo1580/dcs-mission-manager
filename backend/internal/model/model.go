@@ -97,9 +97,12 @@ type Chat struct {
 
 // Mission records a mission run.
 type Mission struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Theatre   string `json:"theatre,omitempty"`
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	Theatre string `json:"theatre,omitempty"`
+	// Source is "live" for a session recorded from DCS, or "test" for one
+	// produced by the test tools. Statistics exclude "test" by default.
+	Source    string `json:"source,omitempty"`
 	StartedAt int64  `json:"startedAt"`
 	EndedAt   int64  `json:"endedAt,omitempty"`
 	Winner    string `json:"winner,omitempty"`

@@ -39,6 +39,11 @@ type Tracker struct {
 	// ensureMissionFn returns an open mission, creating one when needed. It is
 	// used when positions arrive with no mission ever announced.
 	ensureMissionFn func() int64
+	// missionSourceFn, when set, reports the source of the running session
+	// ("live" or "test"). It lets the tracker tag a mission it creates itself
+	// with the same source the rest of the pipeline uses, so simulated
+	// positions never land in a mission counted as real.
+	missionSourceFn func() string
 }
 
 // Options configures a Tracker.
@@ -90,12 +95,34 @@ func (t *Tracker) SetEnsureMission(fn func() int64) {
 	t.mu.Unlock()
 }
 
+// SetMissionSource sets a function reporting the current session source
+// ("live" or "test"). It is consulted when the tracker has to create a mission
+// on its own, so the created mission carries the right tag.
+func (t *Tracker) SetMissionSource(fn func() string) {
+	t.mu.Lock()
+	t.missionSourceFn = fn
+	t.mu.Unlock()
+}
+
+// currentSource returns the source of the running session, defaulting to live.
+func (t *Tracker) currentSource() string {
+	t.mu.Lock()
+	fn := t.missionSourceFn
+	t.mu.Unlock()
+	if fn == nil {
+		return db.SourceLive
+	}
+	if s := fn(); db.ValidSource(s) {
+		return s
+	}
+	return db.SourceLive
+}
+
 // currentMissionID returns the mission to attach samples to.
 func (t *Tracker) currentMissionID() int64 {
 	t.mu.Lock()
 	id := t.missionID
 	fn := t.missionIDFn
-	ensure := t.ensureMissionFn
 	t.mu.Unlock()
 
 	if id != 0 {
@@ -106,10 +133,39 @@ func (t *Tracker) currentMissionID() int64 {
 			return got
 		}
 	}
+	// Nothing announced: fall back to a default mission carrying the running
+	// session's source (live or test).
+	return t.EnsureMission()
+}
+
+// EnsureMission returns the current mission, creating a default one when the
+// tracker has to persist positions without any mission ever having been
+// announced. The mission carries the running session's source, so simulated
+// positions are never attributed to a "live" mission.
+func (t *Tracker) EnsureMission() int64 {
+	t.mu.Lock()
+	ensure := t.ensureMissionFn
+	t.mu.Unlock()
 	if ensure != nil {
 		return ensure()
 	}
-	return 0
+	if t.db == nil {
+		return 0
+	}
+	id, err := t.db.EnsureMissionTagged("Session without mission", "", t.currentSource())
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+// hasTracked reports whether any unit has ever been sampled. It keeps loss
+// detection running after the last unit disappears: the tracker is the only
+// component that can notice a unit vanished, so it must keep ticking.
+func (t *Tracker) hasTracked() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.seen) > 0
 }
 
 // Run samples the store every sampleEvery until ctx is done.
@@ -156,6 +212,13 @@ func (t *Tracker) Tick() {
 	now := time.Now()
 	nowMs := now.UnixMilli()
 
+	// Do not open a mission just because the sampler ticked. Without this, an
+	// idle backend would create an empty "mission" at every start, which then
+	// shows up in the UI as a phantom session with no data.
+	if len(units) == 0 && !t.hasTracked() {
+		return
+	}
+
 	missionID := t.currentMissionID()
 
 	seenNow := make(map[string]bool, len(units))
@@ -200,6 +263,14 @@ func (t *Tracker) Tick() {
 	}
 
 	if t.db != nil && missionID > 0 {
+		// If the session has since been recognised as simulated, promote the
+		// mission. The tracker may have opened it as "live" at an earlier tick,
+		// before the test packet arrived.
+		if source := t.currentSource(); source != "" {
+			if err := t.db.UpgradeMissionSource(missionID, source); err != nil {
+				log.Printf("tracker: upgrade mission source: %v", err)
+			}
+		}
 		if err := t.db.SaveSamples(missionID, samples); err != nil {
 			log.Printf("tracker: save samples: %v", err)
 		}
