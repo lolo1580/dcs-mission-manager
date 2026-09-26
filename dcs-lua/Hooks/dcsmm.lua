@@ -300,7 +300,19 @@ do
   function dcsmm.onSimulationStart()
     local name = (Sim and Sim.getMissionName and Sim.getMissionName()) or "?"
     refreshSlotTypes()
-    sendLine(toJson({ type = "mission", phase = "start", name = name }))
+    -- On transmet les options de mission : le backend en a besoin pour
+    -- respecter les règles de visibilité (fog of war) de la mission.
+    local options = nil
+    if Sim and Sim.getMissionOptions then
+      local ok, opts = pcall(Sim.getMissionOptions)
+      if ok and type(opts) == "table" then options = opts end
+    end
+    sendLine(toJson({
+      type = "mission",
+      phase = "start",
+      name = name,
+      options = options,
+    }))
     sendPlayers()
     say("mission démarrée : " .. tostring(name))
   end

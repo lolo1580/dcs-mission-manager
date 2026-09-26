@@ -20,6 +20,10 @@ import (
 type Listener struct {
 	live *live.Store
 
+	// OnOptions, when set, receives the mission difficulty/view options so the
+	// server can honour the mission's fog-of-war settings.
+	OnOptions func(map[string]any)
+
 	// OnEvent, when set, is called for every received message (for persistence
 	// and broadcasting). It must not block.
 	OnMessage func(model.Message)
@@ -106,6 +110,9 @@ func (l *Listener) dispatch(m *model.Message) {
 			})
 		} else if m.Phase == "end" {
 			l.live.EndMission(m.Winner, now)
+		}
+		if len(m.Options) > 0 && l.OnOptions != nil {
+			l.OnOptions(m.Options)
 		}
 	default:
 		log.Printf("tcp: unknown message type %q", m.Type)

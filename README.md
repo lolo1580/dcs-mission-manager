@@ -37,6 +37,7 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
 | Aérodromes | ✅ Phase 6 | 21 terrains du Caucase : coordonnées, Tower, TACAN, ILS, cartes |
+| Fog of war | ✅ Phase 7 | Respect des options de mission F10 (filtrage côté serveur) |
 
 ### Statistiques avancées (prévues)
 
@@ -158,6 +159,7 @@ défauts raisonnables — identique pour l'`.exe` et pour Docker.
 | `DCSMM_TRACK_INTERVAL` | `3` (secondes) | Fréquence d'échantillonnage des positions |
 | `DCSMM_TRACK_GRACE` | `15` (secondes) | Absence avant de compter une unité comme perdue |
 | `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
+| `DCSMM_REVEAL_ALL_UNITS` | `false` | Désactive le fog of war (tout diffuser ; solo/conception) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ### Côté DCS — `Saved Games\DCS\Config\dcsmm.cfg`
@@ -308,6 +310,7 @@ DCS mission manager/
 - [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
 - [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, `.exe` + Docker multi-arch
 - [x] **Phase 6 — Aérodromes** : 21 terrains du Caucase (fréquences, cartes)
+- [x] **Phase 7 — Fog of war** : respect des options F10 de la mission (filtrage serveur)
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.
 

@@ -41,6 +41,7 @@ import (
 	"dcsmm/internal/tcp"
 	"dcsmm/internal/tracker"
 	"dcsmm/internal/udp"
+	"dcsmm/internal/visibility"
 )
 
 // Version is set at build time with -ldflags "-X main.Version=...".
@@ -257,7 +258,15 @@ func runServer() {
 	} else {
 		log.Printf("aerodrome: %d airfields loaded", airfields.Count())
 	}
-	srv := api.New(cfg, store, liveStore, database, statsService, airfields)
+	visibilityPolicy := visibility.New(cfg.RevealAllUnits)
+	if cfg.RevealAllUnits {
+		log.Printf("visibility: filtrage désactivé (DCSMM_REVEAL_ALL_UNITS=true)")
+	} else {
+		log.Printf("visibility: fog of war respecté (restrictif)")
+	}
+	srv := api.New(cfg, store, liveStore, database, statsService, airfields, visibilityPolicy)
+	// The mission's F10 view options drive fog-of-war filtering.
+	tcpListener.OnOptions = srv.ApplyMissionOptions
 
 	// Persist messages as they arrive, and mirror them over SSE.
 	writer := ingest.New(database, liveStore)

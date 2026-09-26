@@ -45,6 +45,9 @@ type Config struct {
 	TrackGrace time.Duration
 	// TrackRetention is how long tracking history is kept.
 	TrackRetention time.Duration
+	// RevealAllUnits disables fog-of-war filtering. Off by default: a live map
+	// must not reveal units the mission deliberately hides.
+	RevealAllUnits bool
 }
 
 func env(key, def string) string {
@@ -104,5 +107,6 @@ func Load() Config {
 		TrackInterval:  envDuration("DCSMM_TRACK_INTERVAL", 3*time.Second),
 		TrackGrace:     envDuration("DCSMM_TRACK_GRACE", 15*time.Second),
 		TrackRetention: envDuration("DCSMM_TRACK_RETENTION", 24*time.Hour),
+		RevealAllUnits: envBool("DCSMM_REVEAL_ALL_UNITS", false),
 	}
 }

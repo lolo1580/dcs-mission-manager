@@ -24,6 +24,7 @@ import (
 	"dcsmm/internal/state"
 	"dcsmm/internal/stats"
 	"dcsmm/internal/theatre"
+	"dcsmm/internal/visibility"
 )
 
 // The frontend build is written here by `npm run build` (see
@@ -79,6 +80,7 @@ type Server struct {
 	db         *db.DB
 	stats      *stats.Service
 	aerodromes *aerodrome.Catalog
+	visibility *visibility.Policy
 	hub        *hub
 	theatres   []theatre.Theatre
 	tilesDir   string
@@ -86,10 +88,13 @@ type Server struct {
 }
 
 // New creates a server backed by store. live, database and statsService may be nil.
-func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog) *Server {
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, vis *visibility.Policy) *Server {
 	theatres := theatre.All()
 	for i := range theatres {
 		theatres[i].Tiles = hasTiles(cfg.TilesDir, theatres[i].ID)
+	}
+	if vis == nil {
+		vis = visibility.New(false)
 	}
 	return &Server{
 		cfg:        cfg,
@@ -98,6 +103,7 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		db:         database,
 		stats:      statsService,
 		aerodromes: aerodromes,
+		visibility: vis,
 		hub:        newHub(),
 		theatres:   theatres,
 		tilesDir:   cfg.TilesDir,
@@ -112,6 +118,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/theatres", s.handleTheatres)
+	mux.HandleFunc("/api/visibility", s.handleVisibility)
 	mux.HandleFunc("/api/units/", s.handleUnit)
 	mux.HandleFunc("/api/tiles/", s.handleTiles)
 	mux.HandleFunc("/api/game-events", s.handleGameEvents)
@@ -210,14 +217,17 @@ func summarise(units []state.Unit) Summary {
 }
 
 func (s *Server) stateJSON() ([]byte, error) {
-	units := s.store.Snapshot()
+	// Fog-of-war filtering happens here, once, so every consumer (SSE, REST)
+	// sees exactly the same, mission-authorised view.
+	units := s.visibility.Filter(s.store.Snapshot())
 	sort.Slice(units, func(i, j int) bool { return units[i].ID < units[j].ID })
 	payload := map[string]any{
-		"type":    "state",
-		"count":   len(units),
-		"units":   units,
-		"summary": summarise(units),
-		"ts":      time.Now().UnixMilli(),
+		"type":       "state",
+		"count":      len(units),
+		"units":      units,
+		"summary":    summarise(units),
+		"visibility": s.visibility.Describe(),
+		"ts":         time.Now().UnixMilli(),
 	}
 	return json.Marshal(payload)
 }
@@ -233,11 +243,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 //
 // Query parameters: category, coalition, ownship=true, q (type/label substring).
 func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
-	units := filter(s.store.Snapshot(), r)
+	units := filter(s.visibility.Filter(s.store.Snapshot()), r)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"count":   len(units),
-		"units":   units,
-		"summary": summarise(units),
+		"count":      len(units),
+		"units":      units,
+		"summary":    summarise(units),
+		"visibility": s.visibility.Describe(),
 	})
 }
 
@@ -277,13 +288,18 @@ func (s *Server) handleUnit(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing unit id"})
 		return
 	}
-	for _, u := range s.store.Snapshot() {
+	for _, u := range s.visibility.Filter(s.store.Snapshot()) {
 		if u.ID == id {
 			writeJSON(w, http.StatusOK, u)
 			return
 		}
 	}
 	writeJSON(w, http.StatusNotFound, map[string]string{"error": "unit not found"})
+}
+
+// handleVisibility reports the active fog-of-war policy.
+func (s *Server) handleVisibility(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.visibility.Describe())
 }
 
 func (s *Server) handleTheatres(w http.ResponseWriter, _ *http.Request) {

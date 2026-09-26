@@ -9,8 +9,45 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### À venir
 
-- Renseigner les autres théâtres (Syrie, Golfe, Nevada, Marianas…)
-- Affichage des cartes d'aérodrome dans l'interface
+- Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,
+  symboles MIL-STD-2525C, visionneuse de kneeboards
+
+## [0.9.0] — 2026-09-26
+
+**Phase 7 — Fog of war.** Le manager respecte désormais les options de visibilité
+de la mission : il ne révèle plus ce que DCS cache.
+
+### Ajouté
+
+- **`internal/visibility`**
+  - Politique de visibilité basée sur `optionsView` de la mission, **restrictive
+    par défaut** : ne jamais montrer plus que DCS.
+  - Filtrage **côté serveur** (le client ne reçoit jamais les unités masquées).
+  - L'appareil du joueur reste toujours visible ; sans lui la carte serait
+    inutilisable.
+  - Mode « fog of war » (`optview_allies`) traité comme « alliés uniquement » :
+    les contacts capteurs ne sont pas reproduits, par choix de sûreté.
+
+- **Backend**
+  - Le hook Lua transmet `Sim.getMissionOptions()` au démarrage de mission.
+  - `internal/tcp` remonte les options ; le serveur en déduit la politique.
+  - `GET /api/visibility` et clé `visibility` dans chaque trame d'état ;
+    événement SSE `visibility` à chaque changement.
+  - `internal/config` : `DCSMM_REVEAL_ALL_UNITS` (défaut `false`).
+
+- **Frontend**
+  - Bandeau sous l'en-tête indiquant le mode actif et sa limite.
+
+- **Documentation & tests**
+  - `docs/fog-of-war.md` (valeurs DCS officielles, principe, limites).
+  - Tests `internal/visibility` : correspondance des valeurs, filtrage par mode,
+    **non-fuite des unités ennemies/neutres**, dérogation, absence d'appareil.
+
+### Notes
+
+- Les valeurs officielles viennent de `MissionEditor/modules/Options/optionsDb.lua`
+  de DCS. Au passage, deux libellés avaient été mal interprétés au départ :
+  `optview_allies` est le « FOG OF WAR », `optview_onlyallies` est « ALLIES ONLY ».
 
 ## [0.8.0] — 2026-09-26
 

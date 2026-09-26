@@ -24,6 +24,8 @@ type Store struct {
 	players map[int]model.Player
 
 	mission *model.Mission
+
+	options map[string]any
 }
 
 // New creates a store capping events and chat history.
@@ -133,6 +135,20 @@ func (s *Store) Mission() (model.Mission, bool) {
 		return model.Mission{}, false
 	}
 	return *s.mission, true
+}
+
+// SetOptions stores the mission's view/difficulty options.
+func (s *Store) SetOptions(options map[string]any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.options = options
+}
+
+// Options returns the last received mission options.
+func (s *Store) Options() map[string]any {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.options
 }
 
 func sortPlayers(p []model.Player) {

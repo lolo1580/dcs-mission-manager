@@ -16,6 +16,7 @@
     visibleUnits,
     basemaps,
     basemapId,
+    visibility,
   } from './lib/units.js';
   import { players, events, mission } from './lib/session.js';
   import { loadAnalytics } from './lib/analytics.js';
@@ -92,6 +93,18 @@
     {/if}
   </header>
 
+  {#if $visibility && $visibility.mode !== 'all' && !$visibility.override}
+    <div
+      class="fog-banner"
+      title={$visibility.note || ''}
+      class:fog={$visibility.mode === 'unknown'}
+    >
+      <span class="fog-icon">◐</span>
+      Visibilité : {$visibility.label}
+      {#if $visibility.note}— <span class="fog-note">{$visibility.note}</span>{/if}
+    </div>
+  {/if}
+
   <main>
     {#if tab === 'map'}
       <Sidebar />
@@ -130,7 +143,7 @@
 <style>
   .layout {
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     height: 100%;
   }
 
@@ -288,6 +301,30 @@
   main {
     display: flex;
     min-height: 0;
+  }
+
+  .fog-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.78rem;
+    color: #f0b429;
+    background: color-mix(in srgb, #f0b429 12%, var(--panel));
+    border-bottom: 1px solid var(--border);
+  }
+
+  .fog-banner.fog {
+    color: #9aa4b2;
+    background: var(--panel);
+  }
+
+  .fog-icon {
+    font-size: 0.9rem;
+  }
+
+  .fog-note {
+    color: var(--muted);
   }
 
   .map-wrap {

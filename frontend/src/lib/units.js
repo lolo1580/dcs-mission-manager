@@ -10,6 +10,8 @@ export const units = writable([]);
 export const summary = writable({ byCategory: {}, byCoalition: {} });
 export const connected = writable(false);
 export const lastUpdate = writable(null);
+/** Fog-of-war policy reported by the backend. */
+export const visibility = writable({ mode: 'unknown', label: '—', override: false });
 
 /** @type {import('svelte/store').Writable<string|null>} */
 export const selectedId = writable(null);
@@ -89,6 +91,7 @@ export function connect() {
       if (msg.type !== 'state') return;
       units.set(msg.units ?? []);
       summary.set(msg.summary ?? { byCategory: {}, byCoalition: {} });
+      if (msg.visibility) visibility.set(msg.visibility);
       lastUpdate.set(new Date());
 
       // Drop the selection if the unit disappeared.
