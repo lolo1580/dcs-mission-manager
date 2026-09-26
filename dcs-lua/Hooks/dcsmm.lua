@@ -161,6 +161,45 @@ do
     return nil
   end
 
+  -- Associe un slotID à son type d'appareil. Sim.getAvailableSlots renvoie la
+  -- liste des slots disponibles avec leur type ; on construit la table une fois
+  -- par mission et on la rafraîchit périodiquement (des slots peuvent apparaître).
+  local slotTypes = {}
+
+  local function refreshSlotTypes()
+    if not (Sim and Sim.getAvailableSlots and Sim.getAvailableCoalitions) then
+      return
+    end
+    local okCo, coalitions = pcall(Sim.getAvailableCoalitions)
+    if not okCo or type(coalitions) ~= "table" then return end
+
+    local map = {}
+    for coalitionID in pairs(coalitions) do
+      local okS, slots = pcall(Sim.getAvailableSlots, coalitionID)
+      if okS and type(slots) == "table" then
+        for _, slot in ipairs(slots) do
+          -- slot = {unitId, type, role, callsign, groupName, country}
+          local unitId = slot.unitId or slot[1]
+          local unitType = slot.type or slot[2]
+          if unitId and unitType then
+            map[tostring(unitId)] = unitType
+          end
+        end
+      end
+    end
+    slotTypes = map
+  end
+
+  -- Le slotID d'un joueur en multi-siège vaut "unitID_seatID" ; on ne garde que
+  -- la partie unitID pour retrouver le type.
+  local function unitTypeForSlot(slot)
+    if not slot or slot == "" then return "" end
+    if slotTypes[slot] then return slotTypes[slot] end
+    local base = slot:match("^(.-)_%d+$")
+    if base and slotTypes[base] then return slotTypes[base] end
+    return ""
+  end
+
   local function sendPlayers()
     local ok, list = pcall(net.get_player_list)
     if not ok or type(list) ~= "table" then return end
@@ -169,12 +208,14 @@ do
     for _, id in ipairs(list) do
       local name = info(id, "name")
       if name and name ~= "" then
+        local slot = info(id, "slot") or ""
         players[#players + 1] = {
           id = id,
           ucid = info(id, "ucid") or "",
           name = name,
           side = info(id, "side") or 0,
-          slot = info(id, "slot") or "",
+          slot = slot,
+          unitType = unitTypeForSlot(slot),
           ping = stat(id, net.PS_PING),
           crashes = stat(id, net.PS_CRASH),
           killsCar = stat(id, net.PS_CAR),
@@ -258,6 +299,7 @@ do
 
   function dcsmm.onSimulationStart()
     local name = (Sim and Sim.getMissionName and Sim.getMissionName()) or "?"
+    refreshSlotTypes()
     sendLine(toJson({ type = "mission", phase = "start", name = name }))
     sendPlayers()
     say("mission démarrée : " .. tostring(name))
@@ -303,9 +345,14 @@ do
   function dcsmm.onPlayerChangeSlot(id) sendPlayers() end
 
   -- Rafraîchissement périodique des statistiques, via le timer du simulateur.
-  local nextPlayersAt
+  local nextPlayersAt, nextSlotsAt
   function dcsmm.onSimulationFrame()
     local t = (LoGetModelTime and LoGetModelTime()) or 0
+    if not nextSlotsAt then nextSlotsAt = t + 30.0 end
+    if t >= nextSlotsAt then
+      refreshSlotTypes()
+      nextSlotsAt = t + 30.0
+    end
     if not nextPlayersAt then nextPlayersAt = t + playersInterval end
     if t >= nextPlayersAt then
       sendPlayers()

@@ -97,8 +97,10 @@ CREATE TABLE IF NOT EXISTS player_stats (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	mission_id INTEGER REFERENCES missions(id),
 	player_id  INTEGER REFERENCES players(id),
+	dcs_player_id INTEGER,
 	side       INTEGER,
 	slot       TEXT,
+	unit_type  TEXT,
 	ping       INTEGER,
 	crashes    INTEGER,
 	kills_car  INTEGER,
@@ -111,6 +113,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
 );
 CREATE INDEX IF NOT EXISTS idx_stats_mission ON player_stats(mission_id);
 CREATE INDEX IF NOT EXISTS idx_stats_player ON player_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_stats_dcs_player ON player_stats(mission_id, dcs_player_id);
 
 CREATE TABLE IF NOT EXISTS meta (
 	key   TEXT PRIMARY KEY,

@@ -40,11 +40,14 @@ type Message struct {
 
 // Player is a connected client as reported by net.get_player_info / net.get_stat.
 type Player struct {
-	ID        int    `json:"id"`
-	UCID      string `json:"ucid,omitempty"`
-	Name      string `json:"name"`
-	Side      int    `json:"side"` // 0 spectator, 1 red, 2 blue
-	Slot      string `json:"slot,omitempty"`
+	ID   int    `json:"id"`
+	UCID string `json:"ucid,omitempty"`
+	Name string `json:"name"`
+	Side int    `json:"side"` // 0 spectator, 1 red, 2 blue
+	Slot string `json:"slot,omitempty"`
+	// UnitType is the DCS type of the aircraft the player occupies, resolved by
+	// the Lua hook via Sim.getAvailableSlots. Empty when in spectators.
+	UnitType  string `json:"unitType,omitempty"`
 	Ping      int    `json:"ping"`
 	Crashes   int    `json:"crashes"`
 	KillsCar  int    `json:"killsCar"`

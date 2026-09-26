@@ -34,7 +34,8 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 | Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
-| Stats avancées | 📋 Prévu | Pilote/carrière, armes, engins, réseau |
+| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
+| Cartes analytiques & sortie | 📋 Prévu | Heatmaps, traces, télémétrie (4.3 / 4.5) |
 
 ### Statistiques avancées (prévues)
 
@@ -284,7 +285,8 @@ DCS mission manager/
 - [x] **Phase 1 — Live map** : tous les objets, catégories, filtres, traces, recherche, tuiles DCS
 - [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, historique SQLite
 - [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
-- [ ] **Phase 4 — Stats avancées** : 7 modules (pilote, armes, cartes, balance, sortie, réseau, engins)
+- [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
+- [ ] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
 - [ ] **Phase 5 — Packaging** : build final `.exe` + Docker multi-arch, injecteur Lua
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.

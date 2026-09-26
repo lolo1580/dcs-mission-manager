@@ -6,6 +6,7 @@
   import EventPanel from './lib/EventPanel.svelte';
   import ChatPanel from './lib/ChatPanel.svelte';
   import DebriefPanel from './lib/DebriefPanel.svelte';
+  import StatsPanel from './lib/StatsPanel.svelte';
   import {
     connected,
     lastUpdate,
@@ -35,6 +36,7 @@
         {#if $players.length}<span class="badge">{$players.length}</span>{/if}
       </button>
       <button class:active={tab === 'debriefs'} on:click={() => (tab = 'debriefs')}>Débriefs</button>
+      <button class:active={tab === 'stats'} on:click={() => (tab = 'stats')}>Statistiques</button>
     </nav>
 
     {#if $mission}
@@ -64,7 +66,7 @@
       </button>
     {:else if tab === 'session'}
       <span class="meta">{$events.length} événement{$events.length === 1 ? '' : 's'}</span>
-    {:else}
+    {:else if tab === 'debriefs'}
       <span class="meta">Historique des missions</span>
     {/if}
   </header>
@@ -84,9 +86,13 @@
       <div class="session side">
         <ChatPanel />
       </div>
-    {:else}
+    {:else if tab === 'debriefs'}
       <div class="session wide">
         <DebriefPanel />
+      </div>
+    {:else}
+      <div class="session wide">
+        <StatsPanel />
       </div>
     {/if}
   </main>

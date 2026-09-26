@@ -24,6 +24,7 @@ import (
 	"dcsmm/internal/live"
 	"dcsmm/internal/model"
 	"dcsmm/internal/state"
+	"dcsmm/internal/stats"
 	"dcsmm/internal/tcp"
 	"dcsmm/internal/udp"
 )
@@ -70,7 +71,8 @@ func main() {
 	log.Printf("tcp: listening on %s", cfg.TCPAddr)
 
 	// ---- HTTP: API + UI ---------------------------------------------------
-	srv := api.New(cfg, store, liveStore, database)
+	statsService := stats.New(database, classifier)
+	srv := api.New(cfg, store, liveStore, database, statsService)
 
 	// Persist messages as they arrive, and mirror them over SSE.
 	writer := ingest.New(database, liveStore)

@@ -9,8 +9,47 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### À venir
 
-- Phase 4 — Statistiques avancées (7 modules)
+- Phase 4 bis — Cartes analytiques (heatmaps, traces) et analyse de sortie
 - Phase 5 — Packaging final et injecteur Lua
+
+## [0.5.0] — 2026-09-26
+
+**Phase 4 — Statistiques avancées.** Sept modules d'analyse, en portée **carrière**
+(toutes missions, par UCID) ou **mission**.
+
+### Ajouté
+
+- **Backend**
+  - `internal/stats` : vue d'ensemble, pilotes (score, kills, K/D, FF, ping),
+    armes (kills, friendly-fire, cibles et plateformes), engins (**type DCS exact** :
+    kills, pertes, sorties, K/D), coalitions, réseau (ping moyen/max).
+  - Jointure des événements aux joueurs via `dcs_player_id`, ce qui permet de
+    dériver les **morts** et le **friendly-fire** par pilote (absents de
+    `net.get_stat`).
+  - Colonne `unit_type` dans `player_stats`.
+  - Routes `GET /api/stats/{overview,pilots,weapons,engines,network}` avec
+    `?scope=career|mission` et `?missionId=N`.
+
+- **Scripts DCS**
+  - `Hooks/dcsmm.lua` : résolution du **type d'appareil** par joueur via
+    `Sim.getAvailableSlots` (mise en cache, rafraîchie toutes les 30 s) ; le champ
+    `unitType` remplace l'usage du `slotID` opaque.
+
+- **Frontend**
+  - Onglet **Statistiques** : sélecteur Carrière/Mission, cartes de synthèse, et
+    cinq sous-vues (Pilotes, Armes, Engins, Balance, Réseau).
+  - Classement des pilotes avec médailles, K/D, friendly-fire et ping.
+  - Filtres par catégorie d'engin ; barres comparatives des coalitions.
+
+- **Documentation**
+  - `docs/phase4-stats.md`.
+  - Tests `internal/stats` (portées, armes, engins, coalitions, réseau, overview).
+
+### Notes
+
+- Les modules **4.3 Cartes analytiques** (heatmaps, traces) et **4.5 Analyse de
+  sortie** (télémétrie) sont reportés à un incrément dédié : ils s'appuieront sur
+  les positions lat/lng de la live map, sans projection par théâtre.
 
 ## [0.4.0] — 2026-09-26
 

@@ -34,7 +34,12 @@ const pilots = [
   { id: 4, ucid: 'ucid-delta', name: 'Hind', side: 1, slot: 'Mi-24P' },
 ];
 
-const stats = new Map(pilots.map((p) => [p.id, { score: 0, air: 0, car: 0, ship: 0, landings: 0, ejects: 0, crashes: 0 }]));
+const stats = new Map(
+  pilots.map((p) => [
+    p.id,
+    { score: 0, air: 0, car: 0, ship: 0, landings: 0, ejects: 0, crashes: 0 },
+  ])
+);
 
 function roster() {
   return pilots.map((p) => {
@@ -45,6 +50,7 @@ function roster() {
       name: p.name,
       side: p.side,
       slot: p.slot,
+      unitType: p.slot,
       ping: 20 + Math.floor(Math.random() * 180),
       crashes: s.crashes,
       killsCar: s.car,
