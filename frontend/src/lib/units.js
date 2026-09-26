@@ -98,3 +98,15 @@ export async function fetchTheatres() {
   if (!res.ok) throw new Error(`theatres: ${res.status}`);
   return res.json();
 }
+
+/** Selected basemap id, persisted across reloads. */
+export const basemapId = writable(
+  (typeof localStorage !== 'undefined' && localStorage.getItem('dcsmm.basemap')) || 'satellite'
+);
+
+/** Basemaps available from the backend (filled once the map is mounted). */
+export const basemaps = writable([]);
+
+basemapId.subscribe((id) => {
+  if (typeof localStorage !== 'undefined') localStorage.setItem('dcsmm.basemap', id);
+});

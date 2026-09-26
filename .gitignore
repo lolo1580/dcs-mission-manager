@@ -18,6 +18,16 @@
 *.db
 *.db-journal
 
+# Large reference map scans (air navigation charts, ~1.3 GB).
+# Kept locally for optional tile extraction; never committed.
+# Only the explanatory README is tracked.
+/maps_dcs/*
+!/maps_dcs/README.md
+
+# Generated tiles (large, reproducible from maps_dcs/)
+/tiles/*
+!/tiles/.gitkeep
+
 # Editor / OS
 .vscode/
 .idea/

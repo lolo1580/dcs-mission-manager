@@ -2,7 +2,7 @@
   import MapView from './lib/MapView.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import UnitDetails from './lib/UnitDetails.svelte';
-  import { connected, lastUpdate, units, visibleUnits } from './lib/units.js';
+  import { connected, lastUpdate, units, visibleUnits, basemaps, basemapId } from './lib/units.js';
 
   let mapView;
 </script>
@@ -19,6 +19,16 @@
     <span class="meta">{$visibleUnits.length} affichée{$visibleUnits.length === 1 ? '' : 's'}</span>
     {#if $lastUpdate}
       <span class="meta">maj {$lastUpdate.toLocaleTimeString()}</span>
+    {/if}
+    {#if $basemaps.length}
+      <label class="basemap">
+        Fond
+        <select bind:value={$basemapId}>
+          {#each $basemaps as b (b.id)}
+            <option value={b.id}>{b.name}</option>
+          {/each}
+        </select>
+      </label>
     {/if}
     <button class="recenter" on:click={() => mapView?.recenter()} title="Recentrer la carte">
       Recentrer
@@ -93,6 +103,34 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
+  }
+
+  .basemap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .basemap select {
+    padding: 0.3rem 0.45rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .basemap select:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
+  .basemap + .recenter {
+    margin-left: 0;
   }
 
   .recenter:hover {

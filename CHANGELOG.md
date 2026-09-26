@@ -7,6 +7,24 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Ajouté
+
+- **Sélecteur de fond de carte** (Phase 1) : Satellite, Relief, Routier et Sombre,
+  plus l'option « DCS » automatique quand des tuiles authentiques existent. Aucun
+  fond ne requiert de clé API (le mode sombre applique un filtre CSS aux tuiles OSM).
+  Choix par défaut via `DCSMM_BASEMAP` / `DCSMM_BASEMAP_URL`, mémorisé côté navigateur.
+
+- **Documentation & outils**
+  - `maps_dcs/README.md` : nature des scans de cartes fournis (non géoréférencés,
+    projection conique) et voies d'utilisation.
+  - `tools/inspect-maps.py` : recense les scans, leurs dimensions et métadonnées, et
+    exporte les coins pour lecture des graduations.
+
+### Modifié
+
+- `internal/basemap` remplace l'ancien fond unique `DCSMM_BASEMAP_URL`.
+- Le dossier `maps_dcs/` (≈1,2 Go) est exclu de git ; seul son README est suivi.
+
 ### À venir
 
 - Phase 2 — Événements & joueurs (hooks, chat, `net.get_stat`)
@@ -45,6 +63,10 @@ et affichés sur une carte interactive.
 - **Frontend**
   - Carte : icônes SVG par catégorie, couleurs par coalition, **traces de vol** pour
     avions et hélicoptères, survol avec infobulle, recentrage sur le joueur.
+  - **Sélecteur de fond de carte** : Satellite, Relief, Routier, Sombre — plus l'option
+    « DCS » automatique si des tuiles authentiques sont présentes. Aucun fond ne
+    nécessite de clé API (le mode sombre est un filtre CSS sur les tuiles OSM).
+    Le choix est mémorisé dans le navigateur.
   - Panneau latéral : filtres coalitions/catégories avec compteurs en direct, recherche,
     « mon appareil uniquement », liste des unités sélectionnables.
   - Fiche unité : type, catégorie, coalition, pays, position, altitude, cap, âge.

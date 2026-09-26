@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"dcsmm/internal/basemap"
 	"dcsmm/internal/config"
 	"dcsmm/internal/state"
 	"dcsmm/internal/theatre"
@@ -73,7 +74,7 @@ type Server struct {
 	hub      *hub
 	theatres []theatre.Theatre
 	tilesDir string
-	basemap  string
+	basemaps []basemap.Basemap
 }
 
 // New creates a server backed by store.
@@ -88,7 +89,7 @@ func New(cfg config.Config, store *state.Store) *Server {
 		hub:      newHub(),
 		theatres: theatres,
 		tilesDir: cfg.TilesDir,
-		basemap:  cfg.BasemapURL,
+		basemaps: basemap.All(cfg.BasemapURL),
 	}
 }
 
@@ -228,8 +229,9 @@ func (s *Server) handleUnit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTheatres(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"default":  s.cfg.Theatre,
-		"basemap":  s.basemap,
 		"theatres": s.theatres,
+		"basemaps": s.basemaps,
+		"basemap":  s.cfg.Basemap,
 	})
 }
 

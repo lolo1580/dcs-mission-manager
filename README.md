@@ -147,7 +147,8 @@ défauts raisonnables — identique pour l'`.exe` et pour Docker.
 | `DCSMM_THEATRE` | `Caucasus` | Théâtre par défaut |
 | `DCSMM_UNIT_TTL` | `5` (secondes) | Délai avant qu'une unité silencieuse disparaisse |
 | `DCSMM_TILES_DIR` | `./tiles` | Dossier des tuiles de carte DCS |
-| `DCSMM_BASEMAP_URL` | OSM | Fond de carte de repli (template `{z}/{x}/{y}`) |
+| `DCSMM_BASEMAP` | `satellite` | Fond par défaut : `satellite`, `topo`, `osm`, `dark` |
+| `DCSMM_BASEMAP_URL` | *(vide)* | Fond personnalisé optionnel (template `{z}/{x}/{y}`) |
 | `DCSMM_CATEGORIES` | `./categories.json` | Surcharge de classification des engins |
 | `DCSMM_MAX_UNITS` | `5000` | Nombre maximum d'unités suivies |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

@@ -13,6 +13,8 @@
     selectedUnit,
     units,
     fetchTheatres,
+    basemapId,
+    basemaps as basemapsStore,
   } from './units.js';
   import { unitIcon, coalitionColor } from './icons.js';
 
@@ -24,22 +26,41 @@
   let userMoved = false;
   let followOwnship = true;
 
+  /** @type {Array<{id:string,name:string,url:string,attribution:string,maxZoom:number,subdomains?:string[]}>} */
+  let basemaps = [];
+  let dcsTiles = null; // {theatre, bounds} when authentic DCS tiles exist
+  let currentLayer = null;
+
   const TRAIL_MAX = 120;
 
   onMount(async () => {
     map = L.map(mapEl, { zoomControl: true, preferCanvas: true }).setView([45, 40], 5);
     trailLayer = L.layerGroup().addTo(map);
 
-    // Basemap: prefer authentic DCS tiles when available, otherwise a real map.
     try {
       const meta = await fetchTheatres();
-      configureBasemap(meta);
+      basemaps = meta.basemaps ?? [];
+      const th = meta.theatres?.find((t) => t.id === meta.default) ?? meta.theatres?.[0];
+      if (th?.tiles) {
+        dcsTiles = { theatre: th.id, bounds: th.bounds };
+        basemaps = [
+          { id: 'dcs', name: 'DCS (officiel)', url: `/api/tiles/${th.id}/{z}/{x}/{y}.png`, attribution: 'DCS World', maxZoom: 8 },
+          ...basemaps,
+        ];
+      }
+      if (meta.basemap && basemaps.some((b) => b.id === meta.basemap) && !localStorage.getItem('dcsmm.basemap')) {
+        basemapId.set(meta.basemap);
+      }
     } catch {
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 12,
-      }).addTo(map);
+      basemaps = [
+        { id: 'osm', name: 'Routier', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '© OpenStreetMap', maxZoom: 19, subdomains: ['a', 'b', 'c'] },
+      ];
+      basemapsStore.set(basemaps);
     }
+
+    applyBasemap($basemapId ?? 'osm');
+    basemapsStore.set(basemaps);
+    const unsubBase = basemapId.subscribe(applyBasemap);
 
     // Stop auto-following as soon as the user pans or zooms manually.
     map.on('dragstart', () => (userMoved = true));
@@ -52,37 +73,27 @@
 
     return () => {
       unsub?.();
+      unsubBase?.();
       stop?.();
       map?.remove();
     };
   });
 
-  let basemap = null;
-
-  function configureBasemap(meta) {
-    const th = meta.theatres?.find((t) => t.id === meta.default) ?? meta.theatres?.[0];
-    if (th?.tiles) {
-      basemap = L.tileLayer(`/api/tiles/${th.id}/{z}/{x}/{y}.png`, {
-        attribution: 'DCS World',
-        minZoom: 0,
-        maxZoom: 8,
-        tms: false,
-        errorTileUrl: '',
-      }).addTo(map);
-      map.setView([(th.bounds.minLat + th.bounds.maxLat) / 2, (th.bounds.minLng + th.bounds.maxLng) / 2], 6);
-    } else {
-      basemap = L.tileLayer(meta.basemap || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 12,
-      }).addTo(map);
-      if (th) {
-        const b = th.bounds;
-        map.fitBounds([
-          [b.minLat, b.minLng],
-          [b.maxLat, b.maxLng],
-        ]);
-      }
-    }
+  function applyBasemap(id) {
+    if (!map) return;
+    const bm = basemaps.find((b) => b.id === id) ?? basemaps[0];
+    if (!bm) return;
+    if (currentLayer) map.removeLayer(currentLayer);
+    currentLayer = L.tileLayer(bm.url, {
+      attribution: bm.attribution,
+      maxZoom: bm.maxZoom ?? 19,
+      subdomains: bm.subdomains ?? 'abc',
+      className: bm.className ?? '',
+      // DCS tile sets are only available at low zoom levels.
+      minZoom: bm.id === 'dcs' ? 0 : 0,
+      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+    }).addTo(map);
+    currentLayer.bringToBack();
   }
 
   function syncMarkers(list) {
@@ -178,6 +189,12 @@
       map.setView([own.lat, own.lng], 8);
     } else if ($visibleUnits.length) {
       map.fitBounds(L.latLngBounds($visibleUnits.map((u) => [u.lat, u.lng])).pad(0.3));
+    } else if (dcsTiles) {
+      const b = dcsTiles.bounds;
+      map.fitBounds([
+        [b.minLat, b.minLng],
+        [b.maxLat, b.maxLng],
+      ]);
     }
   }
 </script>
@@ -194,6 +211,11 @@
   :global(.dcsmm-marker) {
     background: transparent;
     border: none;
+  }
+
+  /* Key-free dark mode: invert and hue-rotate the standard raster tiles. */
+  :global(.dcsmm-dark-tiles) {
+    filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95) saturate(0.7);
   }
 
   :global(.leaflet-container) {
