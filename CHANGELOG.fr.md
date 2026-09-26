@@ -9,6 +9,24 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### À venir
+
+- Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,
+  symboles MIL-STD-2525C
+
+## [1.0.0-beta.3] — 2026-09-26
+
+Le manager devient un **compagnon local** : il lit désormais les fichiers de DCS
+lui-même. Ce seul changement a transformé les aérodromes d'un jeu de données
+transcrit pour une carte en la vérité du simulateur pour chaque carte installée.
+
+C'est aussi la première version qui **exécute `dcsmm.exe` sous Windows en CI**, et
+la première où les cartes aéronautiques que tu as déjà sur disque sont lisibles
+depuis l'application.
+
+Toujours une pré-version : les scripts Lua n'ont pas encore été exécutés sur une
+session DCS réelle. Voir « Périmètre de la bêta » dans l'entrée précédente.
+
 ### Modifié
 
 - **Les données d'aérodromes ne sont plus transcrites à la main pour le Caucase.**
@@ -123,11 +141,6 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 - **L'analyse pouvait s'ouvrir sur une session simulée.** La heatmap et les
   traces se basent par défaut sur la mission `live` la plus récente, et non plus
   sur la plus récente toutes sources confondues.
-
-### À venir
-
-- Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,
-  symboles MIL-STD-2525C, visionneuse de kneeboards
 
 ## [1.0.0-beta.2] — 2026-09-26
 

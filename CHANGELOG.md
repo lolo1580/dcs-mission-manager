@@ -9,6 +9,24 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Upcoming
+
+- Other features inspired by MizMap / MovingMap: BRA measurement, SAM circles,
+  MIL-STD-2525C symbols
+
+## [1.0.0-beta.3] — 2026-09-26
+
+The manager becomes a **local companion**: it now reads DCS's own files. That
+single change is what turned the airfields from a hand-transcribed dataset for one
+map into the simulator's own truth for every installed map.
+
+It is also the first release that **exercises `dcsmm.exe` on Windows in CI** and
+the first in which the aeronautical charts you already have on disk are readable
+from the app.
+
+Still a pre-release: the Lua scripts have not yet been run against a live DCS
+session. See "Beta scope" in the previous entry for the standing caveat.
+
 ### Changed
 
 - **Airfield data is no longer transcribed by hand for the Caucasus.** DCS is
@@ -112,11 +130,6 @@ to [semantic versioning](https://semver.org/).
   now promoted to `test` on later ticks, and can never fall back to `live`.
 - **Analytics could open on a simulated session.** The heatmap and trails default
   to the newest live mission instead of the newest mission overall.
-
-### Upcoming
-
-- Other features inspired by MizMap / MovingMap: BRA measurement, SAM circles,
-  MIL-STD-2525C symbols, kneeboards viewer
 
 ## [1.0.0-beta.2] — 2026-09-26
 
