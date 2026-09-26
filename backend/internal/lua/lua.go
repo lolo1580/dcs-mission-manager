@@ -133,6 +133,11 @@ func (p *parser) parseValue() (any, error) {
 	if strings.HasPrefix(p.src[p.pos:], "_(") {
 		p.pos += 2
 		p.skipSpace()
+		// A truncated file can end right here; parseString would index past the
+		// end. This is the only caller that does not guarantee a quote.
+		if p.eof() {
+			return nil, p.errorf("expected a quoted string after _(")
+		}
 		v, err := p.parseString()
 		if err != nil {
 			return nil, err
@@ -182,6 +187,11 @@ func (p *parser) parseTable() (any, error) {
 	p.pos++ // consume '{'
 
 	object := map[string]any{}
+	// array collects only the values written under explicit numeric keys that
+	// happen to be exactly the implicit position 1..n. A table whose entries are
+	// all of that form collapses to a slice (debrief `events`, `world_state`).
+	// A table that also uses bare values stays a numeric-keyed map, which is the
+	// shape DCS's own radio.lua/beacons.lua require.
 	var array []any
 	arrayNext := 1
 	isArray := true
@@ -217,8 +227,20 @@ func (p *parser) parseTable() (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			array = append(array, v)
-			arrayNext++
+			// A bare value is not an explicit [n], so the table is not the
+			// slice form. Store it under the first free numeric slot instead of
+			// blindly renumbering later, so an explicit key the value would have
+			// overwritten is preserved.
+			isArray = false
+			slot := arrayNext
+			for {
+				if _, taken := object[strconv.Itoa(slot)]; !taken {
+					break
+				}
+				slot++
+			}
+			object[strconv.Itoa(slot)] = v
+			arrayNext = slot + 1
 		}
 
 		p.skipSpace()
@@ -226,14 +248,9 @@ func (p *parser) parseTable() (any, error) {
 		p.consume(';')
 	}
 
-	// A pure array (keys exactly 1..n) becomes a slice.
+	// A pure array (explicit keys exactly 1..n) becomes a slice.
 	if isArray && len(object) == len(array) {
 		return array, nil
-	}
-	// Mix of keys and bare values: keep everything, bare values under their
-	// numeric keys, so no data is lost.
-	for i, v := range array {
-		object[strconv.Itoa(i+1)] = v
 	}
 	if len(object) == 0 {
 		return []any{}, nil
@@ -272,13 +289,17 @@ func (p *parser) parseString() (string, error) {
 				sb.WriteByte('\'')
 			default:
 				if e >= '0' && e <= '9' {
-					// \ddd decimal escape
+					// \ddd decimal escape. Lua rejects a value above 255; byte(n)
+					// would silently wrap, so the escape is reported instead.
 					n := 0
 					for k := 0; k < 3 && p.pos < len(p.src) && p.src[p.pos] >= '0' && p.src[p.pos] <= '9'; k++ {
 						n = n*10 + int(p.src[p.pos]-'0')
 						p.pos++
 					}
 					p.pos-- // compensate the loop increment below
+					if n > 255 {
+						return "", p.errorf("decimal escape \\%d is out of range", n)
+					}
 					sb.WriteByte(byte(n))
 				} else {
 					sb.WriteByte(e)

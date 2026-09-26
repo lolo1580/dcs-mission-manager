@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"dcsmm/internal/theatre"
 )
 
 // writeLibrary builds a small chart library mirroring the real folder layout:
@@ -49,9 +51,9 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("want 7 charts (the .lua must be ignored), got %d", c.Count())
 	}
 
-	// Theatres are inferred from the folder names.
+	// Theatres are inferred from the folder names, and must use DCS's own ids.
 	theatres := c.Theatres()
-	want := []string{"Caucasus", "Kola", "MarianasWWII"}
+	want := []string{"Caucasus", "Kola", "MarianaIslandsWWII"}
 	if len(theatres) != len(want) {
 		t.Fatalf("theatres = %v, want %v", theatres, want)
 	}
@@ -66,8 +68,8 @@ func TestLoad(t *testing.T) {
 	if !ok {
 		t.Fatal("a chart in a subfolder should be indexed")
 	}
-	if ch.Theatre != "MarianasWWII" {
-		t.Errorf("subfolder theatre = %q, want MarianasWWII", ch.Theatre)
+	if ch.Theatre != "MarianaIslandsWWII" {
+		t.Errorf("subfolder theatre = %q, want MarianaIslandsWWII (DCS's spelling)", ch.Theatre)
 	}
 	// A bare name must NOT resolve: the path is the identifier.
 	if _, ok := c.Get("beacons.png"); ok {
@@ -137,6 +139,60 @@ func TestForAerodrome(t *testing.T) {
 }
 
 // TestMissingDirectoryIsHarmless checks the feature is optional.
+// TestTheatreIdsMatchDCS locks the inferred ids to the ones internal/theatre
+// defines. A mismatch makes a chart unreachable by theatre and advertises an id
+// the selector does not know.
+func TestTheatreIdsMatchDCS(t *testing.T) {
+	known := map[string]bool{}
+	for _, th := range theatre.All() {
+		known[th.ID] = true
+	}
+	for _, hint := range theatreHints {
+		if !known[hint.theatre] {
+			t.Errorf("hint %q maps to %q, which is not a DCS theatre id", hint.fragment, hint.theatre)
+		}
+	}
+}
+
+// TestUnassignedChartsAreListed covers a chart whose folder matches no hint: it
+// is indexed and servable, so it must not be invisible in a full listing.
+func TestUnassignedChartsAreListed(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "legend.png"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if c.Count() != 1 {
+		t.Fatalf("want 1 chart indexed, got %d", c.Count())
+	}
+	if got := len(c.Unassigned()); got != 1 {
+		t.Fatalf("the chart should be unassigned, got %d", got)
+	}
+	if got := len(c.Theatres()); got != 0 {
+		t.Errorf("no theatre should be advertised, got %v", c.Theatres())
+	}
+}
+
+// TestShortCodeIsSearchable covers a two-character airfield code such as "H4",
+// which the earlier threshold of three could never match.
+func TestShortCodeIsSearchable(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "DCS Syria Maps")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "H4_VAD.png"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := Load(dir)
+	if got := c.ForAerodrome("H4", "H4"); len(got) != 1 {
+		t.Errorf(`ForAerodrome("H4") = %d charts, want 1`, len(got))
+	}
+}
+
 func TestMissingDirectoryIsHarmless(t *testing.T) {
 	for _, dir := range []string{"", filepath.Join(t.TempDir(), "nope")} {
 		c, err := Load(dir)

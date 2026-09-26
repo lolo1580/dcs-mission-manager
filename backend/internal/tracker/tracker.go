@@ -86,9 +86,10 @@ func (t *Tracker) SetMissionIDFunc(fn func() int64) {
 	t.mu.Unlock()
 }
 
-// SetEnsureMission sets a function that returns an open mission id, creating one
-// if none exists. This is used when positions arrive without any mission having
-// been announced (for example when only Export.lua is installed).
+// SetEnsureMission sets a function consulted when the tracker has to open a
+// mission on its own. It is only a notification hook: the tracker creates the
+// mission itself, through its own mutex, so that the get-or-create can never
+// race with another component doing the same.
 func (t *Tracker) SetEnsureMission(fn func() int64) {
 	t.mu.Lock()
 	t.ensureMissionFn = fn
@@ -107,15 +108,8 @@ func (t *Tracker) SetMissionSource(fn func() string) {
 // currentSource returns the source of the running session, defaulting to live.
 func (t *Tracker) currentSource() string {
 	t.mu.Lock()
-	fn := t.missionSourceFn
-	t.mu.Unlock()
-	if fn == nil {
-		return db.SourceLive
-	}
-	if s := fn(); db.ValidSource(s) {
-		return s
-	}
-	return db.SourceLive
+	defer t.mu.Unlock()
+	return t.sourceLocked()
 }
 
 // currentMissionID returns the mission to attach samples to.
@@ -142,21 +136,49 @@ func (t *Tracker) currentMissionID() int64 {
 // tracker has to persist positions without any mission ever having been
 // announced. The mission carries the running session's source, so simulated
 // positions are never attributed to a "live" mission.
+//
+// The get-or-create runs under t.mu, so two callers can never open two missions
+// for the same session.
 func (t *Tracker) EnsureMission() int64 {
-	t.mu.Lock()
-	ensure := t.ensureMissionFn
-	t.mu.Unlock()
-	if ensure != nil {
-		return ensure()
-	}
 	if t.db == nil {
 		return 0
 	}
-	id, err := t.db.EnsureMissionTagged("Session without mission", "", t.currentSource())
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	// Re-read the current mission while holding the lock: another goroutine may
+	// have opened one since the caller last looked.
+	if id := t.db.OpenMissionID(); id != 0 {
+		t.missionID = id
+		return id
+	}
+	// The notification hook may be set, but the tracker still opens the mission
+	// itself, under this lock, so the create is serialised.
+	if t.ensureMissionFn != nil {
+		t.ensureMissionFn()
+		if id := t.db.OpenMissionID(); id != 0 {
+			t.missionID = id
+			return id
+		}
+	}
+	id, err := t.db.EnsureMissionTagged("Session without mission", "", t.sourceLocked())
 	if err != nil {
 		return 0
 	}
+	t.missionID = id
 	return id
+}
+
+// sourceLocked reports the session source. t.mu must be held.
+func (t *Tracker) sourceLocked() string {
+	if t.missionSourceFn == nil {
+		return db.SourceLive
+	}
+	if s := t.missionSourceFn(); db.ValidSource(s) {
+		return s
+	}
+	return db.SourceLive
 }
 
 // hasTracked reports whether any unit has ever been sampled. It keeps loss
@@ -289,19 +311,25 @@ func (t *Tracker) detectLosses(seenNow map[string]bool, missionID, nowMs int64) 
 	cutoff := time.Now().Add(-t.grace).UnixMilli()
 
 	for id, s := range t.seen {
-		if seenNow[id] || t.lostIDs[id] {
+		if seenNow[id] {
+			// Still reported: tracking continues, and it is not lost. Tick
+			// already clears lostIDs for a unit that reappears.
 			continue
 		}
-		// Only report once the unit has been missing longer than the grace.
 		if s.RealTS > cutoff {
-			continue
+			continue // within the grace period
 		}
-		t.lostIDs[id] = true
+
+		// Missing beyond the grace: record the loss once, then forget the unit.
+		// Without the deletion, both maps grow with every unit ever seen and
+		// every tick scans all of them.
 		if t.db != nil && missionID > 0 {
 			if err := t.db.SaveLoss(missionID, s); err != nil {
 				log.Printf("tracker: save loss %s: %v", id, err)
 			}
 		}
+		delete(t.seen, id)
+		delete(t.lostIDs, id)
 	}
 }
 

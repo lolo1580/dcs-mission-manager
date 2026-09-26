@@ -9,6 +9,52 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Four defects found by a systematic review**, none of them visible in normal
+  use:
+  - **A truncated data file could crash the backend.** The gettext wrapper `_(`
+    is the only value form that reached the string parser without a guaranteed
+    quote, so a file ending right there indexed past the end of the input. That
+    is a panic on a malformed DCS file, not an error.
+  - **A malformed table could silently corrupt values.** A table mixing
+    positional entries and explicit `[n]` keys had its positional values
+    renumbered from 1 on top of the explicit ones. The shape contract is now
+    documented by `TestTableShapes`, because it is load-bearing: DCS's
+    `radio.lua`/`beacons.lua` are positional and must stay a map.
+  - **The chosen airfield position and its navigation aids varied between runs.**
+    Beacons were read by ranging over a Go map, so which of two ILS beacons won,
+    and in which order the aids were listed, depended on map iteration order.
+    Entries are now ordered. Verified over three launches: identical results.
+  - **Two airfields standing close together could adopt the same embedded id**,
+    after which the id index kept only one of them, with the other's name and
+    runway attached to it. An embedded entry can now be claimed once.
+- **`internal/charts` disagreed with `internal/theatre` on two theatre ids.**
+  Charts under a Sinai folder were tagged `Sinai` (DCS says `SinaiMap`) and
+  Marianas WWII `MarianasWWII` (DCS says `MarianaIslandsWWII`), so filtering by
+  theatre returned nothing and an id the selector does not know was advertised. A
+  test now ties the two lists together.
+- **A chart whose folder matched no theatre was invisible.** It was indexed and
+  servable, but a listing without a filter walked theatres only, so it never
+  appeared. Such charts are now returned too.
+- **A two-character airfield code could never match a chart.** The search index
+  required three characters, so `H4_VAD.png` was unreachable while the code
+  comment claimed the opposite.
+- **`install-lua` could silently install an outdated script.** A file that
+  existed but could not be read (permissions, a lock) fell back to the embedded
+  copy without a word. Only a genuinely missing file does now.
+- **The backup-name search was an unbounded loop.** A `stat` error other than
+  "does not exist" never broke it, so it spun and grew the path string forever
+  instead of reporting the problem.
+- **The tracker could open two missions for the same session.** The get-or-create
+  ran outside the tracker's mutex, so two goroutines could both find no open
+  mission and each create one. It now runs under the lock, and the created id is
+  remembered. A unit whose loss has been recorded is forgotten, so the tracking
+  maps no longer grow with every unit ever seen.
+- **A TCP connection handled before its callbacks were wired lost its first
+  message.** The listener is now started only once every callback is in place,
+  removing the window in which a handler read a nil callback.
+
 ### Security
 
 - **The API is now protected against being driven by a web page.** It has a

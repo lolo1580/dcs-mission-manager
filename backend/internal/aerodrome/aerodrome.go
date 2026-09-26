@@ -216,11 +216,18 @@ func enrichFromEmbedded(extracted, embedded []Aerodrome) {
 	// threshold, an outer marker several kilometres out).
 	const maxMatchKm = 6.0
 
+	// used tracks the embedded entries already claimed. Without it, two extracted
+	// airfields standing close together both adopt the same embedded entry, and
+	// the id index then keeps only one of them: the other becomes unreachable,
+	// with a name and runway that belong to its neighbour.
+	used := map[string]bool{}
+
 	for i := range extracted {
-		e, ok := nearestEmbedded(extracted[i], embedded, maxMatchKm)
+		e, ok := nearestEmbedded(extracted[i], embedded, maxMatchKm, used)
 		if !ok {
 			continue
 		}
+		used[e.ID] = true
 		// Curated name and identifier win: they are the ones the charts and the
 		// UI already refer to, while DCS exposes only an ATC callsign.
 		if e.Name != "" {
@@ -260,13 +267,14 @@ func enrichFromEmbedded(extracted, embedded []Aerodrome) {
 	}
 }
 
-// nearestEmbedded returns the embedded airfield closest to a, within maxKm.
-func nearestEmbedded(a Aerodrome, embedded []Aerodrome, maxKm float64) (Aerodrome, bool) {
+// nearestEmbedded returns the embedded airfield closest to a, within maxKm,
+// skipping the ones already claimed by another extracted airfield.
+func nearestEmbedded(a Aerodrome, embedded []Aerodrome, maxKm float64, used map[string]bool) (Aerodrome, bool) {
 	var best Aerodrome
 	bestKm := maxKm
 	found := false
 	for _, e := range embedded {
-		if e.Lat == 0 && e.Lng == 0 {
+		if (e.Lat == 0 && e.Lng == 0) || used[e.ID] {
 			continue
 		}
 		d := haversineApproxKm(a.Lat, a.Lng, e.Lat, e.Lng)

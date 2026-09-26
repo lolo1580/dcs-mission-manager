@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"dcsmm/internal/lua"
@@ -115,20 +116,57 @@ type radioEntry struct {
 	airfieldN int // from airfield12_0 -> 12
 }
 
-// loadRadio parses radio.lua. The table is keyed numerically, which our Lua
-// parser exposes as a map; entries are identified by their radioId.
+// tableEntries returns the entries of a parsed Lua table regardless of the shape
+// the parser produced: a map (keyed "1".."n" for positional entries) or a slice
+// (explicit [1]..[n] keys collapse to a slice). Without this, a data file written
+// in the other style is silently treated as empty.
+func tableEntries(v any) []any {
+	switch t := v.(type) {
+	case map[string]any:
+		// Sort by numeric key so the result does not depend on map iteration
+		// order, which would otherwise make the chosen airfield position and the
+		// order of its navigation aids vary between runs.
+		keys := make([]int, 0, len(t))
+		for k := range t {
+			if n, ok := numericKey(k); ok {
+				keys = append(keys, n)
+			}
+		}
+		sort.Ints(keys)
+		out := make([]any, 0, len(keys))
+		for _, n := range keys {
+			out = append(out, t[strconv.Itoa(n)])
+		}
+		return out
+	case []any:
+		return t
+	default:
+		return nil
+	}
+}
+
+// numericKey reports whether a table key is a positive integer, and returns it.
+func numericKey(k string) (int, bool) {
+	n, err := strconv.Atoi(k)
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+	return n, true
+}
+
+// loadRadio parses radio.lua. Entries are identified by their radioId.
 func loadRadio(path string) (map[string]radioEntry, error) {
 	root, err := parseLuaFile(path)
 	if err != nil {
 		return nil, err
 	}
-	table, _ := root["radio"].(map[string]any)
-	if table == nil {
+	entries := tableEntries(root["radio"])
+	if entries == nil {
 		return nil, nil
 	}
 
 	out := make(map[string]radioEntry)
-	for _, v := range table {
+	for _, v := range entries {
 		e, ok := v.(map[string]any)
 		if !ok {
 			continue
@@ -226,13 +264,13 @@ func loadBeacons(path string) ([]beaconEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	table, _ := root["beacons"].(map[string]any)
-	if table == nil {
+	entries := tableEntries(root["beacons"])
+	if entries == nil {
 		return nil, nil
 	}
 
 	var out []beaconEntry
-	for _, v := range table {
+	for _, v := range entries {
 		e, ok := v.(map[string]any)
 		if !ok {
 			continue
@@ -273,7 +311,9 @@ func loadTowns(path string) ([]Town, error) {
 	}
 
 	out := make([]Town, 0, len(table))
-	for key, v := range table {
+	// Sort the keys so the result is deterministic (map order is random).
+	for _, key := range sortedKeys(table) {
+		v := table[key]
 		e, ok := v.(map[string]any)
 		if !ok {
 			continue

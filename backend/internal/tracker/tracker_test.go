@@ -101,15 +101,12 @@ func TestTickSamplesPositions(t *testing.T) {
 
 func TestTickDetectsLoss(t *testing.T) {
 	tr, database, _ := setup(t)
-	// A zero grace means a unit missing from this tick is reported immediately.
+	// A zero grace means any unit missing from this tick is reported.
 	tr.grace = 0
 
-	// Previous state: unit 1 was seen a while ago, unit 2 just now.
+	// Unit 1 was seen a while ago and is no longer reported.
 	tr.seen["1"] = sampleAt("1", time.Now().Add(-time.Second).UnixMilli())
-	tr.seen["2"] = sampleAt("2", time.Now().UnixMilli())
 
-	// This tick: no unit is present, so unit 1 (older than grace) is lost and
-	// unit 2 is not (it was seen within the grace window of this instant).
 	tr.Tick()
 
 	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
@@ -119,8 +116,10 @@ func TestTickDetectsLoss(t *testing.T) {
 	if len(points) == 0 {
 		t.Fatal("expected at least one loss")
 	}
-	if tr.lostIDs["1"] != true {
-		t.Fatal("unit 1 should be marked lost")
+	// The unit is forgotten once its loss is recorded, which is what keeps the
+	// tracking maps from growing without bound.
+	if _, tracked := tr.seen["1"]; tracked {
+		t.Error("a unit reported lost should no longer be tracked")
 	}
 
 	// A second tick must not report the same loss twice.
@@ -132,19 +131,79 @@ func TestTickDetectsLoss(t *testing.T) {
 	}
 }
 
-func TestReappearingUnitClearsLoss(t *testing.T) {
-	tr, _, store := setup(t)
+// TestUnitWithinGraceIsNotLost checks the grace period actually holds a unit
+// back: with a long grace, a unit that stops being reported must not be declared
+// lost immediately.
+func TestUnitWithinGraceIsNotLost(t *testing.T) {
+	tr, database, _ := setup(t)
+	tr.grace = time.Hour
+
+	tr.seen["1"] = sampleAt("1", time.Now().UnixMilli())
+
+	tr.Tick()
+
+	if _, tracked := tr.seen["1"]; !tracked {
+		t.Fatal("a unit within its grace window should still be tracked")
+	}
+	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
+	if err != nil {
+		t.Fatalf("heatmap: %v", err)
+	}
+	if len(points) != 0 {
+		t.Fatalf("no loss should be recorded within the grace window, got %d", len(points))
+	}
+}
+
+func TestReappearingUnitIsNotLost(t *testing.T) {
+	tr, database, store := setup(t)
 	tr.grace = 0
 
 	tr.seen["1"] = sampleAt("1", time.Now().Add(-time.Second).UnixMilli())
-	tr.lostIDs["1"] = true
 
-	// The unit reappears.
+	// The unit reappears before the tick.
 	store.Update(&state.Unit{ID: "1", Type: "F-16C_50", Category: "plane", Lat: 42, Lng: 41})
 	tr.Tick()
 
-	if tr.lostIDs["1"] {
-		t.Fatal("a unit that reappears should no longer be considered lost")
+	// It must still be tracked, and no loss must have been recorded.
+	if _, tracked := tr.seen["1"]; !tracked {
+		t.Fatal("a unit that reappears should still be tracked")
+	}
+	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
+	if err != nil {
+		t.Fatalf("heatmap: %v", err)
+	}
+	if len(points) != 0 {
+		t.Fatalf("a unit that reappears must not be reported lost, got %d loss(es)", len(points))
+	}
+}
+
+// TestTrackingMapsStayBounded covers the leak: units that are gone for good must
+// be forgotten, otherwise both maps grow with every unit ever seen and every tick
+// scans them all.
+func TestTrackingMapsStayBounded(t *testing.T) {
+	tr, _, store := setup(t)
+	tr.grace = 0
+
+	// Two units appear, then vanish for good.
+	store.Update(&state.Unit{ID: "1", Type: "F-16C_50", Category: "plane", Lat: 42, Lng: 41})
+	store.Update(&state.Unit{ID: "2", Type: "Su-27", Category: "plane", Lat: 42, Lng: 41})
+	tr.Tick()
+	if n := len(tr.seen); n != 2 {
+		t.Fatalf("want 2 tracked units, got %d", n)
+	}
+
+	// They are gone: one tick within the grace period, then one past it.
+	store.Remove("1")
+	store.Remove("2")
+	tr.grace = 0
+	tr.Tick()
+	tr.Tick()
+
+	if n := len(tr.seen); n != 0 {
+		t.Errorf("units lost for good should be forgotten, %d still tracked", n)
+	}
+	if n := len(tr.lostIDs); n != 0 {
+		t.Errorf("lostIDs should be empty once losses are recorded, got %d", n)
 	}
 }
 

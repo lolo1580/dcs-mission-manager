@@ -9,6 +9,55 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **Quatre défauts trouvés par une revue systématique**, aucun visible en usage
+  normal :
+  - **Un fichier de données tronqué pouvait faire planter le backend.** Le
+    wrapper gettext `_(` est la seule forme de valeur qui atteignait le parseur de
+    chaîne sans guillemet garanti : un fichier se terminant là provoquait un
+    accès hors limites. C'est un panic sur un fichier DCS malformé, pas une
+    erreur.
+  - **Une table malformée pouvait corrompre des valeurs en silence.** Une table
+    mélangeant entrées positionnelles et clés `[n]` explicites voyait ses valeurs
+    positionnelles renumérotées à partir de 1 par-dessus les explicites. Le
+    contrat de forme est désormais documenté par `TestTableShapes`, car il est
+    structurant : `radio.lua`/`beacons.lua` sont positionnels et doivent rester
+    une map.
+  - **La position retenue d'un aérodrome et ses aides variaient d'un lancement à
+    l'autre.** Les balises étaient lues en parcourant une map Go : laquelle de
+    deux balises ILS l'emportait, et dans quel ordre les aides étaient listées,
+    dépendait de l'ordre d'itération. Les entrées sont maintenant ordonnées.
+    Vérifié sur trois lancements : résultats identiques.
+  - **Deux aérodromes proches pouvaient adopter le même identifiant embarqué**,
+    après quoi l'index n'en gardait qu'un, avec le nom et la piste de l'autre.
+    Une entrée embarquée ne peut désormais être prise qu'une fois.
+- **`internal/charts` divergeait de `internal/theatre` sur deux identifiants.**
+  Les cartes d'un dossier Sinai étaient étiquetées `Sinai` (DCS dit `SinaiMap`)
+  et Marianas WWII `MarianasWWII` (DCS dit `MarianaIslandsWWII`) : le filtrage
+  par théâtre ne renvoyait rien et un identifiant inconnu du sélecteur était
+  annoncé. Un test lie désormais les deux listes.
+- **Une carte dont le dossier ne correspondait à aucun théâtre était invisible.**
+  Elle était indexée et servie, mais une liste sans filtre ne parcourait que les
+  théâtres : elle n'apparaissait jamais. Ces cartes sont maintenant renvoyées.
+- **Un code d'aérodrome à deux caractères ne pouvait jamais correspondre.** L'index
+  de recherche exigeait trois caractères, donc `H4_VAD.png` était introuvable,
+  alors que le commentaire du code affirmait le contraire.
+- **`install-lua` pouvait installer un script périmé en silence.** Un fichier
+  existant mais illisible (permissions, verrou) retombait sur la copie embarquée
+  sans rien dire. Seul un fichier réellement absent le fait désormais.
+- **La recherche d'un nom de sauvegarde était une boucle non bornée.** Une erreur
+  de `stat` autre que « n'existe pas » ne la cassait jamais : elle tournait et
+  allongeait le chemin indéfiniment au lieu de signaler le problème.
+- **Le tracker pouvait ouvrir deux missions pour la même session.** Le
+  get-or-create s'exécutait hors du mutex du tracker : deux goroutines pouvaient
+  chacune ne rien trouver et en créer une. Il s'exécute désormais sous le verrou,
+  et l'id créé est mémorisé. Une unité dont la perte a été enregistrée est
+  oubliée : les maps de suivi ne grossissent plus avec chaque unité jamais vue.
+- **Une connexion TCP traitée avant le câblage de ses callbacks perdait son
+  premier message.** Le listener n'est plus démarré qu'une fois tous les callbacks
+  en place, ce qui supprime la fenêtre où un handler lisait un callback nil.
+
 ### Sécurité
 
 - **L'API est désormais protégée contre le pilotage par une page web.** Elle

@@ -85,8 +85,16 @@ func (in *Installer) readSource(rel string) ([]byte, error) {
 	normalized := filepath.ToSlash(rel)
 
 	if in.LuaDir != "" {
-		if data, err := os.ReadFile(filepath.Join(in.LuaDir, filepath.FromSlash(normalized))); err == nil {
+		data, err := os.ReadFile(filepath.Join(in.LuaDir, filepath.FromSlash(normalized)))
+		if err == nil {
 			return data, nil
+		}
+		// Only a missing file falls back to the embedded copy. A file that
+		// exists but cannot be read (permissions, a lock) is a real problem: the
+		// embedded copy may be older, so installing it silently would ship the
+		// wrong scripts.
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("reading %s: %w", normalized, err)
 		}
 	}
 	if data, ok := luafiles.Get(normalized); ok {
@@ -271,9 +279,22 @@ func (in *Installer) backup(dest string, content []byte) (string, error) {
 	path := fmt.Sprintf("%s.bak-%s", dest, suffix)
 
 	// Avoid clobbering an existing backup from the same second.
-	for i := 1; ; i++ {
-		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+	//
+	// The loop is bounded: a stat error other than "does not exist" (a permission
+	// problem on the parent directory, say) would otherwise never break it and
+	// grow the path string forever.
+	const maxAttempts = 1000
+	for i := 1; i <= maxAttempts; i++ {
+		_, err := os.Stat(path)
+		if errors.Is(err, os.ErrNotExist) {
 			break
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			// Could not tell whether the path is taken; stop rather than spin.
+			return "", fmt.Errorf("checking backup path %s: %w", path, err)
+		}
+		if i == maxAttempts {
+			return "", fmt.Errorf("could not find a free backup name for %s", dest)
 		}
 		path = fmt.Sprintf("%s.bak-%s-%d", dest, suffix, i)
 	}

@@ -41,6 +41,9 @@ type Chart struct {
 type Catalog struct {
 	byPath    map[string]Chart
 	byTheatre map[string][]Chart
+	// unassigned holds charts whose theatre could not be inferred from the folder
+	// name. They must still be returned by a listing without a filter.
+	unassigned []Chart
 	// bySearch maps a normalised keyword to the charts whose file name contains
 	// it, which is how charts are matched to an airfield.
 	bySearch map[string][]Chart
@@ -54,6 +57,10 @@ var imageExtensions = map[string]bool{
 // theatreHints maps a lowercase fragment of a folder name to a DCS theatre id.
 // The folder names in a chart library are free-form ("DCS Caucasus Maps",
 // "Marianas_High_Detail_Maps"), so the theatre has to be inferred.
+//
+// The ids must match internal/theatre's own: "MarianaIslandsWWII" and "SinaiMap"
+// are DCS's spellings, and using "MarianasWWII" or "Sinai" here made a chart
+// unreachable by theatre and advertised an id the theatre selector does not know.
 var theatreHints = []struct {
 	fragment string
 	theatre  string
@@ -65,13 +72,16 @@ var theatreHints = []struct {
 	{"persiangulf", "PersianGulf"},
 	{"syria", "Syria"},
 	{"channel", "TheChannel"},
-	{"marianaswwii", "MarianasWWII"},
-	{"wwii", "MarianasWWII"},
+	{"marianaswwii", "MarianaIslandsWWII"},
+	{"wwii", "MarianaIslandsWWII"},
 	{"marianas", "MarianaIslands"},
+	{"mariana", "MarianaIslands"},
 	{"falklands", "Falklands"},
-	{"sinai", "Sinai"},
+	{"sinai", "SinaiMap"},
 	{"afghanistan", "Afghanistan"},
 	{"iraq", "Iraq"},
+	{"germany", "GermanyCW"},
+	{"southeastasia", "SouthEastAsia"},
 }
 
 // Load indexes every chart under dir. A missing directory yields an empty
@@ -125,6 +135,11 @@ func Load(dir string) (*Catalog, error) {
 		c.byPath[ch.Path] = ch
 		if ch.Theatre != "" {
 			c.byTheatre[ch.Theatre] = append(c.byTheatre[ch.Theatre], ch)
+		} else {
+			// No theatre could be inferred. The chart is still indexed and
+			// servable, so it must appear in the full listing too; keeping it in
+			// its own bucket is what makes that possible.
+			c.unassigned = append(c.unassigned, ch)
 		}
 		for _, key := range searchKeys(d.Name()) {
 			c.bySearch[key] = append(c.bySearch[key], ch)
@@ -165,6 +180,14 @@ func (c *Catalog) Theatres() []string {
 		out = append(out, th)
 	}
 	sort.Strings(out)
+	return out
+}
+
+// Unassigned returns the charts whose theatre could not be inferred, so a full
+// listing can include them.
+func (c *Catalog) Unassigned() []Chart {
+	out := make([]Chart, len(c.unassigned))
+	copy(out, c.unassigned)
 	return out
 }
 
@@ -299,8 +322,10 @@ func searchKeys(name string) []string {
 	var keys []string
 	seen := map[string]bool{}
 
+	// A two-character airfield code is real ("H4", "H3"), so the threshold is
+	// two rather than three; four is the common case (ICAO).
 	addKey := func(k string) {
-		if len(k) < 3 || seen[k] {
+		if len(k) < 2 || seen[k] {
 			return
 		}
 		seen[k] = true
@@ -313,9 +338,9 @@ func searchKeys(name string) []string {
 	})
 	for _, f := range fields {
 		n := normalise(f)
-		// Airfield ICAO codes are four letters; names are longer, but a short
-		// name such as "H4" is real, so the threshold stays low.
-		if len(n) >= 3 && !allDigits(n) {
+		// Numeric-only fields are runway or sequence numbers, never airfield
+		// codes, so they are not match keys.
+		if len(n) >= 2 && !allDigits(n) {
 			addKey(n)
 		}
 	}

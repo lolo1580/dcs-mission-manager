@@ -36,6 +36,11 @@ func (s *Server) handleCharts(w http.ResponseWriter, r *http.Request) {
 				list = append(list, c)
 			}
 		}
+		// Charts whose theatre could not be inferred must appear too, otherwise
+		// they exist, are servable, and are invisible.
+		for _, c := range s.charts.Unassigned() {
+			list = append(list, c)
+		}
 	}
 	if list == nil {
 		list = []any{}

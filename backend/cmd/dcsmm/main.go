@@ -391,7 +391,10 @@ func runServer() {
 	}
 	defer tcpLn.Close()
 	tcpListener := tcp.NewListener(liveStore)
-	go tcpListener.Serve(tcpLn)
+	// The listener is served only once its callbacks are wired (see below).
+	// Starting it here and assigning them later would be a data race: a
+	// connection handled in that window reads a nil callback and the message is
+	// silently dropped.
 	log.Printf("tcp: listening on %s", cfg.TCPAddr)
 
 	// ---- HTTP: API + UI ---------------------------------------------------
@@ -481,6 +484,9 @@ func runServer() {
 		}
 		srv.BroadcastMessage(map[string]any{"type": "message", "message": m})
 	}
+
+	// Every callback is in place: the listener may now accept connections.
+	go tcpListener.Serve(tcpLn)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

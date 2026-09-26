@@ -192,6 +192,100 @@ func TestParseStringEscapes(t *testing.T) {
 	}
 }
 
+// TestTruncatedGettextDoesNotPanic covers a truncated file ending inside the
+// gettext wrapper: _(" is the one value form that reaches parseString without a
+// guaranteed quote, so it used to index past the end of the input.
+func TestTruncatedGettextDoesNotPanic(t *testing.T) {
+	for _, doc := range []string{"a = _(", "a = _(\n", "a = _(\"unterminated"} {
+		if _, err := Parse([]byte(doc)); err == nil {
+			t.Errorf("Parse(%q) should report an error, not succeed", doc)
+		}
+	}
+}
+
+// TestDecimalEscapeRange: Lua rejects \256, and byte(n) would silently wrap it
+// to 0.
+func TestDecimalEscapeRange(t *testing.T) {
+	if _, err := Parse([]byte(`s = "\256"`)); err == nil {
+		t.Error("a decimal escape above 255 should be reported")
+	}
+	got, err := Parse([]byte(`s = "\065"`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got["s"] != "A" {
+		t.Errorf(`"\065" = %q, want "A"`, got["s"])
+	}
+}
+
+// TestTableShapes documents the two shapes the parser produces, and why.
+//
+// This distinction is load-bearing: DCS's radio.lua and beacons.lua are written
+// as positional entries ({ {…}, {…} }), and the extractor reads them as a map.
+// A table keyed [1]..[n] instead collapses to a slice, which is the form the
+// debrief uses. Getting this backwards silently empties the airfield dataset.
+func TestTableShapes(t *testing.T) {
+	// Positional entries -> map keyed "1".."n".
+	pos, err := Parse([]byte(`t = {"a", "b", "c"}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if m, ok := pos["t"].(map[string]any); !ok || m["1"] != "a" || m["3"] != "c" {
+		t.Fatalf("positional entries should be a map keyed 1..n, got %#v", pos["t"])
+	}
+
+	// Explicit [1]..[n] -> slice.
+	exp, err := Parse([]byte(`t = {[1] = "a", [2] = "b"}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if arr, ok := exp["t"].([]any); !ok || len(arr) != 2 {
+		t.Fatalf("explicit 1..n keys should collapse to a slice, got %#v", exp["t"])
+	}
+}
+
+// TestMixedBareAndExplicitKeys covers a table using both forms. The explicit
+// keys must survive: the parser used to renumber the positional values from 1,
+// silently overwriting them.
+func TestMixedBareAndExplicitKeys(t *testing.T) {
+	got, err := Parse([]byte(`t = {[10] = "x", "a", [20] = "y"}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	m, ok := got["t"].(map[string]any)
+	if !ok {
+		t.Fatalf("a mixed table should stay a map, got %T", got["t"])
+	}
+	if m["10"] != "x" || m["20"] != "y" {
+		t.Errorf("explicit keys lost: %#v", m)
+	}
+	found := false
+	for _, v := range m {
+		if v == "a" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the positional value was lost: %#v", m)
+	}
+}
+
+// TestExplicitKeyWinsItsSlot documents Lua's own behaviour: an explicit [1]
+// overwrites a positional value that landed in slot 1.
+func TestExplicitKeyWinsItsSlot(t *testing.T) {
+	got, err := Parse([]byte(`t = {"a", [1] = "b"}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	m, ok := got["t"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected a map, got %T", got["t"])
+	}
+	if m["1"] != "b" {
+		t.Errorf(`t[1] = %v, want the explicit "b" (Lua's rule)`, m["1"])
+	}
+}
+
 func TestParseEmptyTable(t *testing.T) {
 	got, err := Parse([]byte(`graveyard = {}`))
 	if err != nil {
