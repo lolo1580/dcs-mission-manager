@@ -125,6 +125,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/stats/weapons", s.handleStatsWeapons)
 	mux.HandleFunc("/api/stats/engines", s.handleStatsEngines)
 	mux.HandleFunc("/api/stats/network", s.handleStatsNetwork)
+	mux.HandleFunc("/api/analytics/heatmap", s.handleHeatmap)
+	mux.HandleFunc("/api/analytics/tracks", s.handleTracks)
+	mux.HandleFunc("/api/analytics/sorties", s.handleSorties)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

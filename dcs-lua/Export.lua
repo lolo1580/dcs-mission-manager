@@ -104,12 +104,39 @@ do
   end
 
   ---------------------------------------------------------------------------
-  -- Position du joueur
+  -- Position du joueur (+ télémétrie avancée si autorisée par le serveur)
   ---------------------------------------------------------------------------
+  -- L'export "ownship" (vitesse, G, incidence…) dépend d'une option serveur.
+  -- On teste sa disponibilité une fois et on l'utilise si possible.
+  local ownshipExportAllowed = nil
+  local function checkOwnshipExport()
+    if ownshipExportAllowed ~= nil then return ownshipExportAllowed end
+    local isAllowed = LoIsOwnshipExportAllowed or (Export and Export.LoIsOwnshipExportAllowed)
+    if not isAllowed then
+      ownshipExportAllowed = false
+      return false
+    end
+    local ok, res = pcall(isAllowed)
+    ownshipExportAllowed = (ok and res == true)
+    return ownshipExportAllowed
+  end
+
+  -- Accès défensif aux fonctions d'export (globales ou dans Export.).
+  local function exportFn(name)
+    return _G[name] or (Export and Export[name])
+  end
+
+  local function tryCall(fn, fallback)
+    if not fn then return fallback end
+    local ok, v = pcall(fn)
+    if ok and type(v) == "number" then return v end
+    return fallback
+  end
+
   local function sendOwnship()
-    local getSelf = LoGetSelfData or (Export and Export.LoGetSelfData)
-    local getPilot = LoGetPilotName or (Export and Export.LoGetPilotName)
-    local getTime = LoGetModelTime or (Export and Export.LoGetModelTime)
+    local getSelf = exportFn("LoGetSelfData")
+    local getPilot = exportFn("LoGetPilotName")
+    local getTime = exportFn("LoGetModelTime")
 
     local data = getSelf and getSelf() or nil
     if not data or not data.LatLongAlt then return end
@@ -118,17 +145,36 @@ do
     ownshipLat = data.LatLongAlt.Lat
     ownshipLng = data.LatLongAlt.Long
 
-    send(string.format(
-      '{"type":"ownship","name":"%s","unitType":"%s","coalition":"%s",' ..
-      '"lat":%.6f,"lng":%.6f,"alt":%.2f,"heading":%.2f,"modelTime":%.2f}',
-      jsonEscape(name),
-      jsonEscape(data.Name or "unknown"),
-      jsonEscape(data.Coalition or "unknown"),
-      ownshipLat, ownshipLng,
-      data.LatLongAlt.Alt,
-      data.Heading or 0,
-      (getTime and getTime()) or 0
-    ))
+    local payload = {
+      type = "ownship",
+      name = name,
+      unitType = data.Name or "unknown",
+      coalition = data.Coalition or "unknown",
+      lat = ownshipLat,
+      lng = ownshipLng,
+      alt = data.LatLongAlt.Alt or 0,
+      heading = data.Heading or 0,
+      modelTime = (getTime and getTime()) or 0,
+    }
+
+    -- Télémétrie avancée, uniquement si le serveur l'autorise.
+    if checkOwnshipExport() then
+      payload.tas = tryCall(exportFn("LoGetTrueAirSpeed"), 0)
+      payload.ias = tryCall(exportFn("LoGetIndicatedAirSpeed"), 0)
+      payload.mach = tryCall(exportFn("LoGetMachNumber"), 0)
+      payload.aoa = tryCall(exportFn("LoGetAngleOfAttack"), 0)
+      payload.altAgl = tryCall(exportFn("LoGetAltitudeAboveGroundLevel"), 0)
+
+      local accel = exportFn("LoGetAccelerationUnits")
+      if accel then
+        local ok, a = pcall(accel)
+        if ok and type(a) == "table" and type(a.y) == "number" then
+          payload.g = a.y
+        end
+      end
+    end
+
+    send(toJson(payload))
   end
 
   ---------------------------------------------------------------------------

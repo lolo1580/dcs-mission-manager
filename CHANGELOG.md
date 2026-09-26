@@ -9,8 +9,43 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### À venir
 
-- Phase 4 bis — Cartes analytiques (heatmaps, traces) et analyse de sortie
 - Phase 5 — Packaging final et injecteur Lua
+
+## [0.6.0] — 2026-09-26
+
+**Phase 4 bis — Cartes analytiques & analyse de sortie.** Historique des positions,
+cartes de chaleur, traces de vol et télémétrie.
+
+### Ajouté
+
+- **Backend**
+  - `internal/tracker` : échantillonnage périodique des positions (traces) et
+    **détection de pertes** par disparition prolongée, avec sa dernière position.
+    Rétention configurable et purge horaire. Crée une mission de session si aucune
+    n'a été annoncée.
+  - Tables `track_positions` et `losses`.
+  - `internal/db` : `SaveSamples` (par lots), `SaveLoss`, `Heatmap` (agrégation en
+    grille de degrés, **sans projection**), `Trails`, `PruneTracking`.
+  - `internal/tracker.Analyse` : durée, distance (haversine), altitude/vitesse/G max.
+  - Routes `GET /api/analytics/{heatmap,tracks,sorties}`.
+  - Configuration : `DCSMM_TRACK_INTERVAL`, `DCSMM_TRACK_GRACE`,
+    `DCSMM_TRACK_RETENTION`.
+  - Champs de télémétrie (`speed`, `g`, `aoa`) sur les unités suivies.
+
+- **Scripts DCS**
+  - `Export.lua` : télémétrie ownship conditionnelle (vitesse vraie/indiquée, Mach,
+    incidence, altitude sol, facteur de charge) si le serveur l'autorise.
+
+- **Frontend**
+  - Onglet **Analyse** : source de carte de chaleur (Trafic / Pertes) et tableau
+    d'analyse de sortie par unité.
+  - Bouton **Historique** sur la carte : superpose la carte de chaleur (dégradé
+    froid→chaud) et les traces enregistrées.
+
+- **Documentation & tests**
+  - `docs/phase4bis-analytics.md`.
+  - Tests `internal/tracker` : échantillonnage, perte, non-duplication,
+    réapparition, haversine, analyse de sortie.
 
 ## [0.5.0] — 2026-09-26
 

@@ -36,6 +36,9 @@ type Message struct {
 	Chunks     int    `json:"chunks,omitempty"`
 	Data       string `json:"data,omitempty"`
 	Size       int    `json:"size,omitempty"`
+
+	// type = "telemetry" — full ownship state (Export.lua).
+	Telemetry *Telemetry `json:"telemetry,omitempty"`
 }
 
 // Player is a connected client as reported by net.get_player_info / net.get_stat.

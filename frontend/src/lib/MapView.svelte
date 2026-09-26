@@ -1,9 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import L from 'leaflet';
-  import 'leaflet/dist/leaflet.css';
-
-  import {
+  import 'leaflet/dist/leaflet.css';  import {
     visibleUnits,
     filters,
     connect,
@@ -17,12 +15,15 @@
     basemaps as basemapsStore,
   } from './units.js';
   import { unitIcon, coalitionColor } from './icons.js';
+  import { heatPoints, trails as trailsStore, heatSource, maxHeatWeight } from './analytics.js';
 
   let mapEl;
   let map;
   /** @type {Map<string, {marker: any, trail: any, trailPts: Array<[number,number]>}>} */
   const layers = new Map();
   let trailLayer;
+  let historyLayer;
+  let heatLayer;
   let userMoved = false;
   let followOwnship = true;
 
@@ -31,11 +32,18 @@
   let dcsTiles = null; // {theatre, bounds} when authentic DCS tiles exist
   let currentLayer = null;
 
+  // History overlays (heatmap and stored trails). Controlled by the parent via
+  // the `history` prop, so the state survives switching tabs.
+  export let history = false;
+  let mapReady = false;
+
   const TRAIL_MAX = 120;
 
   onMount(async () => {
     map = L.map(mapEl, { zoomControl: true, preferCanvas: true }).setView([45, 40], 5);
     trailLayer = L.layerGroup().addTo(map);
+    historyLayer = L.layerGroup();
+    heatLayer = L.layerGroup();
 
     try {
       const meta = await fetchTheatres();
@@ -70,14 +78,76 @@
 
     const stop = connect();
     const unsub = visibleUnits.subscribe(syncMarkers);
+    const unsubHeat = heatPoints.subscribe(() => renderHistory());
+    const unsubTrails = trailsStore.subscribe(() => renderHistory());
+
+    mapReady = true;
+    applyHistory();
 
     return () => {
       unsub?.();
       unsubBase?.();
+      unsubHeat?.();
+      unsubTrails?.();
       stop?.();
       map?.remove();
     };
   });
+
+  // Render the history overlays whenever the toggle or the data changes.
+  $: if (mapReady) applyHistory();
+
+  function applyHistory() {
+    if (!map) return;
+    if (history) {
+      heatLayer.addTo(map);
+      historyLayer.addTo(map);
+    } else {
+      map.removeLayer(heatLayer);
+      map.removeLayer(historyLayer);
+    }
+    renderHistory();
+  }
+
+  /** Fills the heatmap and trail layers from the analytics stores. */
+  function renderHistory() {
+    if (!map) return;
+    heatLayer.clearLayers();
+    historyLayer.clearLayers();
+    if (!history) return;
+
+    let pts = [];
+    heatPoints.subscribe((v) => (pts = v))();
+    let max = 1;
+    for (const p of pts) max = Math.max(max, p.weight ?? 0);
+    for (const p of pts) {
+      const ratio = (p.weight ?? 0) / max;
+      L.circleMarker([p.lat, p.lng], {
+        radius: 4 + ratio * 14,
+        stroke: false,
+        fillColor: heatColor(ratio),
+        fillOpacity: 0.45,
+      }).addTo(heatLayer);
+    }
+
+    let byUnit = {};
+    trailsStore.subscribe((v) => (byUnit = v ?? {}))();
+    for (const [unitId, trail] of Object.entries(byUnit)) {
+      if (!Array.isArray(trail) || trail.length < 2) continue;
+      L.polyline(
+        trail.map((p) => [p.lat, p.lng]),
+        { color: '#f0b429', weight: 1.5, opacity: 0.5 }
+      )
+        .bindTooltip(unitId)
+        .addTo(historyLayer);
+    }
+  }
+
+  /** Heat colour ramp: cool (low) to hot (high). */
+  function heatColor(ratio) {
+    const hue = 220 - 220 * Math.min(Math.max(ratio, 0), 1); // 220 blue -> 0 red
+    return `hsl(${hue}, 90%, 55%)`;
+  }
 
   function applyBasemap(id) {
     if (!map) return;

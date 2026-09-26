@@ -131,6 +131,45 @@ CREATE TABLE IF NOT EXISTS debriefs (
 	created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_debriefs_mission ON debriefs(mission_id);
+
+-- Position and telemetry samples over time, for trails and heatmaps.
+CREATE TABLE IF NOT EXISTS track_positions (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	mission_id INTEGER REFERENCES missions(id),
+	unit_id    TEXT NOT NULL,
+	name       TEXT,
+	type       TEXT,
+	category   TEXT,
+	coalition  TEXT,
+	lat        REAL NOT NULL,
+	lng        REAL NOT NULL,
+	alt        REAL,
+	heading    REAL,
+	speed      REAL,
+	g          REAL,
+	ownship    INTEGER NOT NULL DEFAULT 0,
+	real_ts    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_track_mission ON track_positions(mission_id);
+CREATE INDEX IF NOT EXISTS idx_track_unit ON track_positions(mission_id, unit_id);
+CREATE INDEX IF NOT EXISTS idx_track_ts ON track_positions(real_ts);
+
+-- Units that vanished from the world (presumed destroyed/despawned).
+CREATE TABLE IF NOT EXISTS losses (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	mission_id INTEGER REFERENCES missions(id),
+	unit_id    TEXT NOT NULL,
+	type       TEXT,
+	category   TEXT,
+	coalition  TEXT,
+	lat        REAL NOT NULL,
+	lng        REAL NOT NULL,
+	alt        REAL,
+	ownship    INTEGER NOT NULL DEFAULT 0,
+	real_ts    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_losses_mission ON losses(mission_id);
+CREATE INDEX IF NOT EXISTS idx_losses_ts ON losses(real_ts);
 `
 	_, err := d.sql.Exec(schema)
 	return err

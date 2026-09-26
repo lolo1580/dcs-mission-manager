@@ -30,6 +30,11 @@ type Unit struct {
 	Alt     float64 `json:"alt"`
 	Heading float64 `json:"heading"`
 
+	// Telemetry fields, only populated for the ownship (Export.lua).
+	Speed float64 `json:"speed,omitempty"` // m/s
+	G     float64 `json:"g,omitempty"`     // load factor
+	AoA   float64 `json:"aoa,omitempty"`   // radians
+
 	// Ownship is true for the local player's aircraft.
 	Ownship bool `json:"ownship"`
 

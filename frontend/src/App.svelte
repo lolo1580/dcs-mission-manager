@@ -7,6 +7,7 @@
   import ChatPanel from './lib/ChatPanel.svelte';
   import DebriefPanel from './lib/DebriefPanel.svelte';
   import StatsPanel from './lib/StatsPanel.svelte';
+  import AnalyticsPanel from './lib/AnalyticsPanel.svelte';
   import {
     connected,
     lastUpdate,
@@ -16,9 +17,18 @@
     basemapId,
   } from './lib/units.js';
   import { players, events, mission } from './lib/session.js';
+  import { loadAnalytics } from './lib/analytics.js';
 
   let mapView;
   let tab = 'map';
+  let history = false;
+
+  function toggleHistory() {
+    history = !history;
+    // The analytics data lives in its own store, loaded by the Analytics panel.
+    // Refresh it here so overlays appear even if that tab was never opened.
+    if (history) loadAnalytics();
+  }
 </script>
 
 <div class="layout">
@@ -37,6 +47,7 @@
       </button>
       <button class:active={tab === 'debriefs'} on:click={() => (tab = 'debriefs')}>Débriefs</button>
       <button class:active={tab === 'stats'} on:click={() => (tab = 'stats')}>Statistiques</button>
+      <button class:active={tab === 'analytics'} on:click={() => (tab = 'analytics')}>Analyse</button>
     </nav>
 
     {#if $mission}
@@ -64,6 +75,14 @@
       <button class="action" on:click={() => mapView?.recenter()} title="Recentrer la carte">
         Recentrer
       </button>
+      <button
+        class="action"
+        class:on={history}
+        on:click={toggleHistory}
+        title="Superposer la carte de chaleur et les traces enregistrées"
+      >
+        Historique
+      </button>
     {:else if tab === 'session'}
       <span class="meta">{$events.length} événement{$events.length === 1 ? '' : 's'}</span>
     {:else if tab === 'debriefs'}
@@ -75,7 +94,7 @@
     {#if tab === 'map'}
       <Sidebar />
       <div class="map-wrap">
-        <MapView bind:this={mapView} />
+        <MapView bind:this={mapView} bind:history />
         <UnitDetails />
       </div>
     {:else if tab === 'session'}
@@ -90,9 +109,13 @@
       <div class="session wide">
         <DebriefPanel />
       </div>
-    {:else}
+    {:else if tab === 'stats'}
       <div class="session wide">
         <StatsPanel />
+      </div>
+    {:else}
+      <div class="session wide">
+        <AnalyticsPanel />
       </div>
     {/if}
   </main>
@@ -247,6 +270,12 @@
   }
 
   .action:hover {
+    border-color: var(--blue);
+  }
+
+  .action.on {
+    color: var(--bg);
+    background: var(--blue);
     border-color: var(--blue);
   }
 

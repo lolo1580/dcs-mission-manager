@@ -33,6 +33,15 @@ type Message struct {
 	Heading   float64 `json:"heading"`
 	ModelTime float64 `json:"modelTime"`
 	Units     []World `json:"units"`
+
+	// Ownship telemetry (same "ownship" message, filled by Export.lua when the
+	// server allows ownship export).
+	TAS    float64 `json:"tas"`
+	IAS    float64 `json:"ias"`
+	Mach   float64 `json:"mach"`
+	AoA    float64 `json:"aoa"`
+	G      float64 `json:"g"`
+	AltAGL float64 `json:"altAgl"`
 }
 
 // World is one entry of a "world" message.
@@ -45,6 +54,7 @@ type World struct {
 	Lng       float64 `json:"lng"`
 	Alt       float64 `json:"alt"`
 	Heading   float64 `json:"heading"`
+	Speed     float64 `json:"speed,omitempty"`
 }
 
 // Listener turns UDP datagrams into store updates.
@@ -104,6 +114,9 @@ func (l *Listener) handle(m *Message) {
 			Lng:       m.Lng,
 			Alt:       m.Alt,
 			Heading:   m.Heading,
+			Speed:     speedOf(m),
+			G:         m.G,
+			AoA:       m.AoA,
 			Ownship:   true,
 		})
 	case "world":
@@ -122,6 +135,7 @@ func (l *Listener) handle(m *Message) {
 				Lng:       w.Lng,
 				Alt:       w.Alt,
 				Heading:   w.Heading,
+				Speed:     w.Speed,
 			})
 		}
 		l.store.UpdateAll(units)
@@ -135,4 +149,13 @@ func (l *Listener) handle(m *Message) {
 // FormatUnit is a small helper used by tests and logs.
 func FormatUnit(u state.Unit) string {
 	return fmt.Sprintf("%s/%s %s (%.4f, %.4f)", u.ID, u.Type, u.Coalition, u.Lat, u.Lng)
+}
+
+// speedOf returns the best available speed for an ownship message, preferring
+// true airspeed and falling back to indicated airspeed.
+func speedOf(m *Message) float64 {
+	if m.TAS > 0 {
+		return m.TAS
+	}
+	return m.IAS
 }

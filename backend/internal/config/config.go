@@ -39,6 +39,12 @@ type Config struct {
 	CategoriesFile string
 	// MaxUnits caps how many units are kept in the store.
 	MaxUnits int
+	// TrackInterval is how often unit positions are sampled for history.
+	TrackInterval time.Duration
+	// TrackGrace is how long a unit must be missing before being counted as lost.
+	TrackGrace time.Duration
+	// TrackRetention is how long tracking history is kept.
+	TrackRetention time.Duration
 }
 
 func env(key, def string) string {
@@ -95,5 +101,8 @@ func Load() Config {
 		BasemapURL:     env("DCSMM_BASEMAP_URL", ""),
 		CategoriesFile: env("DCSMM_CATEGORIES", "./categories.json"),
 		MaxUnits:       envInt("DCSMM_MAX_UNITS", 5000),
+		TrackInterval:  envDuration("DCSMM_TRACK_INTERVAL", 3*time.Second),
+		TrackGrace:     envDuration("DCSMM_TRACK_GRACE", 15*time.Second),
+		TrackRetention: envDuration("DCSMM_TRACK_RETENTION", 24*time.Hour),
 	}
 }

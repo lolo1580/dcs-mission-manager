@@ -35,7 +35,7 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
-| Cartes analytiques & sortie | 📋 Prévu | Heatmaps, traces, télémétrie (4.3 / 4.5) |
+| Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
 
 ### Statistiques avancées (prévues)
 
@@ -154,6 +154,9 @@ défauts raisonnables — identique pour l'`.exe` et pour Docker.
 | `DCSMM_BASEMAP_URL` | *(vide)* | Fond personnalisé optionnel (template `{z}/{x}/{y}`) |
 | `DCSMM_CATEGORIES` | `./categories.json` | Surcharge de classification des engins |
 | `DCSMM_MAX_UNITS` | `5000` | Nombre maximum d'unités suivies |
+| `DCSMM_TRACK_INTERVAL` | `3` (secondes) | Fréquence d'échantillonnage des positions |
+| `DCSMM_TRACK_GRACE` | `15` (secondes) | Absence avant de compter une unité comme perdue |
+| `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ### Côté DCS — `Saved Games\DCS\Config\dcsmm.cfg`
@@ -264,6 +267,7 @@ DCS mission manager/
 │       ├─ tcp/              # récepteur événements / joueurs / chat
 │       ├─ live/             # état de session en mémoire
 │       ├─ ingest/           # pont live → base de données
+│       ├─ tracker/          # historique positions + détection de pertes
 │       ├─ db/               # persistance SQLite (pur Go)
 │       ├─ state/            # store unités (en mémoire)
 │       └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
@@ -286,7 +290,7 @@ DCS mission manager/
 - [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, historique SQLite
 - [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
 - [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
-- [ ] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
+- [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
 - [ ] **Phase 5 — Packaging** : build final `.exe` + Docker multi-arch, injecteur Lua
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.

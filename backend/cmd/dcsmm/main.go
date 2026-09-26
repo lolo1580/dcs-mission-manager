@@ -26,6 +26,7 @@ import (
 	"dcsmm/internal/state"
 	"dcsmm/internal/stats"
 	"dcsmm/internal/tcp"
+	"dcsmm/internal/tracker"
 	"dcsmm/internal/udp"
 )
 
@@ -90,10 +91,36 @@ func main() {
 		}
 		srv.BroadcastMessage(map[string]any{"type": "message", "message": m})
 	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go srv.RunBroadcast(ctx, time.Second)
+
+	// ---- Tracking: positions, losses and sortie analysis -------------------
+	track := tracker.New(database, store, tracker.Options{
+		SampleEvery: cfg.TrackInterval,
+		Grace:       cfg.TrackGrace,
+	})
+	if database != nil {
+		track.SetMissionID(database.OpenMissionID())
+		// Follow mission transitions: the ingest writer opens a mission when DCS
+		// announces one, and the tracker picks it up on the next tick.
+		track.SetMissionIDFunc(database.OpenMissionID)
+		// If positions arrive with no mission at all (only Export.lua installed),
+		// create a placeholder mission so tracking is still persisted.
+		track.SetEnsureMission(func() int64 {
+			id, err := database.EnsureMission("Session sans mission", cfg.Theatre)
+			if err != nil {
+				log.Printf("tracker: ensure mission: %v", err)
+				return 0
+			}
+			return id
+		})
+	}
+	trackStop := make(chan struct{})
+	go track.Run(trackStop)
+	go track.PruneLoop(trackStop, cfg.TrackRetention)
+	log.Printf("tracker: sampling every %s (grace %s, retention %s)",
+		cfg.TrackInterval, cfg.TrackGrace, cfg.TrackRetention)
 
 	httpSrv := &http.Server{
 		Addr:    cfg.HTTPAddr,
@@ -112,6 +139,7 @@ func main() {
 	<-stop
 
 	log.Println("shutting down...")
+	close(trackStop)
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	_ = httpSrv.Shutdown(shutdownCtx)
