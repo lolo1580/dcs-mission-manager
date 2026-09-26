@@ -25,7 +25,7 @@ env:
 jobs:
   release:
     name: Build and publish
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -42,23 +42,20 @@ jobs:
 
       - name: Resolve version
         id: version
+        shell: pwsh
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $tag = '${{ github.event.inputs.tag }}'
+          } else {
+            $tag = $env:GITHUB_REF_NAME
+          }
           # "v1.0.0-beta.1" -> "1.0.0-beta.1"
-          VERSION="${TAG#v}"
-          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          # A suffix after the patch number means it is a pre-release.
-          if printf '%s' "$VERSION" | grep -qE '[A-Za-z]'; then
-            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "Building $TAG (version $VERSION)"
+          $version = $tag -replace '^v', ''
+          $prerelease = if ($version -match '[A-Za-z]') { 'true' } else { 'false' }
+          "tag=$tag"             >> $env:GITHUB_OUTPUT
+          "version=$version"     >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+          Write-Host "Building $tag (version $version, prerelease $prerelease)"
 
       - name: Build frontend
         working-directory: frontend
@@ -67,50 +64,56 @@ jobs:
       - name: Embedded Lua scripts up to date
         run: node tools/gen-lua-embed.mjs --check
 
-      - name: Build dcsmm.exe (Windows, frontend embedded)
+      - name: Build dcsmm.exe (frontend embedded)
         working-directory: backend
         env:
+          CGO_ENABLED: '0'
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath \
-            -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o ../dcsmm.exe ./cmd/dcsmm
-          ls -lh ../dcsmm.exe
+          go build -trimpath -ldflags="-s -w -X main.Version=$env:VERSION" -o ../dcsmm.exe ./cmd/dcsmm
+          if (-not (Test-Path ../dcsmm.exe)) { throw 'dcsmm.exe was not produced' }
+          Get-Item ../dcsmm.exe | Select-Object Name, Length
 
-      - name: Build dcsmm (Linux, for the smoke test)
-        working-directory: backend
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
-            -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o ../dcsmm-linux ./cmd/dcsmm
-
+      # The Windows artifact is smoke-tested directly: it is what users download.
       - name: Smoke test the release build
         run: |
-          ./dcsmm-linux version
-          ./dcsmm-linux &
-          DCSMM_PID=$!
-          for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null; then break; fi
-            sleep 0.5
-          done
-          curl -fsS http://127.0.0.1:8080/api/health
-          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="app">'
-          echo "OK: embedded UI is served"
-          kill $DCSMM_PID
+          .\dcsmm.exe version
+          $proc = Start-Process -FilePath .\dcsmm.exe -PassThru -WindowStyle Hidden
+          $up = $false
+          for ($i = 0; $i -lt 20; $i++) {
+            try {
+              Invoke-RestMethod http://127.0.0.1:8080/api/health -TimeoutSec 2 | Out-Null
+              $up = $true
+              break
+            } catch {
+              Start-Sleep -Milliseconds 500
+            }
+          }
+          if (-not $up) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw 'the health endpoint never answered'
+          }
+          $html = (Invoke-WebRequest http://127.0.0.1:8080/ -UseBasicParsing).Content
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          if ($html -notmatch '<div id="app">') {
+            throw 'the embedded UI is not served (fallback page returned)'
+          }
+          Write-Host 'OK: dcsmm.exe runs and serves the embedded UI'
 
       - name: Package the Lua scripts
         run: |
-          cd dcs-lua
-          zip -r ../dcsmm-lua-${{ steps.version.outputs.version }}.zip .
-          cd ..
-          ls -lh dcsmm-lua-*.zip
+          Compress-Archive -Path dcs-lua/* -DestinationPath "dcsmm-lua-${{ steps.version.outputs.version }}.zip"
+          Get-Item dcsmm-lua-*.zip | Select-Object Name, Length
 
       - name: Checksums
         run: |
-          sha256sum dcsmm.exe dcsmm-lua-*.zip > SHA256SUMS.txt
-          cat SHA256SUMS.txt
+          $lines = @()
+          foreach ($f in @('dcsmm.exe') + (Get-ChildItem 'dcsmm-lua-*.zip').Name) {
+            $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            $lines += "$hash  $f"
+          }
+          $lines | Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
 
       - name: Create the GitHub release
         uses: softprops/action-gh-release@v2

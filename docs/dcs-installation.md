@@ -19,7 +19,7 @@ DCS loads two families of scripts from the *Saved Games* folder:
 Copy `dcs-lua/Config/dcsmm.cfg` to `Saved Games\DCS\Config\dcsmm.cfg`, then adapt:
 
 ```lua
-dcsmm_host = "127.0.0.1"   -- IP LAN de la machine du manager si Docker ailleurs
+dcsmm_host = "127.0.0.1"   -- the manager runs locally, nothing to change
 dcsmm_udp_port = 7778
 dcsmm_tcp_port = 7779
 dcsmm_enabled = true
@@ -68,7 +68,7 @@ DCSMM: position export enabled (127.0.0.1:7778)
 |---|---|
 | Nothing in the logs | `dcsmm.cfg` missing or misplaced (it must be in `Config\`) |
 | `LuaSocket introuvable` | Incomplete DCS installation; LuaSocket ships with DCS |
-| The dot does not appear | Backend not started, firewall, or wrong `dcsmm_host` (Docker) |
+| The dot does not appear | Backend not started, or a firewall is blocking 127.0.0.1 |
 | The dot is jerky in game | Increase `dcsmm_send_interval` |
 
 ## Test without DCS

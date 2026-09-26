@@ -2,11 +2,9 @@
 
 🇬🇧 English | [🇫🇷 Français](README.fr.md)
 
-An all-in-one manager for **DCS World**: real-time live map, debriefing reading, and advanced statistics. Deployable either as a **Windows `.exe`** or a **Docker image** — from the **same project**.
+An all-in-one manager for **DCS World**: real-time live map, debriefing reading, and advanced statistics. It runs **locally, on the same Windows machine as DCS**: one `dcsmm.exe`, no server, no container, nothing to configure.
 
-> ⚠️ **DCS World never runs inside Docker.** The simulator stays on Windows.
-> The container only holds the *manager* (backend + Web UI), which communicates with
-> DCS over the network. See [Architecture](#architecture).
+Because it is local, it can read DCS's **own terrain data** — the airfields, frequencies and beacons of every installed map — instead of relying on a hand-maintained dataset.
 
 ---
 
@@ -55,29 +53,29 @@ An all-in-one manager for **DCS World**: real-time live map, debriefing reading,
 ## Architecture
 
 ```
-     MACHINE A (Windows — DCS)                    MACHINE B (Linux/NAS — Docker)
-┌──────────────────────────────┐            ┌──────────────────────────────────┐
-│ DCS World                     │  UDP + TCP │ Go backend (container)            │
-│  Config/dcsmm.cfg  ─ IP(B) ──┼───────────►│  • UDP listener (positions)       │
-│  Scripts/Export.lua  → pos    │◄───────────┼─ • TCP channel (events + commands) │
-│  Scripts/Hooks/dcsmm.lua      │            │  • state + SQLite (volume)        │
-│   → events/players/chat       │            │  • parse debrief (received over network) │
-│   → debrief.log (read + sent) │            │  • REST + SSE                     │
-└──────────────────────────────┘            └───────────────┬──────────────────┘
-                                              HTTP/WS ──────┘
-                                       LAN browsers (machine B or others)
+                      WINDOWS (one machine)
+┌──────────────────────────────────────────────────────────┐
+│ DCS World                                                 │
+│  Scripts/Export.lua      → positions (UDP/JSON)           │
+│  Scripts/Hooks/dcsmm.lua → events/players/chat (TCP/JSON) │
+└──────────────┬───────────────────────────────────────────┘
+               │ 127.0.0.1 — nothing to configure
+               ▼
+┌──────────────────────────────────────────────────────────┐
+│ dcsmm.exe — Go backend + embedded Web UI                  │
+│  • UDP + TCP listeners, in-memory state, SQLite (data/)   │
+│  • debrief parser, statistics, airfield reference         │
+│  • reads Mods/terrains/ and Saved Games/ directly         │
+│  • REST + SSE on http://localhost:8080                    │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### One project, two packagings
+### Local by design
 
 ```
-              A SINGLE SOURCE CODE BASE (Go + embedded Svelte)
-                              │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-   Mode A : dcsmm.exe (machine A)     Mode B : Docker image (machine B)
-   same machine as DCS               Linux/NAS, LAN access
-   backend IP = 127.0.0.1            backend IP = LAN IP of B
+   dcsmm.exe runs ON THE SAME WINDOWS MACHINE AS DCS
+   → no LAN address to set, no firewall rule, no container
+   → direct read access to Mods/terrains/ and Saved Games/
 ```
 
 **Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite + Leaflet (frontend) · SQLite (persistence).
@@ -97,11 +95,6 @@ An all-in-one manager for **DCS World**: real-time live map, debriefing reading,
 - **Go 1.22+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
 - **Node.js 20+** — <https://nodejs.org/> (only to build the frontend)
 - **Git**
-
-### Docker side (machine B, Linux/NAS)
-
-- Docker Engine 24+ and Docker Compose v2
-- `amd64` or `arm64` architecture (multi-arch build included)
 
 ---
 
@@ -133,15 +126,12 @@ Copy the files from `dcs-lua/` into your Saved Games folder — see
 
 Your aircraft appears as a point on the map, updated once per second.
 
-> In Docker mode on another machine, replace `127.0.0.1` with the LAN IP of machine B
-> in `Saved Games\DCS\Config\dcsmm.cfg`.
-
 ---
 
 ## Configuration
 
 All configuration is done through **environment variables** (prefix `DCSMM_`) with sensible
-defaults — identical for the `.exe` and for Docker.
+defaults. None of them is required for a normal install.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -167,7 +157,7 @@ defaults — identical for the `.exe` and for Docker.
 ### DCS side — `Saved Games\DCS\Config\dcsmm.cfg`
 
 ```lua
--- Backend address (LAN IP of the Docker machine, or 127.0.0.1 locally)
+-- Backend address (the manager runs locally)
 dcsmm_host = "127.0.0.1"
 dcsmm_udp_port = 7778
 dcsmm_tcp_port = 7779
@@ -209,7 +199,7 @@ The scripts go into DCS's *Saved Games* folder:
 
 ## Deployment
 
-### Mode A — Windows `.exe` (DCS machine)
+### Windows `.exe`
 
 ```powershell
 # 1. Build the frontend and the backend
@@ -222,25 +212,7 @@ The scripts go into DCS's *Saved Games* folder:
 .\dcsmm.exe
 ```
 
-### Mode B — Docker (machine B, Linux/NAS)
-
-```bash
-docker compose -f deploy/docker-compose.yml up -d
-```
-
-Published ports: `8080/tcp` (UI), `7778/udp` (positions), `7779/tcp` (events + commands).
-A volume persists the SQLite database.
-
-> On machine A, point `dcsmm_host` to the **LAN IP of machine B** (not `127.0.0.1`)
-> and allow the ports in the firewall.
-
-Multi-arch build for ARM NAS:
-
-```bash
-make docker-multiarch
-# or directly:
-docker buildx build --platform linux/amd64,linux/arm64 -f deploy/Dockerfile -t dcsmm:latest .
-```
+The UI opens at <http://localhost:8080>.
 
 ### CLI
 
@@ -325,7 +297,6 @@ DCS mission manager/
 │       └─ lib/              # map, panels, stores
 ├─ tiles/                    # DCS tiles per theatre
 ├─ tools/                    # test telemetry emitter, tile extractor
-├─ deploy/                   # Dockerfile + docker-compose.yml
 └─ docs/                     # documentation
 ```
 
@@ -339,7 +310,7 @@ DCS mission manager/
 - [x] **Phase 3 — Debriefings**: network transfer of `debrief.log`, Lua parser, history
 - [x] **Phase 4 — Advanced stats**: overview, pilots, weapons, engines, balance, network
 - [x] **Phase 4 bis — Analytical maps & sortie**: heatmaps, trails, telemetry
-- [x] **Phase 5 — Packaging**: CLI, safe Lua injector, `.exe` + multi-arch Docker
+- [x] **Phase 5 — Packaging**: CLI, safe Lua injector, single self-contained binary
 - [x] **Phase 6 — Aerodromes**: 21 Caucasus terrains (frequencies, charts)
 - [x] **Phase 7 — Fog of war**: respects the mission's F10 options (server filtering)
 

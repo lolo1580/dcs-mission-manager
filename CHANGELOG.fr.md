@@ -9,6 +9,20 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Modifié
+
+- **Le manager est désormais 100 % local.** Il tourne sur la même machine Windows
+  que DCS. Le déploiement Docker/Linux est retiré : `deploy/`, `.dockerignore`,
+  `docs/deployment.md`, les cibles `make docker` / `make docker-multiarch` et
+  l'option `build.ps1 -Target docker` disparaissent, ainsi que toutes les mises en
+  garde sur l'adresse LAN et les ports du conteneur. C'est ce qui rend possible le
+  changement suivant : un backend local peut lire les fichiers de DCS, et cela
+  élimine toute la classe de problèmes « mauvaise IP / pare-feu / publication de
+  ports ».
+- La CI et le workflow de release construisent et testent maintenant **`dcsmm.exe`
+  sous Windows** plutôt qu'un substitut Linux : l'artefact vérifié est donc celui
+  que les utilisateurs téléchargent.
+
 ### Ajouté
 
 - **Sélecteur de théâtre et étendue de la carte.** La carte live a désormais un

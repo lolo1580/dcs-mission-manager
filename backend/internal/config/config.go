@@ -1,7 +1,9 @@
 // Package config loads backend configuration from DCSMM_* environment variables.
 //
-// The exact same configuration mechanism is used by the Windows .exe and by the
-// Docker image, so both deployments behave identically.
+// The manager is local-only: it runs on the same Windows machine as DCS. That is
+// a deliberate constraint, not a limitation to work around — it is what lets the
+// backend read DCS's own terrain files (airfields, beacons) directly, and it
+// removes every networking pitfall (LAN address, firewall, container ports).
 package config
 
 import (

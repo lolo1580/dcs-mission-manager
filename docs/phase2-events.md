@@ -74,7 +74,7 @@ The same data arrives in real time via **SSE** (`/api/events`) as a
 ## Persistence
 
 SQLite via **modernc.org/sqlite** (pure Go, no CGO): the binary stays single and
-cross-compilable for both the Windows `.exe` and the Docker image.
+needs no C toolchain.
 
 Tables: `missions`, `events`, `chat`, `players`, `player_stats`, `meta`.
 Persistence can be disabled with `DCSMM_DB_ENABLED=false` (everything stays in

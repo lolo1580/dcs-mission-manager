@@ -2,7 +2,7 @@
 
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 
-.PHONY: help frontend backend build run install test docker docker-multiarch clean
+.PHONY: help frontend backend build run install test clean
 
 help: ## Show this help
 	@echo "Targets:"
@@ -12,8 +12,6 @@ help: ## Show this help
 	@echo "  run             Run the backend from source"
 	@echo "  install         Build everything then install the Lua scripts into DCS"
 	@echo "  test            Run Go tests"
-	@echo "  docker          Build the Docker image"
-	@echo "  docker-multiarch Build for linux/amd64 and linux/arm64"
 	@echo "  clean           Remove build artifacts"
 
 frontend: ## Build the web UI
@@ -32,13 +30,6 @@ install: build ## Build then install the Lua scripts into DCS
 
 test: ## Run Go tests
 	cd backend && go test ./...
-
-docker: ## Build the Docker image
-	docker build --build-arg VERSION=$(VERSION) -f deploy/Dockerfile -t dcsmm:$(VERSION) -t dcsmm:latest .
-
-docker-multiarch: ## Build for linux/amd64 and linux/arm64
-	docker buildx build --platform linux/amd64,linux/arm64 \
-		--build-arg VERSION=$(VERSION) -f deploy/Dockerfile -t dcsmm:$(VERSION) .
 
 clean: ## Remove build artifacts
 	rm -rf dcsmm dcsmm.exe frontend/dist backend/internal/api/dist/assets backend/internal/api/dist/index.html

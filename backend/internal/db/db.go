@@ -1,6 +1,6 @@
 // Package db is the durable store of the manager: mission history, game events,
-// chat and per-player statistics. It uses pure-Go SQLite so the binary stays
-// CGO-free and cross-compiles cleanly (Windows .exe and Docker Linux).
+// chat and per-player statistics. It uses pure-Go SQLite, so the binary stays
+// CGO-free and builds without a C toolchain.
 package db
 
 import (

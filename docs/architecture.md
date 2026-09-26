@@ -2,37 +2,65 @@
 
 ## Principle
 
-DCS World cannot run in Docker (Windows only, GPU + rendering required).
-The project is therefore designed as **two components** that communicate over the network:
+The manager is a **local companion to DCS World**: it runs on the same Windows
+machine as the simulator. That is a deliberate choice, and it pays off twice: the
+backend can read DCS's **own terrain data** (airfields, frequencies, beacons of
+every installed map), and it reads the **Saved Games** folder directly, so the
+Lua installer, the debrief and the track files need no transfer or setup.
 
-1. **The Lua scripts on the DCS side** (Windows machine) — collect and send the data.
+1. **The Lua scripts** — collect and send the data.
 2. **The manager** (Go backend + Web UI) — receives, stores, aggregates and displays.
 
-The same manager deploys as a Windows `.exe` or a Linux Docker image, **with no
-changes to the code**.
+## Installing
+
+```powershell
+# 1. Build the frontend and the backend
+.\build.ps1
+
+# 2. Install the scripts (safe merge into Saved Games)
+.\install-dcs.ps1            # add -DryRun to simulate
+
+# 3. Run
+.\dcsmm.exe
+```
+
+The web UI is then at <http://localhost:8080>.
+
+### CLI
+
+```powershell
+dcsmm                 # starts the manager (web interface + DCS receive)
+dcsmm install-lua     # installs/merges the Lua scripts into Saved Games
+dcsmm uninstall-lua   # removes the installed block (keeps the config)
+dcsmm status          # installed / outdated / missing, per file
+dcsmm purge           # deletes recorded sessions (destructive; see README)
+dcsmm version
+```
 
 ## Data flow
 
 ```
-                          WINDOWS (machine A)
+                        WINDOWS (one machine)
 ┌──────────────────────────────────────────────────────────┐
 │ DCS World                                                 │
 │                                                           │
 │  Scripts/Export.lua        Hooks/dcsmm.lua                │
-│   (live map)               (events/players)           │
+│   (live map)               (events/players)               │
 │        │                          │                       │
 │        │ UDP/JSON                 │ TCP/JSON              │
 └────────┼──────────────────────────┼───────────────────────┘
-         │                          │
+         │     127.0.0.1            │
          ▼                          ▼
 ┌──────────────────────────────────────────────────────────┐
-│ Manager (machine A en .exe, ou machine B en Docker)       │
+│ Manager (dcsmm.exe)                                       │
 │                                                           │
 │  internal/udp  ──► internal/state ──► internal/api        │
 │                                        ├─ REST /api/*      │
 │                                        ├─ SSE  /api/events │
 │                                        └─ Embedded web UI │
 │                                                           │
+│  Mods/terrains/  ──► internal/aerodrome (airfields)       │
+│  Saved Games/    ──► internal/install, debrief, tracks    │
 │  internal/debrief (Phase 3)                               │
 │  internal/stats   (Phase 4)                               │
 │  internal/theatre (Phase 1, projection)                   │
@@ -48,6 +76,7 @@ changes to the code**.
 | `internal/state` | In-memory store of units, with expiry (TTL) |
 | `internal/api` | REST, Server-Sent Events, serving of the embedded UI |
 | `internal/theatre` | `lat/lng ↔ DCS coordinates` projection (Phase 1) |
+| `internal/aerodrome` | Airfields and frequencies, read from DCS's own terrain files |
 | `internal/debrief` | `debrief.log` parser (Phase 3) |
 | `internal/stats` | Statistical aggregations (Phase 4) |
 
@@ -68,10 +97,10 @@ will go through the dedicated TCP socket on the Lua side, not through the browse
 
 ## Invariants
 
-- DCS stays on Windows; the container only contains the manager.
-- In Docker on another machine, the Lua scripts target the container's **LAN IP**,
-  never `127.0.0.1` (which would loop back to the Windows host).
+- **Everything runs locally**, on the same machine as DCS. The Lua scripts talk
+  to `127.0.0.1`; there is no remote mode.
 - The Lua export is **throttled** (`LuaExportActivityNextEvent`): a simulator
   frame is never blocked.
 - The provided Lua scripts are **additive**: never overwrite an existing
   `Export.lua` (Tacview, SRS, DCS-BIOS…).
+- Reads from the DCS installation are **read-only** and never execute Lua.

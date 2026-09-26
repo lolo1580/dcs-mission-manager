@@ -9,6 +9,19 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The manager is now local-only.** It runs on the same Windows machine as DCS.
+  The Docker/Linux deployment is removed: `deploy/`, `.dockerignore`,
+  `docs/deployment.md`, the `make docker` / `make docker-multiarch` targets and
+  the `build.ps1 -Target docker` option are gone, along with every LAN-address and
+  container-port caveat in the documentation. This is what makes the next change
+  possible: a local backend can read DCS's own files, and it removes the whole
+  class of "wrong IP / firewall / port publishing" support questions.
+- CI and the release workflow now build and smoke-test **`dcsmm.exe` on Windows**
+  rather than a Linux stand-in, so the artifact that is verified is the artifact
+  users download.
+
 ### Added
 
 - **Theatre selector and map extent.** The live map now has a theatre selector

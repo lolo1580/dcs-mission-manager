@@ -3,10 +3,9 @@
 # Usage:
 #   .\build.ps1              # frontend + backend
 #   .\build.ps1 -Target run  # run from source
-#   .\build.ps1 -Target docker
 
 param(
-    [ValidateSet('all', 'frontend', 'backend', 'run', 'test', 'docker')]
+    [ValidateSet('all', 'frontend', 'backend', 'run', 'test')]
     [string]$Target = 'all'
 )
 
@@ -37,5 +36,4 @@ switch ($Target) {
     'all'      { Build-Frontend; Build-Backend }
     'run'      { Push-Location (Join-Path $root 'backend'); go run ./cmd/dcsmm; Pop-Location }
     'test'     { Push-Location (Join-Path $root 'backend'); go test ./...; Pop-Location }
-    'docker'   { docker build -f (Join-Path $root 'deploy/Dockerfile') -t dcsmm:latest $root }
 }

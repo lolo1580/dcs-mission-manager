@@ -83,12 +83,13 @@ jobs:
         run: npm run build
 
   # ---------------------------------------------------------------------------
-  # Packaging: build the single self-contained binary (frontend embedded).
-  # This is the job that would catch an //go:embed mistake.
+  # Packaging: build the single self-contained binary (frontend embedded) and
+  # actually run it. The product targets Windows only, so this job runs on
+  # Windows and exercises the real artifact rather than a Linux stand-in.
   # ---------------------------------------------------------------------------
   binary:
-    name: Single binary
-    runs-on: ubuntu-latest
+    name: Single binary (Windows)
+    runs-on: windows-latest
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
@@ -108,25 +109,37 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
 
-      - name: Build binary (frontend embedded)
+      - name: Build dcsmm.exe (frontend embedded)
         working-directory: backend
+        env:
+          CGO_ENABLED: '0'
         run: |
-          CGO_ENABLED=0 go build -trimpath \
-            -ldflags="-s -w -X main.Version=ci-${GITHUB_SHA::7}" \
-            -o ../dcsmm ./cmd/dcsmm
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          go build -trimpath -ldflags="-s -w -X main.Version=ci-$sha" -o ../dcsmm.exe ./cmd/dcsmm
+          if (-not (Test-Path ../dcsmm.exe)) { throw 'dcsmm.exe was not produced' }
 
-      - name: Smoke test (serves the UI)
+      - name: Smoke test (runs and serves the UI)
         run: |
-          ./dcsmm version
-          ./dcsmm &
-          DCSMM_PID=$!
-          # Wait for the HTTP endpoint to answer.
-          for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null; then break; fi
-            sleep 0.5
-          done
-          curl -fsS http://127.0.0.1:8080/api/health
+          .\dcsmm.exe version
+          $proc = Start-Process -FilePath .\dcsmm.exe -PassThru -WindowStyle Hidden
+          $up = $false
+          for ($i = 0; $i -lt 20; $i++) {
+            try {
+              Invoke-RestMethod http://127.0.0.1:8080/api/health -TimeoutSec 2 | Out-Null
+              $up = $true
+              break
+            } catch {
+              Start-Sleep -Milliseconds 500
+            }
+          }
+          if (-not $up) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw 'the health endpoint never answered'
+          }
           # The embedded UI must be served, not the fallback page.
-          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="app">'
-          echo "OK: embedded UI is served"
-          kill $DCSMM_PID
+          $html = (Invoke-WebRequest http://127.0.0.1:8080/ -UseBasicParsing).Content
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          if ($html -notmatch '<div id="app">') {
+            throw 'the embedded UI is not served (fallback page returned)'
+          }
+          Write-Host 'OK: dcsmm.exe runs and serves the embedded UI'
