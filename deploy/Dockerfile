@@ -14,7 +14,9 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 2 — build du backend (Go), frontend embarqué
 # ---------------------------------------------------------------------------
-FROM golang:1.22-alpine AS backend
+# La version de Go doit suivre backend/go.mod (Go 1.25 aujourd'hui) : un
+# toolchain plus ancien refuse de compiler le module.
+FROM golang:1.25-alpine AS backend
 WORKDIR /src/backend
 # go.sum est nécessaire : toutes les dépendances (SQLite pur Go) sont verrouillées.
 COPY backend/go.mod backend/go.sum ./
