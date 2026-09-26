@@ -9,6 +9,17 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **`install-lua` ne fonctionnait pas depuis un binaire téléchargé.** Les scripts
+  devaient se trouver dans un dossier `dcs-lua/` à côté de l'exécutable, ce qu'une
+  archive de release ne contient jamais : la commande documentée
+  `.\dcsmm.exe install-lua` échouait avec « dcs-lua directory not found ». Les
+  scripts sont désormais **embarqués dans le binaire** (générés par
+  `tools/gen-lua-embed.mjs`), le dossier sur disque gardant la priorité en
+  développement. Couvert par `TestEmbeddedFallback`, et la CI échoue si
+  `dcs-lua/` change sans régénérer la copie embarquée.
+
 ### À venir
 
 - Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,

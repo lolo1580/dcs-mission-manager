@@ -41,6 +41,11 @@ jobs:
             exit 1
           fi
 
+      # The Lua scripts are embedded into the binary. If someone edits dcs-lua/
+      # without regenerating, the shipped binary would silently differ.
+      - name: Embedded Lua scripts up to date
+        run: node tools/gen-lua-embed.mjs --check
+
       - name: go vet
         working-directory: backend
         run: go vet ./...

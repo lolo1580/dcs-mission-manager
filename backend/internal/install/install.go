@@ -16,6 +16,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"dcsmm/internal/luafiles"
 )
 
 // Markers delimiting the managed block. These strings are load-bearing: they
@@ -57,6 +59,8 @@ type Result struct {
 // Installer installs the Lua scripts into a Saved Games folder.
 type Installer struct {
 	// LuaDir is the directory containing the distribution scripts (dcs-lua).
+	// When empty, or when it does not contain a target, the embedded copies
+	// (package luafiles) are used instead, so a lone dcsmm.exe can still install.
 	LuaDir string
 	// SavedGames is the DCS Saved Games folder.
 	SavedGames string
@@ -69,6 +73,26 @@ type Installer struct {
 // New creates an installer.
 func New(luaDir, savedGames string) *Installer {
 	return &Installer{LuaDir: luaDir, SavedGames: savedGames, Now: time.Now}
+}
+
+// readSource returns the contents of a distribution file, preferring the on-disk
+// dcs-lua directory (so a developer's edits apply immediately) and falling back
+// to the embedded copy (so a released binary works on its own).
+//
+// The relative path is normalised to forward slashes, because the embedded keys
+// are POSIX-style while filepath.Join uses the host separator.
+func (in *Installer) readSource(rel string) ([]byte, error) {
+	normalized := filepath.ToSlash(rel)
+
+	if in.LuaDir != "" {
+		if data, err := os.ReadFile(filepath.Join(in.LuaDir, filepath.FromSlash(normalized))); err == nil {
+			return data, nil
+		}
+	}
+	if data, ok := luafiles.Get(normalized); ok {
+		return data, nil
+	}
+	return nil, fmt.Errorf("script %q not found (neither on disk nor embedded)", normalized)
 }
 
 // FindSavedGames locates the DCS Saved Games folder, preferring OpenBeta when
@@ -109,12 +133,11 @@ func (in *Installer) Install(targets []Target) ([]Result, error) {
 }
 
 func (in *Installer) installOne(t Target) (Result, error) {
-	src := filepath.Join(in.LuaDir, t.Source)
 	dest := filepath.Join(in.SavedGames, t.DestRel)
 
-	content, err := os.ReadFile(src)
+	content, err := in.readSource(t.Source)
 	if err != nil {
-		return Result{DestRel: t.DestRel}, fmt.Errorf("lecture de la source : %w", err)
+		return Result{DestRel: t.DestRel}, err
 	}
 
 	if !t.NeedsBlock {
@@ -332,17 +355,16 @@ func (in *Installer) Uninstall() ([]Result, error) {
 func (in *Installer) Status(targets []Target) []Result {
 	var results []Result
 	for _, t := range targets {
-		src := filepath.Join(in.LuaDir, t.Source)
 		dest := filepath.Join(in.SavedGames, t.DestRel)
 
-		srcContent, srcErr := os.ReadFile(src)
+		srcContent, srcErr := in.readSource(t.Source)
 		destContent, destErr := os.ReadFile(dest)
 
 		res := Result{DestRel: t.DestRel}
 		switch {
 		case srcErr != nil:
 			res.Action = "unknown"
-			res.Note = "source introuvable"
+			res.Note = "source not found"
 		case errors.Is(destErr, os.ErrNotExist):
 			res.Action = "missing"
 		case destErr != nil:

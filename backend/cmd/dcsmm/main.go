@@ -94,15 +94,12 @@ func runLuaCommand(args []string, mode string) int {
 	dryRun := fs.Bool("dry-run", false, "write nothing, show the actions")
 	_ = fs.Parse(args)
 
-	// Resolve the Lua source directory: explicit flag, next to the executable,
-	// or the current working directory (for `go run`).
+	// Resolve the Lua source directory. It is optional: when none is found, the
+	// installer falls back to the scripts embedded in the binary, so a lone
+	// dcsmm.exe works. An explicit --lua-dir still wins.
 	resolvedLua := *luaDir
 	if resolvedLua == "" {
 		resolvedLua = findLuaDir()
-	}
-	if resolvedLua == "" {
-		fmt.Fprintln(os.Stderr, "dcs-lua directory not found. Use --lua-dir <path>")
-		return 1
 	}
 
 	// Resolve Saved Games: explicit flag or auto-detection.
@@ -119,7 +116,11 @@ func runLuaCommand(args []string, mode string) int {
 	ins := install.New(resolvedLua, resolvedSG)
 	ins.DryRun = *dryRun
 
-	fmt.Printf("Scripts  : %s\n", resolvedLua)
+	if resolvedLua == "" {
+		fmt.Println("Scripts  : embedded in the binary")
+	} else {
+		fmt.Printf("Scripts  : %s\n", resolvedLua)
+	}
 	fmt.Printf("DCS      : %s\n", resolvedSG)
 	if *dryRun {
 		fmt.Println("Mode      : dry run (no writes)")

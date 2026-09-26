@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"dcsmm/internal/luafiles"
 )
 
 const distExport = `--[[
@@ -304,6 +306,77 @@ func TestSpliceBlockReplacesInPlace(t *testing.T) {
 func TestExtractBlockMissing(t *testing.T) {
 	if extractBlock("no markers here") != "" {
 		t.Fatal("expected an empty block when markers are absent")
+	}
+}
+
+// TestEmbeddedFallback covers the released-binary case: no dcs-lua folder next
+// to the executable, so the scripts must come from the embedded copies. This
+// guards the regression where a lone dcsmm.exe could not install anything.
+func TestEmbeddedFallback(t *testing.T) {
+	root := t.TempDir()
+	sg := filepath.Join(root, "Saved Games", "DCS")
+	if err := os.MkdirAll(sg, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// LuaDir deliberately empty: embedded copies only.
+	in := New("", sg)
+	in.Now = func() time.Time { return time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC) }
+
+	results, err := in.Install(DefaultTargets())
+	if err != nil {
+		t.Fatalf("install from embedded scripts: %v", err)
+	}
+	for _, r := range results {
+		if r.Action != "created" {
+			t.Errorf("%s: want created, got %s", r.DestRel, r.Action)
+		}
+	}
+
+	// The installed block must contain the real payload, not a placeholder.
+	exportPath := filepath.Join(sg, "Scripts", "Export.lua")
+	content, err := os.ReadFile(exportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), BeginMarker) {
+		t.Fatal("the installed Export.lua should contain the managed block")
+	}
+	if !strings.Contains(string(content), "LuaExportActivityNextEvent") {
+		t.Fatal("the installed Export.lua should contain the real export code")
+	}
+
+	// Status must report them as installed when reading from the embedded set.
+	for _, r := range in.Status(DefaultTargets()) {
+		if r.Action != "installed" {
+			t.Errorf("status: %s should be installed, got %s", r.DestRel, r.Action)
+		}
+	}
+
+	// Uninstall must work too, without any on-disk distribution.
+	if _, err := in.Uninstall(); err != nil {
+		t.Fatalf("uninstall from embedded scripts: %v", err)
+	}
+	remaining, _ := os.ReadFile(exportPath)
+	if strings.Contains(string(remaining), BeginMarker) {
+		t.Fatal("the managed block should have been removed")
+	}
+}
+
+// TestEmbeddedPathsAreForwardSlashed ensures the embedded keys use the same
+// separator style as DefaultTargets, which is what readSource normalises to.
+func TestEmbeddedPathsAreForwardSlashed(t *testing.T) {
+	for _, name := range luafiles.List() {
+		if strings.Contains(name, "\\") {
+			t.Errorf("embedded path %q should use forward slashes", name)
+		}
+	}
+	// Every default target must resolve, either on disk or embedded.
+	in := New("", t.TempDir())
+	for _, target := range DefaultTargets() {
+		if _, err := in.readSource(target.Source); err != nil {
+			t.Errorf("default target %q does not resolve: %v", target.Source, err)
+		}
 	}
 }
 

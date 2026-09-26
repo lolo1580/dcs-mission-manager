@@ -64,6 +64,9 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
 
+      - name: Embedded Lua scripts up to date
+        run: node tools/gen-lua-embed.mjs --check
+
       - name: Build dcsmm.exe (Windows, frontend embedded)
         working-directory: backend
         env:
