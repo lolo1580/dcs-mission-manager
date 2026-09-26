@@ -30,13 +30,14 @@ An all-in-one manager for **DCS World**: real-time live map, debriefing reading,
 | Feature | Status | Details |
 |---|---|---|
 | Real-time live map | ✅ Phase 1 | All objects, categories, filters, trails, search |
+| Theatre & extent | ✅ Phase 8 | 12 DCS maps: framing, extent outline, per-theatre airfields |
 | Authentic DCS tiles | 📋 Planned | F10 tile exporter (`tiles/` folder) |
 | Events & players | ✅ Phase 2 | Kills, crashes, chat, players, SQLite history |
 | Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
 | Server control | 🚧 Partial | Chat to DCS (command channel) coming |
 | Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission) |
 | Analytical maps & sortie | ✅ Phase 4 bis | Heatmaps, trails, sortie analysis, ownship telemetry |
-| Aerodromes | ✅ Phase 6 | 21 Caucasus terrains: coordinates, Tower, TACAN, ILS, charts |
+| Aerodromes | ✅ Phase 6 | 21 Caucasus terrains: coordinates, Tower, TACAN, ILS, charts; shown on the map with a click-through data card |
 | Fog of war | ✅ Phase 7 | Respects F10 mission options (server-side filtering) |
 
 ### Advanced statistics (planned)

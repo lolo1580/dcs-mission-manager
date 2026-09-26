@@ -11,6 +11,16 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **Theatre selector and map extent.** The live map now has a theatre selector
+  (Caucasus, Syria, Nevada, Persian Gulf, Marianas, Sinai, Kola, Afghanistan,
+  Iraq, Falklands, Normandy, The Channel). Choosing one frames the map on that
+  map's bounding box, switches the airfield list to it, and offers a "Bounds"
+  button that outlines the DCS map extent on the map. The choice is persisted.
+- **Airfields on the map with their data.** An "Airfields" button reveals the
+  theatre's airfields as markers; clicking one opens a data card (ICAO,
+  coalition, coordinates, elevation, runway, Tower, TACAN, ILS). The card also
+  has a "Show on the map" button, and clicking an airfield in the Airfields tab
+  now switches to the map and focuses it.
 - **Session source tracking (`live` / `test`) and `dcsmm purge`.** A session
   recorded while the test tools are running is indistinguishable from a real
   flight, because those tools speak exactly the same protocol as DCS. Every
@@ -22,6 +32,10 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **The map (and its overlay cards) could be pushed off screen.** A wide header
+  expanded the layout's grid column, so on narrow windows part of the map and the
+  unit/airfield cards ended up outside the viewport. The header now wraps and the
+  grid column is clamped.
 - **Phantom empty missions.** The position tracker opened a "Session without
   mission" at its first tick, even when no unit had ever been reported, so an
   idle backend accumulated empty sessions in the UI. A mission is now created

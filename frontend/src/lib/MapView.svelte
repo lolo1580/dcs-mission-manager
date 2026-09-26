@@ -13,10 +13,19 @@
     fetchTheatres,
     basemapId,
     basemaps as basemapsStore,
+    theatres,
+    theatre,
+    setTheatre,
+    showBounds,
   } from './units.js';
   import { unitIcon, coalitionColor } from './icons.js';
   import { heatPoints, trails as trailsStore, heatSource, maxHeatWeight } from './analytics.js';
-  import { aerodromes, showOnMap as showAerodromes } from './aerodromes.js';
+  import {
+    aerodromes,
+    showOnMap as showAerodromes,
+    selectAerodrome,
+  } from './aerodromes.js';
+  import { focusRequest } from './ui.js';
 
   let mapEl;
   let map;
@@ -26,6 +35,7 @@
   let historyLayer;
   let heatLayer;
   let aerodromeLayer;
+  let boundsLayer;
   let userMoved = false;
   let followOwnship = true;
 
@@ -33,6 +43,10 @@
   let basemaps = [];
   let dcsTiles = null; // {theatre, bounds} when authentic DCS tiles exist
   let currentLayer = null;
+  /** Theatre whose bounds have already been framed, so a manual pan is kept. */
+  let framedTheatre = null;
+  /** Airfield to focus once the map exists (set before mount completes). */
+  let pendingAerodrome = null;
 
   // History overlays (heatmap and stored trails). Controlled by the parent via
   // the `history` prop, so the state survives switching tabs.
@@ -47,17 +61,13 @@
     historyLayer = L.layerGroup();
     heatLayer = L.layerGroup();
     aerodromeLayer = L.layerGroup();
+    boundsLayer = L.layerGroup();
 
     try {
       const meta = await fetchTheatres();
       basemaps = meta.basemaps ?? [];
-      const th = meta.theatres?.find((t) => t.id === meta.default) ?? meta.theatres?.[0];
-      if (th?.tiles) {
-        dcsTiles = { theatre: th.id, bounds: th.bounds };
-        basemaps = [
-          { id: 'dcs', name: 'DCS (officiel)', url: `/api/tiles/${th.id}/{z}/{x}/{y}.png`, attribution: 'DCS World', maxZoom: 8 },
-          ...basemaps,
-        ];
+      if (meta.default && !localStorage.getItem('dcsmm.theatre')) {
+        theatre.set(meta.default);
       }
       if (meta.basemap && basemaps.some((b) => b.id === meta.basemap) && !localStorage.getItem('dcsmm.basemap')) {
         basemapId.set(meta.basemap);
@@ -85,9 +95,19 @@
     const unsubTrails = trailsStore.subscribe(() => renderHistory());
     const unsubAeroList = aerodromes.subscribe(() => renderAerodromes());
     const unsubAeroToggle = showAerodromes.subscribe(() => renderAerodromes());
+    const unsubBounds = showBounds.subscribe(() => renderBounds());
+    const unsubTheatre = theatre.subscribe(() => onTheatreChange());
+    const unsubFocus = focusRequest.subscribe((a) => {
+      if (a) {
+        focusAerodrome(a);
+        focusRequest.set(null);
+      }
+    });
 
     mapReady = true;
     applyHistory();
+    onTheatreChange();
+    if (pendingAerodrome) focusAerodrome(pendingAerodrome);
 
     return () => {
       unsub?.();
@@ -96,10 +116,86 @@
       unsubTrails?.();
       unsubAeroList?.();
       unsubAeroToggle?.();
+      unsubBounds?.();
+      unsubTheatre?.();
+      unsubFocus?.();
       stop?.();
       map?.remove();
     };
   });
+
+  /** Reacts to a theatre change: basemap availability, extent, airfields. */
+  function onTheatreChange() {
+    if (!map) return;
+    const th = $theatres.find((t) => t.id === $theatre);
+
+    // Authentic DCS tiles, when the theatre provides them.
+    dcsTiles = th?.tiles ? { theatre: th.id, bounds: th.bounds } : null;
+    if (th?.tiles && !basemaps.some((b) => b.id === 'dcs')) {
+      basemaps = [
+        { id: 'dcs', name: 'DCS (official)', url: `/api/tiles/${th.id}/{z}/{x}/{y}.png`, attribution: 'DCS World', maxZoom: 8 },
+        ...basemaps,
+      ];
+      basemapsStore.set(basemaps);
+    }
+
+    // Frame the map on the theatre the first time it becomes active, so the
+    // view is not lost when the user then pans or zooms by hand.
+    if (th?.bounds && framedTheatre !== th.id) {
+      frameBounds(th.bounds);
+      framedTheatre = th.id;
+    }
+
+    renderBounds();
+    loadTheatreAerodromes(th?.id);
+  }
+
+  /** Fits the map to a theatre's bounding box. */
+  function frameBounds(b) {
+    if (!map || !b) return;
+    const south = Math.max(b.minLat, -90);
+    const north = Math.min(b.maxLat, 90);
+    const west = Math.max(b.minLng, -180);
+    const east = Math.min(b.maxLng, 180);
+    map.fitBounds(L.latLngBounds([south, west], [north, east]).pad(0.05));
+  }
+
+  /** Outlines the DCS map extent when the toggle is on. */
+  function renderBounds() {
+    if (!map) return;
+    boundsLayer.clearLayers();
+
+    let on = false;
+    showBounds.subscribe((v) => (on = v))();
+    const b = $theatre ? $theatres.find((t) => t.id === $theatre)?.bounds : null;
+    if (!on || !b) {
+      map.removeLayer(boundsLayer);
+      return;
+    }
+    boundsLayer.addTo(map);
+
+    const name = $theatres.find((t) => t.id === $theatre)?.name ?? $theatre;
+    L.rectangle(
+      [
+        [b.minLat, b.minLng],
+        [b.maxLat, b.maxLng],
+      ],
+      { color: '#f0b429', weight: 1.5, dashArray: '6 4', fill: false, interactive: false }
+    )
+      .bindTooltip(`${name} — DCS map extent`, { sticky: true })
+      .addTo(boundsLayer);
+  }
+
+  /** Loads the airfields of the active theatre (or all of them if unknown). */
+  function loadTheatreAerodromes(id) {
+    const q = id ? `?theatre=${encodeURIComponent(id)}` : '';
+    fetch(`/api/aerodromes${q}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((body) => aerodromes.set(body.aerodromes ?? []))
+      .catch(() => {
+        /* the Airfields tab surfaces load errors */
+      });
+  }
 
   /** Draws airfield markers when the toggle is on. */
   function renderAerodromes() {
@@ -132,6 +228,12 @@
             (a.tacan ? `TACAN ${a.tacan}<br/>` : '') +
             (a.ils?.length ? `ILS ${a.ils.map((i) => `${i.runway} ${i.mhz}`).join(', ')}` : '')
         )
+        // Clicking an airfield opens its full data card, in the corner the unit
+        // card uses. The two never show at once (see UnitDetails).
+        .on('click', () => {
+          selectedId.set(null);
+          selectAerodrome(a);
+        })
         .addTo(aerodromeLayer);
     }
   }
@@ -301,13 +403,29 @@
       map.setView([own.lat, own.lng], 8);
     } else if ($visibleUnits.length) {
       map.fitBounds(L.latLngBounds($visibleUnits.map((u) => [u.lat, u.lng])).pad(0.3));
-    } else if (dcsTiles) {
-      const b = dcsTiles.bounds;
-      map.fitBounds([
-        [b.minLat, b.minLng],
-        [b.maxLat, b.maxLng],
-      ]);
+    } else {
+      const b = $theatre ? $theatres.find((t) => t.id === $theatre)?.bounds : null;
+      if (b) {
+        framedTheatre = $theatre;
+        frameBounds(b);
+      } else if (dcsTiles) {
+        frameBounds(dcsTiles.bounds);
+      }
     }
+  }
+
+  /** Focuses one airfield: used by the Airfields tab to reveal an airfield. */
+  export function focusAerodrome(a) {
+    if (!a) return;
+    // The caller may switch to the map tab in the same tick, before this
+    // component has finished mounting: remember the target and apply it below.
+    if (!map) {
+      pendingAerodrome = a;
+      return;
+    }
+    userMoved = true;
+    map.setView([a.lat, a.lng], 10);
+    pendingAerodrome = null;
   }
 </script>
 

@@ -1,16 +1,24 @@
 /**
  * Aerodrome store: reference airfields (coordinates, radio frequencies, charts).
  */
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { tNow } from './i18n.js';
-import { units } from './units.js';
+import { units, theatre } from './units.js';
 
 export const aerodromes = writable([]);
-export const theatre = writable('Caucasus');
 export const aerodromeError = writable('');
 export const search = writable('');
 /** When true, airfield markers are drawn on the map. */
 export const showOnMap = writable(false);
+/**
+ * Airfield selected on the map. Set from MapView, consumed by UnitDetails (which
+ * shares the map's bottom-right corner with the unit card).
+ */
+export const selectedAerodrome = writable(null);
+
+export function selectAerodrome(a) {
+  selectedAerodrome.set(a ?? null);
+}
 
 export const filteredAerodromes = derived(
   [aerodromes, search],

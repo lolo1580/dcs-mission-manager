@@ -110,8 +110,42 @@ export function connect() {
 export async function fetchTheatres() {
   const res = await fetch('/api/theatres');
   if (!res.ok) throw new Error(`theatres: ${res.status}`);
-  return res.json();
+  const meta = await res.json();
+  // Cache the theatre list (with its geographic bounds) so the map can frame
+  // itself and outline the DCS map extent without another round trip.
+  if (Array.isArray(meta.theatres)) theatres.set(meta.theatres);
+  return meta;
 }
+
+/** Known DCS theatres, as returned by /api/theatres. */
+export const theatres = writable([]);
+
+/** Active theatre id. Persisted, because a player flies the same map for weeks. */
+export const theatre = writable(
+  (typeof localStorage !== 'undefined' && localStorage.getItem('dcsmm.theatre')) || 'Caucasus'
+);
+
+theatre.subscribe((id) => {
+  if (typeof localStorage !== 'undefined') localStorage.setItem('dcsmm.theatre', id);
+});
+
+export function setTheatre(id) {
+  if (id) theatre.set(id);
+}
+
+/** Bounds of the active theatre, or null when it is not known yet. */
+export const theatreBounds = derived([theatres, theatre], ([$list, $id]) => {
+  const t = $list.find((x) => x.id === $id);
+  return t?.bounds ?? null;
+});
+
+/** Whether the active theatre has authentic DCS map tiles available. */
+export const theatreHasTiles = derived([theatres, theatre], ([$list, $id]) =>
+  Boolean($list.find((x) => x.id === $id)?.tiles)
+);
+
+/** When true, the DCS map extent is outlined on the map. */
+export const showBounds = writable(false);
 
 /** Selected basemap id, persisted across reloads. */
 export const basemapId = writable(

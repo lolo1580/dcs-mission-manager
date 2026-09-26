@@ -2,6 +2,7 @@
   import MapView from './lib/MapView.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import UnitDetails from './lib/UnitDetails.svelte';
+  import AerodromeDetails from './lib/AerodromeDetails.svelte';
   import PlayerPanel from './lib/PlayerPanel.svelte';
   import EventPanel from './lib/EventPanel.svelte';
   import ChatPanel from './lib/ChatPanel.svelte';
@@ -17,14 +18,28 @@
     basemaps,
     basemapId,
     visibility,
+    theatres,
+    theatre,
+    setTheatre,
+    showBounds,
   } from './lib/units.js';
   import { players, events, mission } from './lib/session.js';
   import { loadAnalytics } from './lib/analytics.js';
+  import { showOnMap as showAerodromes } from './lib/aerodromes.js';
+  import { activeTab } from './lib/ui.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
 
   let mapView;
   let tab = 'map';
   let history = false;
+
+  // The tab can be driven by other panels (for example "show on the map").
+  activeTab.subscribe((v) => (tab = v));
+
+  function goTo(id) {
+    tab = id;
+    activeTab.set(id);
+  }
 
   function toggleHistory() {
     history = !history;
@@ -43,15 +58,15 @@
     </span>
 
     <nav class="tabs">
-      <button class:active={tab === 'map'} on:click={() => (tab = 'map')}>{$t('tab.map')}</button>
-      <button class:active={tab === 'session'} on:click={() => (tab = 'session')}>
+      <button class:active={tab === 'map'} on:click={() => goTo('map')}>{$t('tab.map')}</button>
+      <button class:active={tab === 'session'} on:click={() => goTo('session')}>
         {$t('tab.session')}
         {#if $players.length}<span class="badge">{$players.length}</span>{/if}
       </button>
-      <button class:active={tab === 'debriefs'} on:click={() => (tab = 'debriefs')}>{$t('tab.debriefs')}</button>
-      <button class:active={tab === 'stats'} on:click={() => (tab = 'stats')}>{$t('tab.stats')}</button>
-      <button class:active={tab === 'analytics'} on:click={() => (tab = 'analytics')}>{$t('tab.analytics')}</button>
-      <button class:active={tab === 'aerodromes'} on:click={() => (tab = 'aerodromes')}>{$t('tab.aerodromes')}</button>
+      <button class:active={tab === 'debriefs'} on:click={() => goTo('debriefs')}>{$t('tab.debriefs')}</button>
+      <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
+      <button class:active={tab === 'analytics'} on:click={() => goTo('analytics')}>{$t('tab.analytics')}</button>
+      <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
     </nav>
 
     {#if $mission}
@@ -84,6 +99,32 @@
       {/if}
       <button class="action" on:click={() => mapView?.recenter()} title={$t('app.recenterTitle')}>
         {$t('app.recenter')}
+      </button>
+      {#if $theatres.length}
+        <label class="theatre">
+          {$t('app.theatre')}
+          <select value={$theatre} on:change={(e) => setTheatre(e.currentTarget.value)} title={$t('app.theatreTitle')}>
+            {#each $theatres as t (t.id)}
+              <option value={t.id}>{t.name}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+      <button
+        class="action"
+        class:on={$showAerodromes}
+        on:click={() => showAerodromes.update((v) => !v)}
+        title={$t('app.airfieldsTitle')}
+      >
+        {$t('app.airfields')}
+      </button>
+      <button
+        class="action"
+        class:on={$showBounds}
+        on:click={() => showBounds.update((v) => !v)}
+        title={$t('app.boundsTitle')}
+      >
+        {$t('app.bounds')}
       </button>
       <button
         class="action"
@@ -129,6 +170,7 @@
       <div class="map-wrap">
         <MapView bind:this={mapView} bind:history />
         <UnitDetails />
+        <AerodromeDetails />
       </div>
     {:else if tab === 'session'}
       <div class="session">
@@ -161,6 +203,9 @@
 <style>
   .layout {
     display: grid;
+    /* minmax(0, 1fr) stops a wide, non-wrapping header from expanding the grid
+       column and pushing the map (and its overlay cards) off screen. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto 1fr;
     height: 100%;
   }
@@ -168,7 +213,9 @@
   header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.75rem;
+    row-gap: 0.35rem;
     padding: 0.5rem 1rem;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
@@ -295,6 +342,29 @@
     margin-left: 0.5rem;
   }
 
+  .theatre {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .theatre select {
+    padding: 0.3rem 0.45rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .theatre select:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
   .lang select {
     padding: 0.3rem 0.45rem;
     color: var(--text);
@@ -338,6 +408,7 @@
   main {
     display: flex;
     min-height: 0;
+    min-width: 0;
   }
 
   .fog-banner {

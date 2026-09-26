@@ -46,6 +46,12 @@ const en = {
   'app.recenterTitle': 'Recenter the map',
   'app.history': 'History',
   'app.historyTitle': 'Overlay the heatmap and recorded trails',
+  'app.theatre': 'Theatre',
+  'app.theatreTitle': 'DCS theatre: frames the map and lists its airfields',
+  'app.bounds': 'Bounds',
+  'app.boundsTitle': 'Outline the DCS map extent',
+  'app.airfields': 'Airfields',
+  'app.airfieldsTitle': 'Show the theatre airfields on the map (click one for its data)',
 
   'tab.map': 'Map',
   'tab.session': 'Session',
@@ -231,6 +237,8 @@ const en = {
   'aerodromes.tower': 'Tower',
   'aerodromes.charts': 'Available charts',
   'aerodromes.chartsHint': 'Charts live in maps_dcs/ (not embedded in the binary).',
+  'aerodromes.clickHint': 'Click a marker on the map to see its data.',
+  'aerodromes.showOnMap': 'Show on the map',
 
   'visibility.prefix': 'Visibility',
   'visibility.mode.map_only': 'Map only',
@@ -259,6 +267,12 @@ const fr = {
   'app.recenterTitle': 'Recentrer la carte',
   'app.history': 'Historique',
   'app.historyTitle': 'Superposer la carte de chaleur et les traces enregistrées',
+  'app.theatre': 'Théâtre',
+  'app.theatreTitle': 'Théâtre DCS : cadre la carte et liste ses aérodromes',
+  'app.bounds': 'Limites',
+  'app.boundsTitle': 'Contour de la carte DCS',
+  'app.airfields': 'Aérodromes',
+  'app.airfieldsTitle': 'Afficher les aérodromes du théâtre sur la carte (cliquer pour les données)',
 
   'tab.map': 'Carte',
   'tab.session': 'Session',
@@ -444,6 +458,8 @@ const fr = {
   'aerodromes.tower': 'Tower',
   'aerodromes.charts': 'Cartes disponibles',
   'aerodromes.chartsHint': 'Les cartes se trouvent dans maps_dcs/ (non embarquées dans le binaire).',
+  'aerodromes.clickHint': 'Clique un marqueur sur la carte pour voir ses données.',
+  'aerodromes.showOnMap': 'Voir sur la carte',
 
   'visibility.prefix': 'Visibilité',
   'visibility.mode.map_only': 'Carte seule',

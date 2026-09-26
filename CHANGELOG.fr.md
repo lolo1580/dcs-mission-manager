@@ -11,6 +11,18 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Sélecteur de théâtre et étendue de la carte.** La carte live a désormais un
+  sélecteur de théâtre (Caucasus, Syria, Nevada, Persian Gulf, Marianas, Sinai,
+  Kola, Afghanistan, Iraq, Falklands, Normandy, The Channel). En choisir un cadre
+  la carte sur la boîte englobante de cette carte, bascule la liste des
+  aérodromes dessus, et propose un bouton « Limites » qui trace l'étendue de la
+  carte DCS. Le choix est conservé.
+- **Aérodromes sur la carte avec leurs données.** Un bouton « Aérodromes »
+  affiche les aérodromes du théâtre sous forme de marqueurs ; cliquer l'un d'eux
+  ouvre une fiche (OACI, coalition, coordonnées, élévation, piste, Tower, TACAN,
+  ILS). La fiche propose aussi « Voir sur la carte », et cliquer un aérodrome
+  dans l'onglet Aérodromes bascule maintenant sur la carte et le centre.
+
 - **Suivi de la source des sessions (`live` / `test`) et commande `dcsmm purge`.**
   Une session enregistrée pendant que les outils de test tournent est
   indiscernable d'un vrai vol, car ces outils parlent exactement le même
@@ -23,6 +35,10 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **La carte (et ses fiches superposées) pouvait sortir de l'écran.** Un en-tête
+  trop large élargissait la colonne de la grille : sur une fenêtre étroite, une
+  partie de la carte et les fiches unité/aérodrome se retrouvaient hors du
+  viewport. L'en-tête passe maintenant à la ligne et la colonne est bornée.
 - **Missions fantômes vides.** Le tracker de positions ouvrait une « Session
   without mission » dès son premier tick, même si aucune unité n'avait jamais été
   signalée : un backend inactif accumulait donc des sessions vides dans

@@ -32,13 +32,14 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 | Fonction | État | Détail |
 |---|---|---|
 | Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
+| Théâtre & étendue | ✅ Phase 8 | 12 cartes DCS : cadrage, contour de l'étendue, aérodromes par théâtre |
 | Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
 | Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
-| Aérodromes | ✅ Phase 6 | 21 terrains du Caucase : coordonnées, Tower, TACAN, ILS, cartes |
+| Aérodromes | ✅ Phase 6 | 21 terrains du Caucase : coordonnées, Tower, TACAN, ILS, cartes ; affichés sur la carte avec fiche au clic |
 | Fog of war | ✅ Phase 7 | Respect des options de mission F10 (filtrage côté serveur) |
 
 ### Statistiques avancées (prévues)

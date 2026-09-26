@@ -5,11 +5,14 @@
     aerodromeError,
     search,
     showOnMap,
+    selectedAerodrome,
     loadAerodromes,
     loadNearest,
     fmtMHz,
     fmtCoords,
   } from './aerodromes.js';
+  import { theatres, theatre, setTheatre } from './units.js';
+  import { revealAerodrome } from './ui.js';
   import { t } from './i18n.js';
 
   let selected = null;
@@ -17,14 +20,40 @@
 
   onMount(loadAerodromes);
 
+  // Keep the local selection in sync when the airfield was chosen on the map.
+  // A reactive statement (rather than a manual subscribe) lets Svelte manage the
+  // store subscription lifetime.
+  $: if ($selectedAerodrome) selected = $selectedAerodrome;
+
   async function useNearest() {
     nearestFirst = await loadNearest();
   }
-</script>
+
+  /** Selects an airfield and reveals it on the map. */
+  function pick(a) {
+    selected = a;
+    showOnMap.set(true);
+    revealAerodrome(a);
+  }</script>
 
 <section class="aerodromes">
   <header>
     <h2>{$t('aerodromes.title')} <span class="count">{$filteredAerodromes.length}</span></h2>
+    {#if $theatres.length}
+      <select
+        class="theatre"
+        value={$theatre}
+        on:change={(e) => {
+          setTheatre(e.currentTarget.value);
+          loadAerodromes();
+        }}
+        title={$t('app.theatreTitle')}
+      >
+        {#each $theatres as th (th.id)}
+          <option value={th.id}>{th.name}</option>
+        {/each}
+      </select>
+    {/if}
     <button class="refresh" on:click={loadAerodromes}>{$t('aerodromes.refresh')}</button>
   </header>
 
@@ -48,11 +77,13 @@
     </label>
   </div>
 
+  <p class="hint">{$t('aerodromes.clickHint')}</p>
+
   <div class="split">
     <ul class="list">
       {#each $filteredAerodromes as a (a.id)}
         <li>
-          <button class:selected={selected?.id === a.id} on:click={() => (selected = a)}>
+          <button class:selected={selected?.id === a.id} on:click={() => pick(a)}>
             <span class="name">{a.name}</span>
             <span class="sub">
               {a.id}
@@ -144,6 +175,29 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
+  }
+
+  .theatre {
+    padding: 0.25rem 0.45rem;
+    font-size: 0.74rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .theatre:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
+  header {
+    gap: 0.45rem;
+  }
+
+  h2 {
+    margin-right: auto;
   }
 
   .refresh:hover,
@@ -313,12 +367,6 @@
     margin: 0.5rem 0 0;
     font-size: 0.74rem;
     color: var(--muted);
-  }
-
-  code {
-    background: var(--bg);
-    padding: 0.05rem 0.3rem;
-    border-radius: 4px;
   }
 
   .empty {
