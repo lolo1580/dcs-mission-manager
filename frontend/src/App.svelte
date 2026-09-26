@@ -5,6 +5,7 @@
   import PlayerPanel from './lib/PlayerPanel.svelte';
   import EventPanel from './lib/EventPanel.svelte';
   import ChatPanel from './lib/ChatPanel.svelte';
+  import DebriefPanel from './lib/DebriefPanel.svelte';
   import {
     connected,
     lastUpdate,
@@ -33,6 +34,7 @@
         Session
         {#if $players.length}<span class="badge">{$players.length}</span>{/if}
       </button>
+      <button class:active={tab === 'debriefs'} on:click={() => (tab = 'debriefs')}>Débriefs</button>
     </nav>
 
     {#if $mission}
@@ -60,8 +62,10 @@
       <button class="action" on:click={() => mapView?.recenter()} title="Recentrer la carte">
         Recentrer
       </button>
-    {:else}
+    {:else if tab === 'session'}
       <span class="meta">{$events.length} événement{$events.length === 1 ? '' : 's'}</span>
+    {:else}
+      <span class="meta">Historique des missions</span>
     {/if}
   </header>
 
@@ -72,13 +76,17 @@
         <MapView bind:this={mapView} />
         <UnitDetails />
       </div>
-    {:else}
+    {:else if tab === 'session'}
       <div class="session">
         <PlayerPanel />
         <EventPanel />
       </div>
       <div class="session side">
         <ChatPanel />
+      </div>
+    {:else}
+      <div class="session wide">
+        <DebriefPanel />
       </div>
     {/if}
   </main>
@@ -260,5 +268,13 @@
     width: auto;
     min-width: 0;
     border-right: none;
+  }
+
+  .session.wide {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    border-right: none;
+    overflow: hidden;
   }
 </style>

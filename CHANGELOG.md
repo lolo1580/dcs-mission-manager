@@ -9,9 +9,47 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### À venir
 
-- Phase 3 — Débriefings (transport réseau + parseur)
 - Phase 4 — Statistiques avancées (7 modules)
 - Phase 5 — Packaging final et injecteur Lua
+
+## [0.4.0] — 2026-09-26
+
+**Phase 3 — Débriefings.** À la fin de chaque mission, `debrief.log` est envoyé au
+backend, analysé et archivé.
+
+### Ajouté
+
+- **Parsing Lua (`internal/lua`)**
+  - Parseur du sous-ensemble Lua utilisé par les fichiers de données DCS
+    (`nom = valeur`, tables imbriquées, chaînes, commentaires). **N'exécute pas
+    de Lua** : lecture de données uniquement.
+
+- **Analyse des débriefs (`internal/debrief`)**
+  - Extraction typée : chemin du `.miz`, durée, `result`, état final du monde et
+    **chronologie des événements** (`takeoff`, `land`, `engine shutdown`,
+    `mission end`, `kill`, `crash`, `eject`…).
+  - Agrégats (`Summarise`) : décollages, atterrissages, kills, crashes, éjections,
+    pilotes, répartition par type d'événement.
+
+- **Transport et stockage**
+  - `internal/debriefstore` : réassemblage des transferts **multi-morceaux**
+    (chunks base64, arrivée désordonnée tolérée, transferts concurrents isolés).
+  - `Hooks/dcsmm.lua` : lit `debrief.log` en fin de mission et l'envoie en morceaux
+    de 32 Ko encodés en base64.
+  - Table `debriefs` (métadonnées, `parsed` JSON, `raw` original).
+
+- **API**
+  - `GET /api/debriefs`, `GET /api/debriefs/{id}` et `?raw=1` pour le texte brut.
+
+- **Frontend**
+  - Onglet **Débriefs** : liste, compteurs (décollages, atterrissages, kills,
+    crashes, éjections, durée), pilotes et chronologie colorée par type.
+
+- **Outils & documentation**
+  - `tools/send-debrief.mjs` : envoie un `debrief.log` au backend.
+  - `docs/phase3-debriefs.md`.
+  - Tests : parseur Lua (dont un vrai `debrief.log`), analyse, réassemblage
+    multi-morceaux, ordre des chunks, transferts concurrents, base64 invalide.
 
 ## [0.3.0] — 2026-09-26
 

@@ -19,6 +19,7 @@ import (
 	"dcsmm/internal/category"
 	"dcsmm/internal/config"
 	"dcsmm/internal/db"
+	"dcsmm/internal/debriefstore"
 	"dcsmm/internal/ingest"
 	"dcsmm/internal/live"
 	"dcsmm/internal/model"
@@ -73,7 +74,15 @@ func main() {
 
 	// Persist messages as they arrive, and mirror them over SSE.
 	writer := ingest.New(database, liveStore)
+	debriefs := debriefstore.New(database)
+	debriefs.OnDebrief = func(d model.Debrief) {
+		srv.BroadcastMessage(map[string]any{"type": "debrief", "debrief": d})
+	}
 	tcpListener.OnMessage = func(m model.Message) {
+		// Debrief transfers are chunked and reassembled separately.
+		if debriefs.Handle(m) {
+			return
+		}
 		if database != nil {
 			writer.Handle(m)
 		}

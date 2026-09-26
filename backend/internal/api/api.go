@@ -115,6 +115,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/history/events", s.handleHistoryEvents)
 	mux.HandleFunc("/api/history/chat", s.handleHistoryChat)
 	mux.HandleFunc("/api/history/missions", s.handleHistoryMissions)
+	mux.HandleFunc("/api/debriefs", s.handleDebriefs)
+	mux.HandleFunc("/api/debriefs/", s.handleDebrief)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

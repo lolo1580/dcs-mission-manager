@@ -28,6 +28,14 @@ type Message struct {
 	Name    string `json:"name,omitempty"`
 	Theatre string `json:"theatre,omitempty"`
 	Winner  string `json:"winner,omitempty"`
+
+	// type = "debrief" — debrief.log is sent in chunks because it can be large.
+	// Data is base64-encoded to survive any byte sequence intact.
+	TransferID string `json:"transferId,omitempty"`
+	Chunk      int    `json:"chunk,omitempty"`
+	Chunks     int    `json:"chunks,omitempty"`
+	Data       string `json:"data,omitempty"`
+	Size       int    `json:"size,omitempty"`
 }
 
 // Player is a connected client as reported by net.get_player_info / net.get_stat.

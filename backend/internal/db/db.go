@@ -116,6 +116,18 @@ CREATE TABLE IF NOT EXISTS meta (
 	key   TEXT PRIMARY KEY,
 	value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS debriefs (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	mission_id INTEGER REFERENCES missions(id),
+	mission    TEXT,
+	theatre    TEXT,
+	raw        TEXT,
+	parsed     TEXT NOT NULL,
+	size       INTEGER NOT NULL,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_debriefs_mission ON debriefs(mission_id);
 `
 	_, err := d.sql.Exec(schema)
 	return err

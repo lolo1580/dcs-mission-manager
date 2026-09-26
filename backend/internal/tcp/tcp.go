@@ -86,6 +86,8 @@ func (l *Listener) dispatch(m *model.Message) {
 			T:      m.T,
 			RealTS: time.Now().UnixMilli(),
 		})
+	case "debrief":
+		// Handled downstream (chunk reassembly); nothing to do in the live store.
 	case "players":
 		l.live.SetPlayers(m.Players)
 	case "chat":

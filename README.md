@@ -32,8 +32,8 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 | Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
 | Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
 | Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
+| Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
-| Débriefings | 📋 Prévu | Lecture de `debrief.log`, historique |
 | Stats avancées | 📋 Prévu | Pilote/carrière, armes, engins, réseau |
 
 ### Statistiques avancées (prévues)
@@ -256,6 +256,9 @@ DCS mission manager/
 │       ├─ theatre/          # théâtres DCS et leurs emprises
 │       ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
 │       ├─ model/            # types échangés DCS ↔ backend
+│       ├─ lua/              # parseur de données Lua (debrief.log)
+│       ├─ debrief/          # analyse des débriefs
+│       ├─ debriefstore/     # réassemblage des transferts de débrief
 │       ├─ udp/              # récepteur positions (live map)
 │       ├─ tcp/              # récepteur événements / joueurs / chat
 │       ├─ live/             # état de session en mémoire
@@ -280,7 +283,7 @@ DCS mission manager/
 - [x] **Phase 0 — PoC** : `Export.lua` (position joueur) → Go → carte Leaflet
 - [x] **Phase 1 — Live map** : tous les objets, catégories, filtres, traces, recherche, tuiles DCS
 - [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, historique SQLite
-- [ ] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur, historique
+- [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
 - [ ] **Phase 4 — Stats avancées** : 7 modules (pilote, armes, cartes, balance, sortie, réseau, engins)
 - [ ] **Phase 5 — Packaging** : build final `.exe` + Docker multi-arch, injecteur Lua
 

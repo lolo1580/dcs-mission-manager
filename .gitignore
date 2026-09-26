@@ -3,6 +3,7 @@
 /backend/dcsmm.exe
 /dist/
 *.exe
+*.exe~
 
 # Frontend
 /frontend/node_modules/

@@ -191,6 +191,67 @@ do
   end
 
   ---------------------------------------------------------------------------
+  -- Débrief : lecture de debrief.log et envoi en morceaux
+  ---------------------------------------------------------------------------
+  -- Le fichier peut dépasser 1 Mo ; on l'envoie en morceaux base64 pour ne pas
+  -- saturer la connexion ni bloquer le simulateur.
+  local CHUNK_BYTES = 32768
+
+  local function readFile(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local data = f:read("*a")
+    f:close()
+    return data
+  end
+
+  -- Encodage base64 (LuaSocket le fournit ; sinon on n'envoie pas).
+  local function b64(data)
+    if socket and socket.base64 then
+      local ok, v = pcall(socket.base64, data)
+      if ok then return v end
+    end
+    if mime and mime.b64 then
+      local ok, v = pcall(mime.b64, data)
+      if ok then return v end
+    end
+    return nil
+  end
+
+  local function sendDebrief()
+    if not (lfs and lfs.writedir) then return end
+    local path = lfs.writedir() .. "Logs/debrief.log"
+    local data = readFile(path)
+    if not data or #data == 0 then
+      say("debrief.log introuvable ou vide")
+      return
+    end
+
+    local chunks = math.ceil(#data / CHUNK_BYTES)
+    local transferId = string.format("dbg-%d", os.time())
+    local missionName = (Sim and Sim.getMissionName and Sim.getMissionName()) or "?"
+
+    for i = 0, chunks - 1 do
+      local part = data:sub(i * CHUNK_BYTES + 1, (i + 1) * CHUNK_BYTES)
+      local encoded = b64(part)
+      if not encoded then
+        say("encodage base64 indisponible, débrief non envoyé")
+        return
+      end
+      sendLine(toJson({
+        type = "debrief",
+        transferId = transferId,
+        chunk = i,
+        chunks = chunks,
+        size = #data,
+        name = missionName,
+        data = encoded,
+      }))
+    end
+    say(string.format("débrief envoyé (%d octets, %d morceaux)", #data, chunks))
+  end
+
+  ---------------------------------------------------------------------------
   -- Table de callbacks attendue par Sim.setUserCallbacks
   ---------------------------------------------------------------------------
   local dcsmm = {}
@@ -203,6 +264,9 @@ do
   end
 
   function dcsmm.onSimulationStop()
+    -- On envoie le débrief AVANT de fermer la connexion : le backend attend
+    -- le fichier pour l'historiser.
+    pcall(sendDebrief)
     sendLine(toJson({ type = "mission", phase = "end" }))
     if conn then pcall(function() conn:close() end) end
     conn = nil
