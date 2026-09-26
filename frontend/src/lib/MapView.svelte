@@ -29,6 +29,11 @@
   } from './aerodromes.js';
   import { focusRequest } from './ui.js';
 
+  /** True when the aeronautical style is active: chart-like labels are used. */
+  let aero = false;
+  /** Current zoom, so labels appear progressively as the map is zoomed in. */
+  let zoom = 5;
+
   let mapEl;
   let map;
   /** @type {Map<string, {marker: any, trail: any, trailPts: Array<[number,number]>}>} */
@@ -86,11 +91,18 @@
     applyBasemap($basemapId ?? 'osm');
     basemapsStore.set(basemaps);
     const unsubBase = basemapId.subscribe(applyBasemap);
-
     // Stop auto-following as soon as the user pans or zooms manually.
     map.on('dragstart', () => (userMoved = true));
     map.on('zoomstart', (e) => {
       if (e.originalEvent) userMoved = true;
+    });
+
+    // Airfield labels are zoom-dependent: showing them all at low zoom turns the
+    // map into a pile of overlapping boxes.
+    zoom = map.getZoom();
+    map.on('zoomend', () => {
+      zoom = map.getZoom();
+      renderAerodromes();
     });
 
     const stop = connect();
@@ -229,12 +241,30 @@
           <path d="M12 3 v18 M3 12 h18"/>
         </svg>`;
       const icon = L.divIcon({ html, className: 'dcsmm-marker', iconSize: [18, 18], iconAnchor: [9, 9] });
+
+      // On the aeronautical style, airfields carry a permanent label like a
+      // chart; elsewhere a tooltip on hover is enough.
+      const label =
+        `<strong>${escapeHTML(a.name)}</strong>` +
+        (a.icaoCode && a.icaoCode.length === 4 ? ` <span class="icao">${escapeHTML(a.icaoCode)}</span>` : '') +
+        (a.tower ? `<br/>TWR ${a.tower.toFixed(3)}` : '') +
+        (a.tacan ? ` · ${escapeHTML(a.tacan)}` : '') +
+        (a.ils?.length ? `<br/>ILS ${a.ils.map((i) => `${i.runway ? i.runway + ' ' : ''}${i.mhz}`).join(', ')}` : '');
+
+      // Chart-style labels are permanent, but only once the zoom is high enough
+      // to fit them: below minLabelZoom the map would be unreadable.
+      const labelled = aero && zoom >= 8;
+      // Only the fields with navigation data are worth labelling when zoomed
+      // out; at higher zoom every field gets its callout.
+      const hasNavaid = Boolean(a.tower || a.tacan || a.ils?.length || a.vor);
+      const showLabel = labelled && (zoom >= 9 || hasNavaid);
+
       L.marker([a.lat, a.lng], { icon })
         .bindTooltip(
-          `<strong>${a.name}</strong> (${a.id})<br/>` +
-            (a.tower ? `Tower ${a.tower.toFixed(3)} MHz<br/>` : '') +
-            (a.tacan ? `TACAN ${a.tacan}<br/>` : '') +
-            (a.ils?.length ? `ILS ${a.ils.map((i) => `${i.runway} ${i.mhz}`).join(', ')}` : '')
+          label,
+          showLabel
+            ? { permanent: true, direction: 'right', offset: [10, 0], className: 'dcsmm-chart-label' }
+            : { direction: 'top' }
         )
         // Clicking an airfield opens its full data card, in the corner the unit
         // card uses. The two never show at once (see UnitDetails).
@@ -244,6 +274,11 @@
         })
         .addTo(aerodromeLayer);
     }
+  }
+
+  /** Minimal HTML escaping: airfield names come from a file on disk. */
+  function escapeHTML(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   }
 
   /** Draws settlements when the toggle is on. Thousands of points, so a canvas
@@ -337,6 +372,15 @@
     const bm = basemaps.find((b) => b.id === id) ?? basemaps[0];
     if (!bm) return;
     if (currentLayer) map.removeLayer(currentLayer);
+
+    // The aeronautical style is meant to show airfields: switch them on, and use
+    // permanent chart-style labels rather than hover tooltips.
+    aero = bm.id === 'aero';
+    if (aero) {
+      showAerodromes.set(true);
+    }
+    renderAerodromes();
+
     currentLayer = L.tileLayer(bm.url, {
       attribution: bm.attribution,
       maxZoom: bm.maxZoom ?? 19,
@@ -485,6 +529,34 @@
   /* Key-free dark mode: invert and hue-rotate the standard raster tiles. */
   :global(.dcsmm-dark-tiles) {
     filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95) saturate(0.7);
+  }
+
+  /* Aeronautical style: wash the topographic base out so the airfield labels and
+     the unit symbols stay legible, the way a chart keeps its terrain quiet. */
+  :global(.dcsmm-aero-tiles) {
+    filter: grayscale(0.45) brightness(1.14) contrast(1.02) saturate(0.5);
+  }
+
+  /* Chart-style airfield label: a small boxed callout, as on a paper chart. */
+  :global(.dcsmm-chart-label) {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.68rem;
+    line-height: 1.25;
+    color: #1b1f24;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #6b7280;
+    border-radius: 3px;
+    box-shadow: none;
+    white-space: nowrap;
+  }
+
+  :global(.dcsmm-chart-label::before) {
+    display: none;
+  }
+
+  :global(.dcsmm-chart-label .icao) {
+    color: #4b5563;
+    font-weight: 400;
   }
 
   :global(.leaflet-container) {

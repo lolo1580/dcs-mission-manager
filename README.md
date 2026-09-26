@@ -28,6 +28,7 @@ Because it is local, it can read DCS's **own terrain data** — the airfields, f
 | Feature | Status | Details |
 |---|---|---|
 | Real-time live map | ✅ Phase 1 | All objects, categories, filters, trails, search |
+| Basemaps | ✅ Phase 8 | Satellite, Relief, Road, **Aeronautical**, Dark — all key-free |
 | Theatre & extent | ✅ Phase 8 | 12 DCS maps: framing, extent outline, per-theatre airfields |
 | Authentic DCS tiles | 📋 Planned | F10 tile exporter (`tiles/` folder) |
 | Events & players | ✅ Phase 2 | Kills, crashes, chat, players, SQLite history |

@@ -26,6 +26,18 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **Aeronautical basemap style.** A fifth basemap, "Aeronautical", renders the
+  topographic base in a pale, muted style and shows the airfields as permanent
+  chart callouts (name, ICAO, Tower, TACAN, ILS) that appear as the map is zoomed
+  in, so the view never turns into a pile of overlapping boxes. Selecting the
+  style reveals the airfields, since that is what the style exists for.
+  - It is a *chart-style rendering plus real aeronautical content*, not a scanned
+    chart. No free, worldwide, key-less source of aeronautical tiles exists:
+    OpenAIP requires an API key, open flightmaps has no public endpoint, VFRMAP
+    covers the United States only, and DCS's own F10 imagery is Eagle Dynamics'
+    copyrighted work — reading factual data from the installation is one thing,
+    re-serving their map imagery is another. The reason is recorded in the
+    `basemap` package comment so it does not have to be rediscovered.
 - **Airfields read from DCS itself.** Because the manager is local, it reads the
   simulator's own terrain files (`Mods/terrains/<map>/radio.lua` and
   `beacons.lua`) instead of relying on a hand-transcribed dataset. The two files

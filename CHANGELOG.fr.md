@@ -27,6 +27,20 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Style de carte aéronautique.** Un cinquième fond, « Aéronautique », rend la
+  base topographique en version pâle et atténuée, et affiche les aérodromes sous
+  forme d'appels cartographiques permanents (nom, OACI, Tower, TACAN, ILS) qui
+  apparaissent au fur et à mesure du zoom, pour que la vue ne devienne jamais un
+  empilement de cadres. Choisir ce style révèle les aérodromes, puisque c'est sa
+  raison d'être.
+  - C'est un *rendu style carte avec du vrai contenu aéronautique*, pas une carte
+    scannée. Il n'existe aucune source de tuiles aéronautiques gratuite,
+    mondiale et sans clé : OpenAIP exige une clé d'API, open flightmaps n'a pas
+    d'endpoint public, VFRMAP ne couvre que les États-Unis, et l'imagerie F10 de
+    DCS est l'œuvre protégée d'Eagle Dynamics — lire des données factuelles de
+    l'installation est une chose, rediffuser leur imagerie en est une autre. La
+    raison est consignée dans le commentaire du paquet `basemap` pour ne pas
+    avoir à la redécouvrir.
 - **Aérodromes lus depuis DCS lui-même.** Le manager étant local, il lit les
   fichiers de terrain du simulateur (`Mods/terrains/<carte>/radio.lua` et
   `beacons.lua`) au lieu de dépendre d'un jeu de données transcrit. Les deux

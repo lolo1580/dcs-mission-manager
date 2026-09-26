@@ -32,6 +32,7 @@ d'un jeu de données maintenu à la main.
 | Fonction | État | Détail |
 |---|---|---|
 | Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
+| Fonds de carte | ✅ Phase 8 | Satellite, Relief, Routier, **Aéronautique**, Sombre — tous sans clé |
 | Théâtre & étendue | ✅ Phase 8 | 12 cartes DCS : cadrage, contour de l'étendue, aérodromes par théâtre |
 | Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
 | Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
