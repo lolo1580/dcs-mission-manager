@@ -23,6 +23,25 @@ const (
 	beaconNDBMark = "BEACON_TYPE_AIRPORT_HOMER_WITH_MARKER"
 )
 
+// Frequency bands, used to reject a navigation aid whose declared frequency
+// cannot belong to its type.
+//
+// DCS occasionally declares a beacon with a frequency outside the band its type
+// uses — Ivalo's ILS is listed at 212 MHz, and Sas Al Nakheel's VOR at
+// 128.925 MHz. That is not a parsing mistake: the value really is in the file.
+// Showing it would be worse than showing nothing, because no pilot can tune an
+// ILS at 212 MHz. Such aids are dropped, and the count is reported at startup so
+// the data problem stays visible instead of being silently swallowed.
+const (
+	ilsMinMHz, ilsMaxMHz = 108.10, 111.95 // ILS localizer / glideslope, PRMG
+	vorMinMHz, vorMaxMHz = 108.00, 117.95 // VOR and VOR/DME
+	ndbMinKHz, ndbMaxKHz = 190.0, 1750.0  // NDB / marker beacons
+)
+
+func inILSband(mhz float64) bool { return mhz >= ilsMinMHz && mhz <= ilsMaxMHz }
+func inVORband(mhz float64) bool { return mhz >= vorMinMHz && mhz <= vorMaxMHz }
+func inNDBband(khz float64) bool { return khz >= ndbMinKHz && khz <= ndbMaxKHz }
+
 // Terrain holds everything read from one DCS terrain folder.
 type Terrain struct {
 	Airfields []Aerodrome
@@ -35,6 +54,10 @@ type Terrain struct {
 	// "world_" id (a VOR in the middle of a desert, for instance) belong to no
 	// airfield and are ignored: they must not turn into an aerodrome.
 	BeaconTotal int
+	// Dropped lists navigation aids whose declared frequency does not belong to
+	// their type (see the band constants above). They are reported so a data
+	// problem in DCS stays visible rather than silently disappearing.
+	Dropped []string
 }
 
 // Town is a named settlement with real coordinates, from map/towns.lua.
@@ -71,8 +94,9 @@ func LoadTerrain(dir, theatre string) (Terrain, error) {
 	// Merge: the two files describe the same airfields and share an identifier
 	// (airfield22_0 = Batumi in both). The radio file carries the name and the
 	// ATC frequency, the beacon file the navigation aids and the true position.
-	merged := mergeAirfields(radio, beacons, theatre)
+	merged, dropped := mergeAirfields(radio, beacons, theatre)
 	t.Airfields = merged
+	t.Dropped = dropped
 
 	for _, a := range merged {
 		if a.Lat != 0 || a.Lng != 0 {
@@ -270,7 +294,7 @@ func loadTowns(path string) ([]Town, error) {
 }
 
 // mergeAirfields joins the radio and beacon data on the airfield number.
-func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre string) []Aerodrome {
+func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre string) ([]Aerodrome, []string) {
 	// Group beacons by airfield number, so both files can be matched even when
 	// their identifiers differ in suffix.
 	byAirfield := map[int][]beaconEntry{}
@@ -298,6 +322,13 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 		ordered = append(ordered, n)
 	}
 	sort.Ints(ordered)
+
+	// dropped collects the aids rejected for an out-of-band frequency.
+	var dropped []string
+	reject := func(b beaconEntry, kind string, mhz float64) {
+		dropped = append(dropped, fmt.Sprintf("%s/%s %s %.3f outside the %s band",
+			theatre, b.name, b.callsign, mhz, kind))
+	}
 
 	out := make([]Aerodrome, 0, len(ordered))
 	for _, n := range ordered {
@@ -333,19 +364,37 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 			case beaconTACAN:
 				a.TACAN = formatTACAN(b.callsign, b.channel)
 			case beaconVOR, beaconVORDME:
-				a.VOR = formatTACAN(b.callsign, b.channel)
-				if a.VORMHz == 0 {
-					a.VORMHz = roundMHz(b.hz)
+				mhz := roundMHz(b.hz)
+				if !hasFrequency(b.hz) || inVORband(mhz) {
+					a.VOR = formatTACAN(b.callsign, b.channel)
+					if a.VORMHz == 0 {
+						a.VORMHz = mhz
+					}
+				} else {
+					reject(b, "VOR", mhz)
 				}
 			case beaconRSBN:
 				a.RSBN = b.callsign
 			case beaconILS:
 				// The localizer frequency is the ILS frequency.
-				a.ILS = append(a.ILS, ILS{Runway: a.Runway, MHz: roundMHz(b.hz)})
+				if mhz := roundMHz(b.hz); inILSband(mhz) {
+					a.ILS = append(a.ILS, ILS{Runway: a.Runway, MHz: mhz})
+				} else {
+					reject(b, "ILS", mhz)
+				}
 			case beaconPRMG:
-				a.PRMG = append(a.PRMG, ILS{Runway: a.Runway, MHz: roundMHz(b.hz)})
+				if mhz := roundMHz(b.hz); inILSband(mhz) {
+					a.PRMG = append(a.PRMG, ILS{Runway: a.Runway, MHz: mhz})
+				} else {
+					reject(b, "PRMG", mhz)
+				}
 			case beaconNDB, beaconNDBMark:
-				a.NDB = append(a.NDB, NDB{Name: b.callsign, KHz: roundKHz(b.hz)})
+				khz := roundKHz(b.hz)
+				if hasFrequency(b.hz) && inNDBband(khz) {
+					a.NDB = append(a.NDB, NDB{Name: b.callsign, KHz: khz})
+				} else {
+					reject(b, "NDB", khz/1000)
+				}
 			}
 		}
 
@@ -359,7 +408,7 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 		out = append(out, a)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return out
+	return out, dropped
 }
 
 // airfieldPosition picks the best representative position for an airfield, with
@@ -463,15 +512,20 @@ func formatTACAN(callsign string, channel int) string {
 }
 
 func roundMHz(hz float64) float64 {
-	if hz <= 0 {
+	if !hasFrequency(hz) {
 		return 0
 	}
 	// Frequencies are stored in Hz; MHz to three decimals, as DCS displays them.
 	return float64(int(hz/1000+0.5)) / 1000
 }
 
+// hasFrequency reports whether a beacon declares a usable frequency. Some
+// entries have none (a TACAN is tuned by channel, not frequency), and some
+// declare 0, which must not be read as a real value.
+func hasFrequency(hz float64) bool { return hz > 0 }
+
 func roundKHz(hz float64) float64 {
-	if hz <= 0 {
+	if !hasFrequency(hz) {
 		return 0
 	}
 	return float64(int(hz/100+0.5)) / 10

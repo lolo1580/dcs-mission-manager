@@ -100,7 +100,9 @@
     right: 1rem;
     bottom: 1rem;
     z-index: 1000;
-    width: 260px;
+    /* Never wider than the map it sits on, so it cannot spill off screen on a
+       narrow window. */
+    width: min(280px, calc(100% - 2rem));
     padding: 0.8rem 0.9rem;
     background: var(--panel);
     border: 1px solid var(--border);
@@ -181,7 +183,15 @@
     margin: 0.5rem 0 0;
     padding: 0;
     display: grid;
+    /* minmax(0, 1fr) plus min-width on the items: a grid item defaults to
+       min-width: auto, so a long file name makes it wider than its container
+       instead of being truncated. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.2rem;
+  }
+
+  .charts li {
+    min-width: 0;
   }
 
   .charts.muted {
@@ -202,6 +212,9 @@
     align-items: center;
     gap: 0.4rem;
     width: 100%;
+    /* min-width lets the children shrink, so a long file name is truncated
+       rather than overflowing the card. */
+    min-width: 0;
     padding: 0.25rem 0.4rem;
     font-size: 0.74rem;
     text-align: left;
@@ -225,6 +238,8 @@
   }
 
   .cname {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

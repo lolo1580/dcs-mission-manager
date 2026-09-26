@@ -423,6 +423,9 @@ func runServer() {
 			}
 			log.Printf("aerodrome: %s: %d airfields (%d radio, %d beacons, %d towns)",
 				r.Theatre, r.Airfields, r.RadioAirfields, r.BeaconTotal, r.Towns)
+			for _, d := range r.Dropped {
+				log.Printf("aerodrome: dropped %s", d)
+			}
 			total += r.Airfields
 		}
 		if len(terrainReports) > 0 {

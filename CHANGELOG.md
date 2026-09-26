@@ -9,6 +9,25 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Authentic DCS tiles could never load.** The tile handler appended ".png" to
+  the `y` segment while Leaflet already sends it (the template is
+  `/{z}/{x}/{y}.png`), so every request resolved to `11.png.png` and returned
+  404. The bug was invisible until a tile actually existed on disk; it is now
+  covered by `TestHandleTilesExtension`, which also checks that traversal stays
+  refused.
+- **A navigation aid could be shown with an impossible frequency.** DCS declares
+  Ivalo's ILS at 212 MHz and Sas Al Nakheel's VOR at 128.925 MHz — outside the
+  band those aids use, so no pilot could tune them. Frequencies are now validated
+  against their band (ILS 108.10–111.95 MHz, VOR 108–117.95 MHz, NDB 190–1750
+  kHz), and an out-of-band aid is dropped rather than displayed. 1 of 122 ILS
+  entries was affected. A rejection is logged at startup so a data problem
+  upstream stays visible instead of being swallowed.
+- **Long chart file names overflowed the airfield card**, whose width could also
+  exceed the map on a narrow window. Both are clamped now, with the name
+  truncated by ellipsis.
+
 ### Upcoming
 
 - Other features inspired by MizMap / MovingMap: BRA measurement, SAM circles,

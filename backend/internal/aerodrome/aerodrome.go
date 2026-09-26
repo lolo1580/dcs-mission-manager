@@ -299,7 +299,10 @@ type TerrainReport struct {
 	RadioAirfields int    `json:"radioAirfields"`
 	BeaconTotal    int    `json:"beaconTotal"`
 	Towns          int    `json:"towns"`
-	Error          string `json:"error,omitempty"`
+	// Dropped lists the navigation aids rejected for an out-of-band frequency,
+	// so a data problem in DCS remains visible.
+	Dropped []string `json:"dropped,omitempty"`
+	Error   string   `json:"error,omitempty"`
 }
 
 // Towns returns the settlements of a theatre, read from towns.lua. Empty when

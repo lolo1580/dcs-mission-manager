@@ -322,6 +322,11 @@ func (s *Server) handleTheatres(w http.ResponseWriter, _ *http.Request) {
 }
 
 // handleTiles serves DCS map tiles laid out as <tilesDir>/<theatre>/<z>/<x>/<y>.png.
+//
+// Leaflet requests tiles through the template /{z}/{x}/{y}.png, so the extension
+// arrives in the URL. It is trimmed rather than assumed: appending ".png"
+// unconditionally produced "11.png.png" and a 404 for every tile ever requested,
+// which went unnoticed because no tiles were shipped.
 func (s *Server) handleTiles(w http.ResponseWriter, r *http.Request) {
 	rest := strings.TrimPrefix(r.URL.Path, "/api/tiles/")
 	parts := strings.Split(rest, "/")
@@ -329,7 +334,9 @@ func (s *Server) handleTiles(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	th, z, x, y := parts[0], parts[1], parts[2], parts[3]
+	th, z, x := parts[0], parts[1], parts[2]
+	// Accept both "11" and "11.png"; anything else is refused.
+	y := strings.TrimSuffix(parts[3], ".png")
 	if !validTilePart(th) || !validTilePart(z) || !validTilePart(x) || !validTilePart(y) {
 		http.NotFound(w, r)
 		return

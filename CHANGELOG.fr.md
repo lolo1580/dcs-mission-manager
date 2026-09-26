@@ -9,6 +9,26 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **Les tuiles DCS authentiques ne pouvaient jamais se charger.** Le handler
+  ajoutait « .png » au segment `y` alors que Leaflet l'envoie déjà (le template
+  est `/{z}/{x}/{y}.png`) : chaque requête aboutissait à `11.png.png` et un 404.
+  Le bug était invisible tant qu'aucune tuile n'existait sur disque ; il est
+  maintenant couvert par `TestHandleTilesExtension`, qui vérifie aussi que les
+  traversals restent refusés.
+- **Une aide à la navigation pouvait s'afficher avec une fréquence impossible.**
+  DCS déclare l'ILS d'Ivalo à 212 MHz et le VOR de Sas Al Nakheel à 128,925 MHz,
+  hors des bandes de ces aides : aucun pilote ne peut les syntoniser. Les
+  fréquences sont désormais validées contre leur bande (ILS 108,10–111,95 MHz,
+  VOR 108–117,95 MHz, NDB 190–1750 kHz), et une aide hors bande est écartée
+  plutôt qu'affichée. 1 ILS sur 122 était concerné. Un rejet est journalisé au
+  démarrage pour qu'un problème de données en amont reste visible au lieu d'être
+  avalé.
+- **Les noms de cartes trop longs débordaient de la fiche d'aérodrome**, dont la
+  largeur pouvait aussi dépasser la carte sur une fenêtre étroite. Les deux sont
+  désormais bornés, le nom étant tronqué par des points de suspension.
+
 ### À venir
 
 - Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,
