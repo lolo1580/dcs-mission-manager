@@ -31,9 +31,10 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 |---|---|---|
 | Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
 | Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
+| Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
+| Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
 | Débriefings | 📋 Prévu | Lecture de `debrief.log`, historique |
 | Stats avancées | 📋 Prévu | Pilote/carrière, armes, engins, réseau |
-| Contrôle serveur | 📋 Prévu | Liste des missions, kick/ban, slots, chat |
 
 ### Statistiques avancées (prévues)
 
@@ -144,6 +145,7 @@ défauts raisonnables — identique pour l'`.exe` et pour Docker.
 | `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (télémétrie Live map) |
 | `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMM_DB_PATH` | `./data/dcsmm.db` | Chemin de la base SQLite |
+| `DCSMM_DB_ENABLED` | `true` | Activer la persistance (sinon tout en mémoire) |
 | `DCSMM_THEATRE` | `Caucasus` | Théâtre par défaut |
 | `DCSMM_UNIT_TTL` | `5` (secondes) | Délai avant qu'une unité silencieuse disparaisse |
 | `DCSMM_TILES_DIR` | `./tiles` | Dossier des tuiles de carte DCS |
@@ -252,7 +254,13 @@ DCS mission manager/
 │       ├─ config/           # chargement env + défauts
 │       ├─ category/         # classification des engins (type DCS → famille)
 │       ├─ theatre/          # théâtres DCS et leurs emprises
-│       ├─ udp/              # récepteur + décodage
+│       ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
+│       ├─ model/            # types échangés DCS ↔ backend
+│       ├─ udp/              # récepteur positions (live map)
+│       ├─ tcp/              # récepteur événements / joueurs / chat
+│       ├─ live/             # état de session en mémoire
+│       ├─ ingest/           # pont live → base de données
+│       ├─ db/               # persistance SQLite (pur Go)
 │       ├─ state/            # store unités (en mémoire)
 │       └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
 ├─ frontend/                 # Svelte + Vite + Leaflet
@@ -271,7 +279,7 @@ DCS mission manager/
 
 - [x] **Phase 0 — PoC** : `Export.lua` (position joueur) → Go → carte Leaflet
 - [x] **Phase 1 — Live map** : tous les objets, catégories, filtres, traces, recherche, tuiles DCS
-- [ ] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, canal de commandes
+- [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, historique SQLite
 - [ ] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur, historique
 - [ ] **Phase 4 — Stats avancées** : 7 modules (pilote, armes, cartes, balance, sortie, réseau, engins)
 - [ ] **Phase 5 — Packaging** : build final `.exe` + Docker multi-arch, injecteur Lua

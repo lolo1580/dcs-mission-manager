@@ -19,8 +19,10 @@ type Config struct {
 	UDPAddr string
 	// TCPAddr is the listen address for events and downstream commands (Phase 2+).
 	TCPAddr string
-	// DBPath is the path of the SQLite database (Phase 3+).
+	// DBPath is the path of the SQLite database.
 	DBPath string
+	// DBEnabled toggles persistence (SQLite). Disabled keeps everything in memory.
+	DBEnabled bool
 	// Theatre is the default DCS theatre.
 	Theatre string
 	// LogLevel is one of debug, info, warn, error.
@@ -65,6 +67,18 @@ func envDuration(key string, def time.Duration) time.Duration {
 	return def
 }
 
+func envBool(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		switch strings.ToLower(v) {
+		case "1", "true", "yes", "on":
+			return true
+		case "0", "false", "no", "off":
+			return false
+		}
+	}
+	return def
+}
+
 // Load reads the configuration from the environment, applying defaults.
 func Load() Config {
 	return Config{
@@ -72,6 +86,7 @@ func Load() Config {
 		UDPAddr:        env("DCSMM_UDP_ADDR", "127.0.0.1:7778"),
 		TCPAddr:        env("DCSMM_TCP_ADDR", "127.0.0.1:7779"),
 		DBPath:         env("DCSMM_DB_PATH", "./data/dcsmm.db"),
+		DBEnabled:      envBool("DCSMM_DB_ENABLED", true),
 		Theatre:        env("DCSMM_THEATRE", "Caucasus"),
 		LogLevel:       strings.ToLower(env("DCSMM_LOG_LEVEL", "info")),
 		UnitTTL:        envDuration("DCSMM_UNIT_TTL", 5*time.Second),

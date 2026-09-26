@@ -1,7 +1,8 @@
 // Command dcsmm is the DCS Mission Manager backend.
 //
-// It listens for telemetry sent by the DCS Lua scripts (UDP), keeps an in-memory
-// state of the units, and exposes it to the web UI (HTTP + Server-Sent Events).
+// It listens for telemetry from the DCS Lua scripts (UDP for positions, TCP for
+// events and players), keeps an in-memory state, persists history to SQLite, and
+// exposes everything to the web UI (HTTP + Server-Sent Events).
 package main
 
 import (
@@ -17,7 +18,12 @@ import (
 	"dcsmm/internal/api"
 	"dcsmm/internal/category"
 	"dcsmm/internal/config"
+	"dcsmm/internal/db"
+	"dcsmm/internal/ingest"
+	"dcsmm/internal/live"
+	"dcsmm/internal/model"
 	"dcsmm/internal/state"
+	"dcsmm/internal/tcp"
 	"dcsmm/internal/udp"
 )
 
@@ -26,18 +32,53 @@ func main() {
 
 	store := state.New(cfg.UnitTTL, cfg.MaxUnits)
 	classifier := category.New(cfg.CategoriesFile)
+	liveStore := live.New(1000, 500)
 
-	conn, err := udp.Listen(cfg.UDPAddr)
+	// ---- Optional persistence --------------------------------------------
+	var database *db.DB
+	if cfg.DBEnabled {
+		var err error
+		database, err = db.Open(cfg.DBPath)
+		if err != nil {
+			log.Printf("db: disabled, could not open %s: %v", cfg.DBPath, err)
+			database = nil
+		} else {
+			defer database.Close()
+			log.Printf("db: using %s", cfg.DBPath)
+		}
+	}
+
+	// ---- UDP: unit positions ---------------------------------------------
+	udpConn, err := udp.Listen(cfg.UDPAddr)
 	if err != nil {
 		log.Fatalf("udp: listen on %s: %v", cfg.UDPAddr, err)
 	}
-	defer conn.Close()
-
+	defer udpConn.Close()
 	listener := udp.NewListener(store, classifier)
-	go listener.Serve(conn)
+	go listener.Serve(udpConn)
 	log.Printf("udp: listening on %s", cfg.UDPAddr)
 
-	srv := api.New(cfg, store)
+	// ---- TCP: events, players, chat (and future commands) ----------------
+	tcpLn, err := tcp.Listen(cfg.TCPAddr)
+	if err != nil {
+		log.Fatalf("tcp: listen on %s: %v", cfg.TCPAddr, err)
+	}
+	defer tcpLn.Close()
+	tcpListener := tcp.NewListener(liveStore)
+	go tcpListener.Serve(tcpLn)
+	log.Printf("tcp: listening on %s", cfg.TCPAddr)
+
+	// ---- HTTP: API + UI ---------------------------------------------------
+	srv := api.New(cfg, store, liveStore, database)
+
+	// Persist messages as they arrive, and mirror them over SSE.
+	writer := ingest.New(database, liveStore)
+	tcpListener.OnMessage = func(m model.Message) {
+		if database != nil {
+			writer.Handle(m)
+		}
+		srv.BroadcastMessage(map[string]any{"type": "message", "message": m})
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -54,6 +95,7 @@ func main() {
 		}
 	}()
 
+	// ---- Shutdown ---------------------------------------------------------
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
@@ -62,4 +104,6 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	_ = httpSrv.Shutdown(shutdownCtx)
+	_ = tcpLn.Close()
+	_ = udpConn.Close()
 }

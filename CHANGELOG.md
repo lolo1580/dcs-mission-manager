@@ -7,30 +7,54 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-### Ajouté
-
-- **Sélecteur de fond de carte** (Phase 1) : Satellite, Relief, Routier et Sombre,
-  plus l'option « DCS » automatique quand des tuiles authentiques existent. Aucun
-  fond ne requiert de clé API (le mode sombre applique un filtre CSS aux tuiles OSM).
-  Choix par défaut via `DCSMM_BASEMAP` / `DCSMM_BASEMAP_URL`, mémorisé côté navigateur.
-
-- **Documentation & outils**
-  - `maps_dcs/README.md` : nature des scans de cartes fournis (non géoréférencés,
-    projection conique) et voies d'utilisation.
-  - `tools/inspect-maps.py` : recense les scans, leurs dimensions et métadonnées, et
-    exporte les coins pour lecture des graduations.
-
-### Modifié
-
-- `internal/basemap` remplace l'ancien fond unique `DCSMM_BASEMAP_URL`.
-- Le dossier `maps_dcs/` (≈1,2 Go) est exclu de git ; seul son README est suivi.
-
 ### À venir
 
-- Phase 2 — Événements & joueurs (hooks, chat, `net.get_stat`)
 - Phase 3 — Débriefings (transport réseau + parseur)
 - Phase 4 — Statistiques avancées (7 modules)
 - Phase 5 — Packaging final et injecteur Lua
+
+## [0.3.0] — 2026-09-26
+
+**Phase 2 — Événements & joueurs.** Le backend reçoit et historise les événements
+de jeu, les joueurs connectés et le chat.
+
+### Ajouté
+
+- **Backend**
+  - `internal/model` : types échangés (messages, joueurs, événements, chat, missions).
+  - `internal/tcp` : récepteur TCP au format **JSON ligne par ligne** (NDJSON),
+    avec reconnexion par connexion et journalisation.
+  - `internal/live` : état de session en mémoire (événements, joueurs triés par camp,
+    chat, mission courante) avec plafonds.
+  - `internal/db` : **persistance SQLite pure Go** (`modernc.org/sqlite`, sans CGO),
+    tables `missions`, `events`, `chat`, `players`, `player_stats`, `meta`.
+  - `internal/ingest` : pont entre le direct et la base ; ouvre la mission courante,
+    résout les joueurs par **UCID** (carrière qui survit aux renommages) et
+    n'enregistre les stats que des joueurs actifs.
+  - `internal/api` : `GET /api/game-events`, `/api/players`, `/api/chat`,
+    `/api/mission`, `/api/history/{events,chat,missions}` ; trame SSE `session`.
+  - `internal/config` : `DCSMM_DB_ENABLED`.
+
+- **Scripts DCS**
+  - `Hooks/dcsmm.lua` : envoi TCP des événements (`onGameEvent`), du chat
+    (`onChatMessage`), des joueurs et de leurs statistiques (`net.get_player_list`,
+    `net.get_player_info`, `net.get_stat`), et des transitions de mission. Connexion
+    persistante, reconnexion automatique, appels protégés par `pcall`, jamais bloquant.
+  - `Config/dcsmm.cfg` : `dcsmm_players_interval`.
+
+- **Frontend**
+  - Onglets **Carte** / **Session** ; nom de la mission en cours dans l'en-tête.
+  - Panneau **Joueurs** : nom, score, kills air/sol/navire, atterrissages, ping
+    (surligné au-delà de 250 ms), code couleur par camp.
+  - Panneau **Événements** : filtres par type avec compteurs, horodatage et
+    description lisible des arguments DCS.
+  - Panneau **Chat** : historique et zone de saisie (envoi vers DCS à venir).
+
+- **Outils & documentation**
+  - `tools/send-events.mjs` : simulateur du canal TCP (mission, joueurs, événements, chat).
+  - `docs/phase2-events.md`.
+  - Tests : `internal/live` (plafonds, tri, mission) et `internal/db` (missions,
+    événements, chat, UCID, stats).
 
 ## [0.2.0] — 2026-09-25
 
@@ -75,7 +99,9 @@ et affichés sur une carte interactive.
 - **Outils & documentation**
   - `tools/send-telemetry.mjs` : émet aussi des objets de monde (sol, navires, IA).
   - `tools/export-tiles.py` : extraction de tuiles depuis une image de carte géoréférencée.
-  - `categories.example.json`, `docs/live-map.md`.
+  - `tools/inspect-maps.py` : recense les scans de cartes et exporte les coins.
+  - `categories.example.json`, `docs/live-map.md`, `maps_dcs/README.md`.
+  - `maps_dcs/` (≈1,2 Go) exclu de git ; seul son README est suivi.
   - Tests unitaires supplémentaires (catégories, théâtres, plafond du store, messages monde).
 
 ## [0.1.0] — 2026-09-25

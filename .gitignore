@@ -15,8 +15,11 @@
 
 # Local data
 /data/
+**/data/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Large reference map scans (air navigation charts, ~1.3 GB).
 # Kept locally for optional tile extraction; never committed.

@@ -3,6 +3,7 @@
  * client-side filters and selection.
  */
 import { writable, derived, get } from 'svelte/store';
+import { events, players, chat, mission, sessionRev } from './session.js';
 
 /** All units as received from the backend. @type {import('svelte/store').Writable<Array>} */
 export const units = writable([]);
@@ -75,6 +76,16 @@ export function connect() {
   source.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
+
+      if (msg.type === 'session') {
+        if (msg.events) events.set(msg.events);
+        if (msg.players) players.set(msg.players);
+        if (msg.chat) chat.set(msg.chat);
+        mission.set(msg.mission ?? null);
+        sessionRev.update((n) => n + 1);
+        return;
+      }
+
       if (msg.type !== 'state') return;
       units.set(msg.units ?? []);
       summary.set(msg.summary ?? { byCategory: {}, byCoalition: {} });

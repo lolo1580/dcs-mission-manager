@@ -18,6 +18,8 @@ import (
 
 	"dcsmm/internal/basemap"
 	"dcsmm/internal/config"
+	"dcsmm/internal/db"
+	"dcsmm/internal/live"
 	"dcsmm/internal/state"
 	"dcsmm/internal/theatre"
 )
@@ -71,14 +73,16 @@ npm run build</code></pre>
 type Server struct {
 	cfg      config.Config
 	store    *state.Store
+	live     *live.Store
+	db       *db.DB
 	hub      *hub
 	theatres []theatre.Theatre
 	tilesDir string
 	basemaps []basemap.Basemap
 }
 
-// New creates a server backed by store.
-func New(cfg config.Config, store *state.Store) *Server {
+// New creates a server backed by store. live and database may be nil.
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB) *Server {
 	theatres := theatre.All()
 	for i := range theatres {
 		theatres[i].Tiles = hasTiles(cfg.TilesDir, theatres[i].ID)
@@ -86,6 +90,8 @@ func New(cfg config.Config, store *state.Store) *Server {
 	return &Server{
 		cfg:      cfg,
 		store:    store,
+		live:     liveStore,
+		db:       database,
 		hub:      newHub(),
 		theatres: theatres,
 		tilesDir: cfg.TilesDir,
@@ -102,6 +108,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/theatres", s.handleTheatres)
 	mux.HandleFunc("/api/units/", s.handleUnit)
 	mux.HandleFunc("/api/tiles/", s.handleTiles)
+	mux.HandleFunc("/api/game-events", s.handleGameEvents)
+	mux.HandleFunc("/api/chat", s.handleChat)
+	mux.HandleFunc("/api/players", s.handlePlayers)
+	mux.HandleFunc("/api/mission", s.handleMission)
+	mux.HandleFunc("/api/history/events", s.handleHistoryEvents)
+	mux.HandleFunc("/api/history/chat", s.handleHistoryChat)
+	mux.HandleFunc("/api/history/missions", s.handleHistoryMissions)
 	mux.Handle("/", s.webHandler())
 	return mux
 }
@@ -119,7 +132,36 @@ func (s *Server) RunBroadcast(ctx context.Context, interval time.Duration) {
 			if b, err := s.stateJSON(); err == nil {
 				s.hub.broadcast(b)
 			}
+			if b, err := s.sessionJSON(); err == nil {
+				s.hub.broadcast(b)
+			}
 		}
+	}
+}
+
+// sessionJSON is the compact "everything that changed" frame: recent game
+// events, players, chat and mission. It is small enough to resend each second.
+func (s *Server) sessionJSON() ([]byte, error) {
+	if s.live == nil {
+		return nil, nil
+	}
+	payload := map[string]any{
+		"type":    "session",
+		"events":  s.live.Events(),
+		"players": s.live.Players(),
+		"chat":    s.live.Chat(),
+	}
+	if m, ok := s.live.Mission(); ok {
+		payload["mission"] = m
+	}
+	return json.Marshal(payload)
+}
+
+// BroadcastMessage lets other components push an arbitrary SSE frame (for
+// example a newly persisted event) to connected clients.
+func (s *Server) BroadcastMessage(v any) {
+	if b, err := json.Marshal(v); err == nil {
+		s.hub.broadcast(b)
 	}
 }
 
