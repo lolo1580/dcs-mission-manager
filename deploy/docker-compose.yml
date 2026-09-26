@@ -3,16 +3,17 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
+      args:
+        VERSION: "0.7.0"
     image: dcsmm:latest
     container_name: dcsmm
     restart: unless-stopped
+    # DCS tourne sur une autre machine (Windows) : les ports doivent être
+    # joignables depuis le réseau local, pas seulement depuis l'hôte.
     ports:
-      # Interface web
-      - "8080:8080/tcp"
-      # Télémétrie (positions) reçue de DCS
-      - "7778:7778/udp"
-      # Événements + commandes descendantes (Phase 2+)
-      - "7779:7779/tcp"
+      - "8080:8080/tcp"   # interface web
+      - "7778:7778/udp"   # télémétrie des positions (live map)
+      - "7779:7779/tcp"   # événements, joueurs, chat, débriefs
     environment:
       DCSMM_HTTP_ADDR: "0.0.0.0:8080"
       DCSMM_UDP_ADDR: "0.0.0.0:7778"
@@ -20,8 +21,9 @@ services:
       DCSMM_DB_PATH: "/data/dcsmm.db"
       DCSMM_THEATRE: "Caucasus"
       DCSMM_LOG_LEVEL: "info"
+      # Rétention de l'historique de positions (secondes). 0 = illimité.
+      DCSMM_TRACK_RETENTION: "86400"
     volumes:
-      # Persistance de la base SQLite (et des débriefs importés, Phase 3)
       - dcsmm-data:/data
 
 volumes:

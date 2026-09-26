@@ -9,9 +9,10 @@
   Tout est échantillonné à intervalle régulier via
   LuaExportActivityNextEvent, sans jamais bloquer une frame.
 
-  ⚠️  NE PAS REMPLACER un Export.lua existant (Tacview, SRS, DCS-BIOS…).
-      Ajoute plutôt le bloc `do ... end` ci-dessous À LA FIN de ton
-      Export.lua existant, ou copie ce fichier si tu n'en as pas.
+  Installation : `dcsmm install-lua` fusionne ce bloc dans ton Export.lua
+  existant (Tacview, SRS, DCS-BIOS…) en le plaçant entre les marqueurs DCSMM.
+  Ne supprime pas les marqueurs : ils servent à la mise à jour et à la
+  désinstallation (`dcsmm uninstall-lua`).
 
   Prérequis : Config/dcsmm.cfg présent dans Saved Games\DCS\Config\
 
@@ -24,6 +25,7 @@
     dcsmm_coalitions      liste des coalitions à inclure (défaut {"blue","red"})
 ]]
 
+-- >>> DCSMM-BEGIN (bloc géré automatiquement — ne pas éditer à la main) >>>
 do
   ---------------------------------------------------------------------------
   -- Journalisation défensive
@@ -145,36 +147,41 @@ do
     ownshipLat = data.LatLongAlt.Lat
     ownshipLng = data.LatLongAlt.Long
 
-    local payload = {
-      type = "ownship",
-      name = name,
-      unitType = data.Name or "unknown",
-      coalition = data.Coalition or "unknown",
-      lat = ownshipLat,
-      lng = ownshipLng,
-      alt = data.LatLongAlt.Alt or 0,
-      heading = data.Heading or 0,
-      modelTime = (getTime and getTime()) or 0,
-    }
-
-    -- Télémétrie avancée, uniquement si le serveur l'autorise.
+    -- Télémétrie avancée, uniquement si le serveur l'autorise. On construit la
+    -- charge JSON directement : les champs optionnels ne sont ajoutés que s'ils
+    -- sont réellement disponibles.
+    local extra = ""
     if checkOwnshipExport() then
-      payload.tas = tryCall(exportFn("LoGetTrueAirSpeed"), 0)
-      payload.ias = tryCall(exportFn("LoGetIndicatedAirSpeed"), 0)
-      payload.mach = tryCall(exportFn("LoGetMachNumber"), 0)
-      payload.aoa = tryCall(exportFn("LoGetAngleOfAttack"), 0)
-      payload.altAgl = tryCall(exportFn("LoGetAltitudeAboveGroundLevel"), 0)
+      local tas = tryCall(exportFn("LoGetTrueAirSpeed"), 0)
+      local ias = tryCall(exportFn("LoGetIndicatedAirSpeed"), 0)
+      local mach = tryCall(exportFn("LoGetMachNumber"), 0)
+      local aoa = tryCall(exportFn("LoGetAngleOfAttack"), 0)
+      local altAgl = tryCall(exportFn("LoGetAltitudeAboveGroundLevel"), 0)
+      extra = string.format(
+        ',"tas":%.2f,"ias":%.2f,"mach":%.3f,"aoa":%.4f,"altAgl":%.1f',
+        tas, ias, mach, aoa, altAgl)
 
       local accel = exportFn("LoGetAccelerationUnits")
       if accel then
         local ok, a = pcall(accel)
         if ok and type(a) == "table" and type(a.y) == "number" then
-          payload.g = a.y
+          extra = extra .. string.format(',"g":%.2f', a.y)
         end
       end
     end
 
-    send(toJson(payload))
+    send(string.format(
+      '{"type":"ownship","name":"%s","unitType":"%s","coalition":"%s",' ..
+      '"lat":%.6f,"lng":%.6f,"alt":%.2f,"heading":%.2f,"modelTime":%.2f%s}',
+      jsonEscape(name),
+      jsonEscape(data.Name or "unknown"),
+      jsonEscape(data.Coalition or "unknown"),
+      ownshipLat, ownshipLng,
+      data.LatLongAlt.Alt or 0,
+      data.Heading or 0,
+      (getTime and getTime()) or 0,
+      extra
+    ))
   end
 
   ---------------------------------------------------------------------------
@@ -266,3 +273,4 @@ do
     return t + interval
   end
 end
+-- <<< DCSMM-END <<<

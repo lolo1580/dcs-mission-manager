@@ -207,14 +207,11 @@ Les scripts se placent dans le dossier *Saved Games* de DCS :
 ### Mode A — `.exe` Windows (machine DCS)
 
 ```powershell
-# 1. Builder le frontend
-cd frontend
-npm install
-npm run build
+# 1. Builder le frontend et le backend
+.\build.ps1
 
-# 2. Compiler le binaire unique (frontend embarqué)
-cd ..
-go build -o dcsmm.exe ./backend/cmd/dcsmm
+# 2. Installer les scripts côté DCS (fusion sûre dans Saved Games)
+.\install-dcs.ps1            # ajouter -DryRun pour simuler
 
 # 3. Lancer
 .\dcsmm.exe
@@ -235,7 +232,19 @@ Un volume persiste la base SQLite.
 Build multi-arch pour NAS ARM :
 
 ```bash
+make docker-multiarch
+# ou directement :
 docker buildx build --platform linux/amd64,linux/arm64 -f deploy/Dockerfile -t dcsmm:latest .
+```
+
+### CLI
+
+```powershell
+dcsmm                 # lance le manager (interface web + réception DCS)
+dcsmm install-lua     # installe/fusionne les scripts Lua dans Saved Games
+dcsmm uninstall-lua   # retire le bloc installé (garde la config)
+dcsmm status          # installed / outdated / missing, par fichier
+dcsmm version
 ```
 
 ---
@@ -246,16 +255,19 @@ docker buildx build --platform linux/amd64,linux/arm64 -f deploy/Dockerfile -t d
 DCS mission manager/
 ├─ README.md
 ├─ CHANGELOG.md
+├─ VERSION
 ├─ Makefile / build.ps1       # commandes de build
+├─ install-dcs.ps1           # installe les scripts Lua dans Saved Games
 ├─ dcs-lua/                  # scripts à installer côté DCS
 │   ├─ Config/dcsmm.cfg      # modèle de configuration
 │   ├─ Export.lua            # positions → UDP (live map)
-│   └─ Hooks/dcsmm.lua       # events / joueurs / chat (Phase 2+)
+│   └─ Hooks/dcsmm.lua       # events / joueurs / chat
 ├─ backend/                  # Go
 │   ├─ go.mod
-│   ├─ cmd/dcsmm/main.go
+│   ├─ cmd/dcsmm/main.go     # serveur + CLI (install/uninstall/status)
 │   └─ internal/
 │       ├─ config/           # chargement env + défauts
+│       ├─ install/          # injecteur Lua (fusion par marqueurs)
 │       ├─ category/         # classification des engins (type DCS → famille)
 │       ├─ theatre/          # théâtres DCS et leurs emprises
 │       ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
@@ -270,12 +282,13 @@ DCS mission manager/
 │       ├─ tracker/          # historique positions + détection de pertes
 │       ├─ db/               # persistance SQLite (pur Go)
 │       ├─ state/            # store unités (en mémoire)
+│       ├─ stats/            # agrégations statistiques
 │       └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
 ├─ frontend/                 # Svelte + Vite + Leaflet
 │   └─ src/
 │       ├─ App.svelte
-│       └─ lib/              # carte, panneau latéral, fiche unité, stores
-├─ tiles/                    # tuiles DCS par théâtre (Phase 1)
+│       └─ lib/              # carte, panneaux, stores
+├─ tiles/                    # tuiles DCS par théâtre
 ├─ tools/                    # émetteur de télémétrie de test, extracteur de tuiles
 ├─ deploy/                   # Dockerfile + docker-compose.yml
 └─ docs/                     # documentation
@@ -291,7 +304,8 @@ DCS mission manager/
 - [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
 - [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
 - [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
-- [ ] **Phase 5 — Packaging** : build final `.exe` + Docker multi-arch, injecteur Lua
+- [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, `.exe` + Docker multi-arch
+- [ ] **Phase 6 — Aérodromes** : terrains, fréquences (Tower/Radar/TACAN/ILS), cartes
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.
 

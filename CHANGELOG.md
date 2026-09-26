@@ -9,7 +9,49 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### À venir
 
-- Phase 5 — Packaging final et injecteur Lua
+- Phase 6 — Aérodromes : terrains, fréquences (Tower/Radar/TACAN/ILS), cartes
+
+## [0.7.0] — 2026-09-26
+
+**Phase 5 — Packaging.** CLI, injecteur Lua sûr, déploiement `.exe` / Docker.
+
+### Ajouté
+
+- **CLI (`dcsmm`)**
+  - `install-lua` : installe/fusionne les scripts dans Saved Games ;
+  - `uninstall-lua` : retire le bloc et `Hooks/dcsmm.lua` ;
+  - `status` : `installed` / `outdated` / `missing` par fichier ;
+  - `version` / `help`.
+  - Détection automatique de `Saved Games` (`DCS.openbeta` prioritaire) et du
+    dossier `dcs-lua` ; `--saved-games`, `--lua-dir`, `--dry-run`.
+
+- **Injecteur Lua (`internal/install`)**
+  - **Ne remplace jamais** un `Export.lua` existant (Tacview, SRS, DCS-BIOS…) :
+    fusion d'un bloc délimité par `>>> DCSMM-BEGIN >>>` / `<<< DCSMM-END <<<`.
+  - **Sauvegarde horodatée** avant toute modification.
+  - **Idempotent** : une seconde exécution met à jour le bloc en place.
+  - Marqueurs ajoutés dans `Export.lua` et `Hooks/dcsmm.lua`.
+
+- **Déploiement**
+  - `Dockerfile` : `go.sum` copié (build reproductible), version injectée par
+    `-ldflags`, `ca-certificates`, utilisateur non-root, volume `/data`.
+  - `docker-compose.yml` : ports UDP/TCP publiés, rétention configurée.
+  - `Makefile` : cibles `install` et `docker-multiarch` ; `build.ps1` injecte la
+    version depuis `VERSION`.
+  - `install-dcs.ps1` : installateur Windows en un clic avec `-DryRun`.
+
+- **Documentation & tests**
+  - `docs/deployment.md` : les deux modes, le piège de l'IP LAN en Docker, ports.
+  - `VERSION` (0.7.0).
+  - Tests `internal/install` : création, **fusion préservant le contenu tiers**,
+    idempotence, remplacement en place, sauvegarde, `--dry-run`, désinstallation,
+    statut (missing/installed/outdated).
+
+### Corrigé
+
+- `Export.lua` appelait `toJson()`, jamais défini : l'envoi du joueur échouait
+  silencieusement. La charge JSON est désormais construite directement, avec les
+  champs de télémétrie ajoutés conditionnellement.
 
 ## [0.6.0] — 2026-09-26
 

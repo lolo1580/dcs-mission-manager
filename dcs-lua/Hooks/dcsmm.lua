@@ -21,11 +21,11 @@
     dcsmm_players_interval intervalle d'envoi des joueurs en secondes (défaut 5.0)
 ]]
 
+-- >>> DCSMM-BEGIN (bloc géré automatiquement — ne pas éditer à la main) >>>
 do
   local function say(msg)
     if net and net.log then net.log("DCSMM: " .. tostring(msg)) end
   end
-
   ---------------------------------------------------------------------------
   -- Configuration
   ---------------------------------------------------------------------------
@@ -363,3 +363,4 @@ do
   Sim.setUserCallbacks(dcsmm)
   say("hooks chargés")
 end
+-- <<< DCSMM-END <<<

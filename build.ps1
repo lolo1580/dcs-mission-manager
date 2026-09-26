@@ -24,9 +24,11 @@ function Build-Frontend {
 function Build-Backend {
     Write-Host '==> Building backend' -ForegroundColor Cyan
     Push-Location (Join-Path $root 'backend')
-    go build -o (Join-Path $root 'dcsmm.exe') ./cmd/dcsmm
+    $version = (Select-String -Path (Join-Path $root 'VERSION') -Pattern '^\s*(.+)$').Matches.Groups[1].Value.Trim()
+    if (-not $version) { $version = 'dev' }
+    go build -trimpath -ldflags="-s -w -X main.Version=$version" -o (Join-Path $root 'dcsmm.exe') ./cmd/dcsmm
     Pop-Location
-    Write-Host '==> Built dcsmm.exe' -ForegroundColor Green
+    Write-Host "==> Built dcsmm.exe ($version)" -ForegroundColor Green
 }
 
 switch ($Target) {
