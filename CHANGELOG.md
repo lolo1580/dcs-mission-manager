@@ -9,22 +9,18 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-
-- **License**: MIT (`LICENSE`), plus a non-affiliation notice for Eagle Dynamics
-  in both READMEs.
-- **Provenance note** for the aerodrome dataset
-  (`backend/internal/aerodrome/data/README.md`), covering the source charts and
-  the factual/database-right nature of the data.
-
 ### Upcoming
 
 - Other features inspired by MizMap / MovingMap: BRA measurement, SAM circles,
   MIL-STD-2525C symbols, kneeboards viewer
 
-## [1.0.0] — 2026-09-26
+## [1.0.0-beta.1] — 2026-09-26
 
-**Bilingual release.** The whole project is now in English, with French kept as a
+First public **pre-release**. The whole feature set is implemented and the whole
+chain is tested, but the DCS-side scripts have not yet been exercised against a
+live DCS installation (see "Beta scope" below).
+
+**Bilingual release.** The whole project is in English, with French kept as a
 first-class option.
 
 ### Added
@@ -39,6 +35,13 @@ first-class option.
 - **Bilingual documentation**
   - `README.md` / `CHANGELOG.md` in English (primary) with `README.fr.md` /
     `CHANGELOG.fr.md` preserved, plus cross-language links at the top.
+
+- **License**: MIT (`LICENSE`), plus a non-affiliation notice for Eagle Dynamics
+  in both READMEs.
+
+- **Provenance note** for the aerodrome dataset
+  (`backend/internal/aerodrome/data/README.md`), covering the source charts and
+  the factual/database-right nature of the data.
 
 ### Changed
 
@@ -60,6 +63,29 @@ first-class option.
   was rewritten and a scan confirmed no other file was affected.
 - `frontend/index.html` declared `lang="fr"` while the app now defaults to English.
 - CI and Docker comments were still French.
+
+### Beta scope
+
+Verified:
+
+- Live map from UDP telemetry through the Go backend to the browser (SSE).
+- Events, players and chat over TCP, persisted to SQLite and replayed on restart.
+- Debrief parsing against a **real** `debrief.log`, including chunked transfer.
+- Advanced statistics, analytics (heatmap, trails, sorties) and the Caucasus
+  airfield dataset.
+- Fog-of-war filtering driven by DCS's official `optionsView` values.
+- Single self-contained binary and the Docker image; CI green.
+
+Not yet verified against a live DCS session:
+
+- `Scripts/Export.lua` and `Scripts/Hooks/dcsmm.lua` running inside DCS.
+- `Sim.getMissionOptions()` on a real mission (values taken from DCS's own
+  `optionsDb.lua`).
+- Fog-of-war behaviour with real units and coalitions.
+- Debrief transfer from an actual end-of-mission.
+- LuaSocket availability in the GUI/hooks Lua state.
+
+Feedback and bug reports are welcome via GitHub Issues.
 
 ## [0.9.0] — 2026-09-26
 

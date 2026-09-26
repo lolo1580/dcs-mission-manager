@@ -1,0 +1,147 @@
+name: Release
+
+# Triggered by pushing a version tag, e.g.:
+#   git tag v1.0.0-beta.1
+#   git push origin v1.0.0-beta.1
+#
+# Tags containing a pre-release suffix (beta, rc, alpha) are published as GitHub
+# pre-releases, so they are never advertised as the latest stable build.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.0-beta.1)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          # "v1.0.0-beta.1" -> "1.0.0-beta.1"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG"       >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # A suffix after the patch number means it is a pre-release.
+          if printf '%s' "$VERSION" | grep -qE '[A-Za-z]'; then
+            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building $TAG (version $VERSION)"
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+
+      - name: Build dcsmm.exe (Windows, frontend embedded)
+        working-directory: backend
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath \
+            -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o ../dcsmm.exe ./cmd/dcsmm
+          ls -lh ../dcsmm.exe
+
+      - name: Build dcsmm (Linux, for the smoke test)
+        working-directory: backend
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+            -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o ../dcsmm-linux ./cmd/dcsmm
+
+      - name: Smoke test the release build
+        run: |
+          ./dcsmm-linux version
+          ./dcsmm-linux &
+          DCSMM_PID=$!
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null; then break; fi
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:8080/api/health
+          curl -fsS http://127.0.0.1:8080/ | grep -q '<div id="app">'
+          echo "OK: embedded UI is served"
+          kill $DCSMM_PID
+
+      - name: Package the Lua scripts
+        run: |
+          cd dcs-lua
+          zip -r ../dcsmm-lua-${{ steps.version.outputs.version }}.zip .
+          cd ..
+          ls -lh dcsmm-lua-*.zip
+
+      - name: Checksums
+        run: |
+          sha256sum dcsmm.exe dcsmm-lua-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          body: |
+            DCS Mission Manager ${{ steps.version.outputs.version }}.
+
+            This is a **pre-release**: the whole chain is tested, but the Lua
+            scripts have not yet been run against a live DCS installation.
+            See the CHANGELOG "Beta scope" section for what is and is not verified.
+
+            ## Download
+
+            - `dcsmm.exe` — Windows binary (web UI embedded). Run it, then open
+              http://localhost:8080.
+            - `dcsmm-lua-*.zip` — the Lua scripts to install into DCS, if you
+              prefer not to use the built-in installer (`dcsmm install-lua`).
+            - `SHA256SUMS.txt` — checksums.
+
+            ## Quick start
+
+            ```powershell
+            .\dcsmm.exe install-lua   # merges the scripts into Saved Games (safe)
+            .\dcsmm.exe               # start the manager
+            ```
+
+            Then load a mission in DCS. See the README for the full setup.
+
+            > Community project, not affiliated with or endorsed by Eagle Dynamics.
+          files: |
+            dcsmm.exe
+            dcsmm-lua-*.zip
+            SHA256SUMS.txt
