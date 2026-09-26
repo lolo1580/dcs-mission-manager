@@ -320,4 +320,7 @@ Le plan complet et détaillé est disponible dans le fichier de plan du projet.
 
 ## Licence
 
-À définir.
+[MIT](LICENSE) © 2026 Laurent (lolo1580)
+
+Projet communautaire, non affilié à Eagle Dynamics et non approuvé par cet
+éditeur. « DCS World » et ses terrains sont des marques d'Eagle Dynamics SA.

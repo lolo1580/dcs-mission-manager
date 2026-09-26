@@ -4,7 +4,7 @@
 // The data is embedded at build time from data/*.json. It comes from the
 // official aerodrome approach charts (VAD/GND); DCS does not expose radio
 // frequencies through its Lua API at runtime, so a curated dataset is the only
-// reliable source.
+// reliable source. See data/README.md for provenance.
 package aerodrome
 
 import (

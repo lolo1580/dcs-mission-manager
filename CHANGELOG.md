@@ -9,6 +9,14 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **License**: MIT (`LICENSE`), plus a non-affiliation notice for Eagle Dynamics
+  in both READMEs.
+- **Provenance note** for the aerodrome dataset
+  (`backend/internal/aerodrome/data/README.md`), covering the source charts and
+  the factual/database-right nature of the data.
+
 ### Upcoming
 
 - Other features inspired by MizMap / MovingMap: BRA measurement, SAM circles,

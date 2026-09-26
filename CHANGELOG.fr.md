@@ -9,7 +9,15 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-### À venir
+### Added
+
+- **Licence** : MIT (`LICENSE`), plus une mention de non-affiliation à Eagle
+  Dynamics dans les deux README.
+- **Note de provenance** pour les données d'aérodromes
+  (`backend/internal/aerodrome/data/README.md`) : cartes sources, et nature
+  factuelle / droit des bases de données.
+
+### Upcoming
 
 - Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,
   symboles MIL-STD-2525C, visionneuse de kneeboards

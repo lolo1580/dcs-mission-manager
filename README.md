@@ -319,4 +319,7 @@ The full, detailed plan is available in the project's plan file.
 
 ## License
 
-To be defined.
+[MIT](LICENSE) © 2026 Laurent (lolo1580)
+
+This is a community project, not affiliated with or endorsed by Eagle Dynamics.
+"DCS World" and its terrains are trademarks of Eagle Dynamics SA.
