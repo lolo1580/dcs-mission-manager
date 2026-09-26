@@ -68,17 +68,19 @@ var builtin = []Basemap{
 		Subdomains:  []string{"a", "b", "c"},
 	},
 	{
-		// Aeronautical look: a pale, muted rendering of the topographic base,
-		// styled client-side to read like a chart. It is not a real aeronautical
-		// chart — no free, worldwide, key-less source of those exists (see the
-		// note below) — but the aeronautical *content* (airfields, TACAN, ILS,
-		// VOR, towns) is drawn by the app from DCS's own data, which is the part
-		// that matters for flight planning.
+		// Aeronautical look: the relief base, which already carries contour
+		// lines, shaded relief and land use — close to what a chart shows — with
+		// the airfields drawn as permanent callouts by the app.
+		//
+		// A pale wash was tried first and made the map unreadable; the relief
+		// tiles need almost no filtering, only a slight calming so the labels
+		// stay legible on top.
 		ID:          "aero",
 		Name:        "Aeronautical",
-		URL:         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-		Attribution: "© Esri — topographic base, chart-style rendering",
-		MaxZoom:     19,
+		URL:         "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+		Attribution: "© OpenStreetMap contributors, SRTM | © OpenTopoMap (CC-BY-SA)",
+		MaxZoom:     17,
+		Subdomains:  []string{"a", "b", "c"},
 		ClassName:   "dcsmm-aero-tiles",
 	},
 	{

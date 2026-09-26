@@ -531,10 +531,11 @@
     filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95) saturate(0.7);
   }
 
-  /* Aeronautical style: wash the topographic base out so the airfield labels and
-     the unit symbols stay legible, the way a chart keeps its terrain quiet. */
+  /* Aeronautical style: the relief base is already chart-like, so it is calmed
+     only slightly — enough for the callouts to stand out, not enough to wash the
+     terrain away (a heavier filter made the map unreadable). */
   :global(.dcsmm-aero-tiles) {
-    filter: grayscale(0.45) brightness(1.14) contrast(1.02) saturate(0.5);
+    filter: saturate(0.82) brightness(1.03) contrast(1.04);
   }
 
   /* Chart-style airfield label: a small boxed callout, as on a paper chart. */

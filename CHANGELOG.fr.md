@@ -62,20 +62,22 @@ session DCS réelle. Voir « Périmètre de la bêta » dans l'entrée précéde
     scan garde sa licence. `DCSMM_CHARTS_DIR` change le dossier.
   - L'endpoint de fichier ne sert que les fichiers présents dans l'index : une
     URL forgée ne peut donc rien lire d'autre.
-- **Style de carte aéronautique.** Un cinquième fond, « Aéronautique », rend la
-  base topographique en version pâle et atténuée, et affiche les aérodromes sous
-  forme d'appels cartographiques permanents (nom, OACI, Tower, TACAN, ILS) qui
-  apparaissent au fur et à mesure du zoom, pour que la vue ne devienne jamais un
-  empilement de cadres. Choisir ce style révèle les aérodromes, puisque c'est sa
-  raison d'être.
-  - C'est un *rendu style carte avec du vrai contenu aéronautique*, pas une carte
+- **Style de carte aéronautique.** Un cinquième fond, « Aéronautique », s'appuie
+  sur la base relief — courbes de niveau, relief ombré et occupation du sol, déjà
+  proche d'une carte — et affiche les aérodromes sous forme d'appels
+  cartographiques permanents (nom, OACI, Tower, TACAN, ILS) qui apparaissent au
+  fur et à mesure du zoom, pour que la vue ne devienne jamais un empilement de
+  cadres. Choisir ce style révèle les aérodromes, puisque c'est sa raison d'être.
+  - C'est une *base style carte avec du vrai contenu aéronautique*, pas une carte
     scannée. Il n'existe aucune source de tuiles aéronautiques gratuite,
     mondiale et sans clé : OpenAIP exige une clé d'API, open flightmaps n'a pas
     d'endpoint public, VFRMAP ne couvre que les États-Unis, et l'imagerie F10 de
     DCS est l'œuvre protégée d'Eagle Dynamics — lire des données factuelles de
     l'installation est une chose, rediffuser leur imagerie en est une autre. La
-    raison est consignée dans le commentaire du paquet `basemap` pour ne pas
-    avoir à la redécouvrir.
+    raison est consignée dans le commentaire du paquet `basemap`.
+  - Un rendu pâle et délavé a été essayé d'abord et a dû être remplacé : il
+    rendait la carte illisible. La base relief n'a besoin que d'un léger
+    apaisement, et le résultat est bien plus lisible.
 - **Aérodromes lus depuis DCS lui-même.** Le manager étant local, il lit les
   fichiers de terrain du simulateur (`Mods/terrains/<carte>/radio.lua` et
   `beacons.lua`) au lieu de dépendre d'un jeu de données transcrit. Les deux
