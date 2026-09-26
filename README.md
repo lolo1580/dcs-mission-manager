@@ -136,7 +136,7 @@ defaults. None of them is required for a normal install.
 
 | Variable | Default | Description |
 |---|---|---|
-| `DCSMM_HTTP_ADDR` | `0.0.0.0:8080` | HTTP listening address (Web UI + SSE) |
+| `DCSMM_HTTP_ADDR` | `127.0.0.1:8080` | HTTP listening address (Web UI + SSE). Set `0.0.0.0:8080` to reach the UI from another device; the API has no authentication |
 | `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | UDP listening address (Live map telemetry) |
 | `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
 | `DCSMM_DB_PATH` | `./data/dcsmm.db` | SQLite database path |

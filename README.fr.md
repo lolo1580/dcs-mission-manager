@@ -140,7 +140,7 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `DCSMM_HTTP_ADDR` | `0.0.0.0:8080` | Adresse d'écoute HTTP (Web UI + SSE) |
+| `DCSMM_HTTP_ADDR` | `127.0.0.1:8080` | Adresse d'écoute HTTP (Web UI + SSE). Mettre `0.0.0.0:8080` pour atteindre l'UI depuis un autre appareil ; l'API est alors sans authentification |
 | `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (télémétrie Live map) |
 | `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMM_DB_PATH` | `./data/dcsmm.db` | Chemin de la base SQLite |

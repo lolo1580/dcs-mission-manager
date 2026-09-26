@@ -9,6 +9,26 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **The API is now protected against being driven by a web page.** It has a
+  destructive endpoint (`/api/maintenance/purge`) and no authentication, and the
+  server was bound to `0.0.0.0`, so:
+  - any site you visited while the manager ran could `POST` to it — a plain POST
+    is a "simple request" that reaches the server without a preflight — and
+    delete your database. This was reproduced before fixing it.
+  - a DNS-rebinding page could reach it with a matching `Origin`.
+  The origin is now checked against the request's Host, the Host must name the
+  local machine while the server is bound to loopback, and **the default listen
+  address is `127.0.0.1:8080`** instead of `0.0.0.0:8080`. Reaching the UI from
+  another device is still possible, deliberately, with
+  `DCSMM_HTTP_ADDR=0.0.0.0:8080` — in which case the README says the API is
+  unauthenticated. Covered by `TestOriginGuard` and `TestIsLoopbackAddr`.
+- **Player names were injected into Leaflet tooltips unescaped.** Leaflet renders
+  tooltip content as HTML, so a player called `<img src=x onerror=...>` in a
+  multiplayer mission would have run script in every viewer's browser. Airfield
+  names, town names and unit ids are escaped too, for the same reason.
+
 ### Fixed
 
 - **Wrong theatre identifiers hid airfields that had been read correctly.** DCS

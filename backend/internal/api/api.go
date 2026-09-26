@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -88,6 +90,10 @@ type Server struct {
 	tilesDir   string
 	chartsDir  string
 	basemaps   []basemap.Basemap
+	// localOnly is true when the server is bound to the loopback interface, in
+	// which case it also refuses requests whose Host is not local (DNS
+	// rebinding).
+	localOnly bool
 }
 
 // New creates a server backed by store. live, database and statsService may be nil.
@@ -113,11 +119,86 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		tilesDir:   cfg.TilesDir,
 		chartsDir:  cfg.ChartsDir,
 		basemaps:   basemap.All(cfg.BasemapURL),
+		localOnly:  isLoopbackAddr(cfg.HTTPAddr),
 	}
 }
 
 // Handler returns the HTTP router.
 func (s *Server) Handler() http.Handler {
+	mux := s.routes()
+	return s.originGuard(mux)
+}
+
+// originGuard protects an API that has a destructive endpoint and no
+// authentication from being driven by a web page.
+//
+// Two browser-borne attacks matter for a local server:
+//
+//   - CSRF: a page on another site sends a request to http://127.0.0.1:8080. A
+//     plain POST is a "simple request" and reaches the server without a
+//     preflight, so the Origin must be checked explicitly.
+//   - DNS rebinding: a page served from a domain that is later re-pointed at
+//     127.0.0.1. Origin and Host then agree, so the Origin check alone is not
+//     enough; the Host must also name the local machine.
+//
+// When the operator deliberately binds to a non-loopback address (the
+// documented opt-in for reaching the UI from another device), the Host check is
+// skipped: they asked for network access, and the README states the API is then
+// unauthenticated. Requests without an Origin (curl, the CLI) are always
+// allowed, since no browser is involved.
+func (s *Server) originGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" && !sameOrigin(origin, r.Host) {
+			http.Error(w, "cross-origin request refused", http.StatusForbidden)
+			return
+		}
+		if s.localOnly && !loopbackHost(r.Host) {
+			http.Error(w, "request refused: the manager only accepts local requests", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// sameOrigin reports whether an Origin header matches the request's Host.
+func sameOrigin(origin, host string) bool {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return u.Host == host
+}
+
+// loopbackHost reports whether a Host header names the local machine.
+//
+// An empty host is not loopback: in a listen address (":8080") it means "every
+// interface", and treating it as local would let the server believe it is
+// unreachable while it is exposed.
+func loopbackHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	h := host
+	if hostOnly, _, err := net.SplitHostPort(host); err == nil {
+		h = hostOnly
+	}
+	if h == "" {
+		// ":8080" — a port with no host, i.e. all interfaces.
+		return false
+	}
+	switch strings.Trim(h, "[]") {
+	case "127.0.0.1", "localhost", "::1":
+		return true
+	}
+	return false
+}
+
+// isLoopbackAddr reports whether a listen address only accepts local traffic.
+func isLoopbackAddr(addr string) bool {
+	return loopbackHost(addr)
+}
+
+func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", s.handleHealth)
 	mux.HandleFunc("/api/state", s.handleState)
@@ -341,8 +422,10 @@ func (s *Server) handleTiles(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// Guard against path traversal by rejecting separators and dots already
-	// covered by validTilePart; join and ensure the result stays under tilesDir.
+	// Guard against path traversal. The parts are already validated, so escape
+	// is not reachable; this is defence in depth, and the comparison appends a
+	// separator because a plain HasPrefix would accept a sibling directory
+	// ("C:\tiles-other" starts with "C:\tiles").
 	full := filepath.Join(s.tilesDir, th, z, x, y+".png")
 	absBase, err := filepath.Abs(s.tilesDir)
 	if err != nil {
@@ -350,7 +433,7 @@ func (s *Server) handleTiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	absFull, err := filepath.Abs(full)
-	if err != nil || !strings.HasPrefix(absFull, absBase) {
+	if err != nil || !strings.HasPrefix(absFull, absBase+string(os.PathSeparator)) {
 		http.NotFound(w, r)
 		return
 	}

@@ -9,6 +9,27 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Sécurité
+
+- **L'API est désormais protégée contre le pilotage par une page web.** Elle
+  contient un endpoint destructif (`/api/maintenance/purge`) et aucune
+  authentification, et le serveur écoutait sur `0.0.0.0` :
+  - n'importe quel site que tu visitais pendant que le manager tournait pouvait
+    lui envoyer un `POST` — un POST simple atteint le serveur sans preflight — et
+    supprimer ta base. Le problème a été reproduit avant d'être corrigé.
+  - une page en DNS rebinding pouvait l'atteindre avec un `Origin` cohérent.
+  L'origine est maintenant comparée au Host de la requête, le Host doit désigner
+  la machine locale tant que le serveur est lié au loopback, et **l'adresse
+  d'écoute par défaut est `127.0.0.1:8080`** au lieu de `0.0.0.0:8080`. Atteindre
+  l'interface depuis un autre appareil reste possible, délibérément, avec
+  `DCSMM_HTTP_ADDR=0.0.0.0:8080` — auquel cas le README précise que l'API est sans
+  authentification. Couvert par `TestOriginGuard` et `TestIsLoopbackAddr`.
+- **Les noms de joueurs étaient injectés sans échappement dans les infobulles
+  Leaflet.** Leaflet interprète leur contenu comme du HTML : un joueur nommé
+  `<img src=x onerror=...>` dans une mission multijoueur aurait exécuté du script
+  dans le navigateur de chaque spectateur. Les noms d'aérodromes, de villes et
+  les ids d'unités sont échappés de même.
+
 ### Corrigé
 
 - **De mauvais identifiants de théâtre masquaient des aérodromes pourtant lus

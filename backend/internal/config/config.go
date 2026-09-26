@@ -16,7 +16,11 @@ import (
 
 // Config holds the runtime configuration of the backend.
 type Config struct {
-	// HTTPAddr is the listen address of the web UI (HTTP + SSE).
+	// HTTPAddr is the listen address of the web UI (HTTP + SSE). It defaults to
+	// the loopback interface: the manager is local, and the API includes a
+	// destructive purge endpoint with no authentication. Set
+	// DCSMM_HTTP_ADDR=0.0.0.0:8080 deliberately to reach the UI from another
+	// device (a tablet in the cockpit, for instance).
 	HTTPAddr string
 	// UDPAddr is the listen address for telemetry coming from DCS.
 	UDPAddr string
@@ -125,7 +129,7 @@ func envBool(key string, def bool) bool {
 // Load reads the configuration from the environment, applying defaults.
 func Load() Config {
 	return Config{
-		HTTPAddr:       env("DCSMM_HTTP_ADDR", "0.0.0.0:8080"),
+		HTTPAddr:       env("DCSMM_HTTP_ADDR", "127.0.0.1:8080"),
 		UDPAddr:        env("DCSMM_UDP_ADDR", "127.0.0.1:7778"),
 		TCPAddr:        env("DCSMM_TCP_ADDR", "127.0.0.1:7779"),
 		DBPath:         env("DCSMM_DB_PATH", "./data/dcsmm.db"),

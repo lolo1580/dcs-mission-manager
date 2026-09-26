@@ -202,7 +202,7 @@
       ],
       { color: '#f0b429', weight: 1.5, dashArray: '6 4', fill: false, interactive: false }
     )
-      .bindTooltip(`${name} — DCS map extent`, { sticky: true })
+      .bindTooltip(escapeHTML(name) + ' — DCS map extent', { sticky: true })
       .addTo(boundsLayer);
   }
 
@@ -307,7 +307,7 @@
         fillOpacity: 0.55,
         interactive: true,
       })
-        .bindTooltip(t.name, { direction: 'top' })
+        .bindTooltip(escapeHTML(t.name), { direction: 'top' })
         .addTo(townLayer);
     }
   }
@@ -356,7 +356,7 @@
         trail.map((p) => [p.lat, p.lng]),
         { color: '#f0b429', weight: 1.5, opacity: 0.5 }
       )
-        .bindTooltip(unitId)
+        .bindTooltip(escapeHTML(unitId))
         .addTo(historyLayer);
     }
   }
@@ -475,8 +475,16 @@
   }
 
   function tooltip(u) {
+    // Leaflet renders tooltip content as HTML, and these values are untrusted:
+    // "label" is a player name taken from the mission, so a player called
+    // "<img src=x onerror=...>" would otherwise execute in every viewer's
+    // browser. Everything interpolated here must be escaped.
     const label = u.label || u.type;
-    return `<strong>${label}</strong><br/>${u.type}<br/>alt ${Math.round(u.alt)} m · cap ${Math.round(u.heading)}°`;
+    return (
+      `<strong>${escapeHTML(label)}</strong><br/>` +
+      `${escapeHTML(u.type)}<br/>` +
+      `alt ${Math.round(u.alt)} m · cap ${Math.round(u.heading)}°`
+    );
   }
 
   export function recenter() {
