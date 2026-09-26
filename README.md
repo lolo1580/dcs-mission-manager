@@ -36,6 +36,7 @@ débriefings, et statistiques avancées. Déployable soit en **`.exe` Windows**,
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
+| Aérodromes | ✅ Phase 6 | 21 terrains du Caucase : coordonnées, Tower, TACAN, ILS, cartes |
 
 ### Statistiques avancées (prévues)
 
@@ -268,6 +269,7 @@ DCS mission manager/
 │   └─ internal/
 │       ├─ config/           # chargement env + défauts
 │       ├─ install/          # injecteur Lua (fusion par marqueurs)
+│       ├─ aerodrome/        # aérodromes et fréquences (données embarquées)
 │       ├─ category/         # classification des engins (type DCS → famille)
 │       ├─ theatre/          # théâtres DCS et leurs emprises
 │       ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
@@ -305,7 +307,7 @@ DCS mission manager/
 - [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
 - [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
 - [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, `.exe` + Docker multi-arch
-- [ ] **Phase 6 — Aérodromes** : terrains, fréquences (Tower/Radar/TACAN/ILS), cartes
+- [x] **Phase 6 — Aérodromes** : 21 terrains du Caucase (fréquences, cartes)
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.
 

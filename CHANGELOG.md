@@ -9,7 +9,39 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### À venir
 
-- Phase 6 — Aérodromes : terrains, fréquences (Tower/Radar/TACAN/ILS), cartes
+- Renseigner les autres théâtres (Syrie, Golfe, Nevada, Marianas…)
+- Affichage des cartes d'aérodrome dans l'interface
+
+## [0.8.0] — 2026-09-26
+
+**Phase 6 — Aérodromes.** Référentiel des terrains du Caucase : coordonnées,
+fréquences radio et cartes d'approche.
+
+### Ajouté
+
+- **Données aérodromes (`internal/aerodrome`)**
+  - 21 terrains du Caucase extraits des **cartes d'approche fournies** :
+    coordonnées, élévation, piste, **Tower**, **TACAN**, **ILS** par piste, et
+    références aux cartes VAD/GND.
+  - Les données sont **embarquées** (`//go:embed data/*.json`) ; le format est
+    générique, ajouter un théâtre = déposer un fichier JSON.
+  - DCS n'exposant pas les fréquences à l'exécution, ce référentiel est la seule
+    source fiable.
+
+- **API**
+  - `GET /api/aerodromes` (filtre `?theatre=`, tri par distance avec `?lat=&lng=`)
+    et `GET /api/aerodromes/{code}`.
+
+- **Frontend**
+  - Onglet **Aérodromes** : recherche par nom/code OACI/TACAN, bouton
+    « Proches de moi », fiche détaillée (Tower, TACAN, ILS, cartes disponibles).
+  - Case **« Sur la carte »** : les terrains s'affichent en marqueurs, fréquences
+    en infobulle.
+
+- **Documentation & tests**
+  - `docs/phase6-aerodromes.md` (source, périmètre, modèle, limites).
+  - Tests `internal/aerodrome` : chargement, terrain connu, complétude, tri,
+    filtrage par théâtre.
 
 ## [0.7.0] — 2026-09-26
 

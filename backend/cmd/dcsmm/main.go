@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"dcsmm/internal/aerodrome"
 	"dcsmm/internal/api"
 	"dcsmm/internal/category"
 	"dcsmm/internal/config"
@@ -249,7 +250,14 @@ func runServer() {
 
 	// ---- HTTP: API + UI ---------------------------------------------------
 	statsService := stats.New(database, classifier)
-	srv := api.New(cfg, store, liveStore, database, statsService)
+	airfields, err := aerodrome.Load()
+	if err != nil {
+		log.Printf("aerodrome: dataset unavailable: %v", err)
+		airfields = nil
+	} else {
+		log.Printf("aerodrome: %d airfields loaded", airfields.Count())
+	}
+	srv := api.New(cfg, store, liveStore, database, statsService, airfields)
 
 	// Persist messages as they arrive, and mirror them over SSE.
 	writer := ingest.New(database, liveStore)

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"dcsmm/internal/aerodrome"
 	"dcsmm/internal/basemap"
 	"dcsmm/internal/config"
 	"dcsmm/internal/db"
@@ -72,33 +73,35 @@ npm run build</code></pre>
 
 // Server wires the unit store to the HTTP handlers.
 type Server struct {
-	cfg      config.Config
-	store    *state.Store
-	live     *live.Store
-	db       *db.DB
-	stats    *stats.Service
-	hub      *hub
-	theatres []theatre.Theatre
-	tilesDir string
-	basemaps []basemap.Basemap
+	cfg        config.Config
+	store      *state.Store
+	live       *live.Store
+	db         *db.DB
+	stats      *stats.Service
+	aerodromes *aerodrome.Catalog
+	hub        *hub
+	theatres   []theatre.Theatre
+	tilesDir   string
+	basemaps   []basemap.Basemap
 }
 
 // New creates a server backed by store. live, database and statsService may be nil.
-func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service) *Server {
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog) *Server {
 	theatres := theatre.All()
 	for i := range theatres {
 		theatres[i].Tiles = hasTiles(cfg.TilesDir, theatres[i].ID)
 	}
 	return &Server{
-		cfg:      cfg,
-		store:    store,
-		live:     liveStore,
-		db:       database,
-		stats:    statsService,
-		hub:      newHub(),
-		theatres: theatres,
-		tilesDir: cfg.TilesDir,
-		basemaps: basemap.All(cfg.BasemapURL),
+		cfg:        cfg,
+		store:      store,
+		live:       liveStore,
+		db:         database,
+		stats:      statsService,
+		aerodromes: aerodromes,
+		hub:        newHub(),
+		theatres:   theatres,
+		tilesDir:   cfg.TilesDir,
+		basemaps:   basemap.All(cfg.BasemapURL),
 	}
 }
 
@@ -128,6 +131,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analytics/heatmap", s.handleHeatmap)
 	mux.HandleFunc("/api/analytics/tracks", s.handleTracks)
 	mux.HandleFunc("/api/analytics/sorties", s.handleSorties)
+	mux.HandleFunc("/api/aerodromes", s.handleAerodromes)
+	mux.HandleFunc("/api/aerodromes/", s.handleAerodrome)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

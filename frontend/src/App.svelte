@@ -8,6 +8,7 @@
   import DebriefPanel from './lib/DebriefPanel.svelte';
   import StatsPanel from './lib/StatsPanel.svelte';
   import AnalyticsPanel from './lib/AnalyticsPanel.svelte';
+  import AerodromePanel from './lib/AerodromePanel.svelte';
   import {
     connected,
     lastUpdate,
@@ -48,6 +49,7 @@
       <button class:active={tab === 'debriefs'} on:click={() => (tab = 'debriefs')}>Débriefs</button>
       <button class:active={tab === 'stats'} on:click={() => (tab = 'stats')}>Statistiques</button>
       <button class:active={tab === 'analytics'} on:click={() => (tab = 'analytics')}>Analyse</button>
+      <button class:active={tab === 'aerodromes'} on:click={() => (tab = 'aerodromes')}>Aérodromes</button>
     </nav>
 
     {#if $mission}
@@ -113,9 +115,13 @@
       <div class="session wide">
         <StatsPanel />
       </div>
-    {:else}
+    {:else if tab === 'analytics'}
       <div class="session wide">
         <AnalyticsPanel />
+      </div>
+    {:else}
+      <div class="session wide">
+        <AerodromePanel />
       </div>
     {/if}
   </main>

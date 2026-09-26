@@ -16,6 +16,7 @@
   } from './units.js';
   import { unitIcon, coalitionColor } from './icons.js';
   import { heatPoints, trails as trailsStore, heatSource, maxHeatWeight } from './analytics.js';
+  import { aerodromes, showOnMap as showAerodromes } from './aerodromes.js';
 
   let mapEl;
   let map;
@@ -24,6 +25,7 @@
   let trailLayer;
   let historyLayer;
   let heatLayer;
+  let aerodromeLayer;
   let userMoved = false;
   let followOwnship = true;
 
@@ -44,6 +46,7 @@
     trailLayer = L.layerGroup().addTo(map);
     historyLayer = L.layerGroup();
     heatLayer = L.layerGroup();
+    aerodromeLayer = L.layerGroup();
 
     try {
       const meta = await fetchTheatres();
@@ -80,6 +83,8 @@
     const unsub = visibleUnits.subscribe(syncMarkers);
     const unsubHeat = heatPoints.subscribe(() => renderHistory());
     const unsubTrails = trailsStore.subscribe(() => renderHistory());
+    const unsubAeroList = aerodromes.subscribe(() => renderAerodromes());
+    const unsubAeroToggle = showAerodromes.subscribe(() => renderAerodromes());
 
     mapReady = true;
     applyHistory();
@@ -89,10 +94,47 @@
       unsubBase?.();
       unsubHeat?.();
       unsubTrails?.();
+      unsubAeroList?.();
+      unsubAeroToggle?.();
       stop?.();
       map?.remove();
     };
   });
+
+  /** Draws airfield markers when the toggle is on. */
+  function renderAerodromes() {
+    if (!map) return;
+    aerodromeLayer.clearLayers();
+
+    let on = false;
+    showAerodromes.subscribe((v) => (on = v))();
+    if (!on) {
+      map.removeLayer(aerodromeLayer);
+      return;
+    }
+    aerodromeLayer.addTo(map);
+
+    let list = [];
+    aerodromes.subscribe((v) => (list = v))();
+
+    for (const a of list) {
+      const html = `
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+             stroke="#f0b429" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 3 v18 M3 12 h18"/>
+        </svg>`;
+      const icon = L.divIcon({ html, className: 'dcsmm-marker', iconSize: [18, 18], iconAnchor: [9, 9] });
+      L.marker([a.lat, a.lng], { icon })
+        .bindTooltip(
+          `<strong>${a.name}</strong> (${a.id})<br/>` +
+            (a.tower ? `Tower ${a.tower.toFixed(3)} MHz<br/>` : '') +
+            (a.tacan ? `TACAN ${a.tacan}<br/>` : '') +
+            (a.ils?.length ? `ILS ${a.ils.map((i) => `${i.runway} ${i.mhz}`).join(', ')}` : '')
+        )
+        .addTo(aerodromeLayer);
+    }
+  }
 
   // Render the history overlays whenever the toggle or the data changes.
   $: if (mapReady) applyHistory();
