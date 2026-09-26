@@ -11,12 +11,14 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Modifié
 
+- **Les données d'aérodromes ne sont plus transcrites à la main pour le Caucase.**
+  DCS est lu en priorité ; l'entrée curatée ne sert plus qu'à l'enrichir.
 - **Le manager est désormais 100 % local.** Il tourne sur la même machine Windows
   que DCS. Le déploiement Docker/Linux est retiré : `deploy/`, `.dockerignore`,
   `docs/deployment.md`, les cibles `make docker` / `make docker-multiarch` et
   l'option `build.ps1 -Target docker` disparaissent, ainsi que toutes les mises en
-  garde sur l'adresse LAN et les ports du conteneur. C'est ce qui rend possible le
-  changement suivant : un backend local peut lire les fichiers de DCS, et cela
+  garde sur l'adresse LAN et les ports du conteneur. C'est ce qui rend possible la
+  lecture des aérodromes : un backend local peut lire les fichiers de DCS, et cela
   élimine toute la classe de problèmes « mauvaise IP / pare-feu / publication de
   ports ».
 - La CI et le workflow de release construisent et testent maintenant **`dcsmm.exe`
@@ -25,6 +27,31 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Aérodromes lus depuis DCS lui-même.** Le manager étant local, il lit les
+  fichiers de terrain du simulateur (`Mods/terrains/<carte>/radio.lua` et
+  `beacons.lua`) au lieu de dépendre d'un jeu de données transcrit. Les deux
+  fichiers partagent un identifiant (`airfield22_0` = Batumi dans les deux) : le
+  premier donne le nom et la fréquence ATC, le second toutes les aides à la
+  navigation (TACAN, ILS, VOR, RSBN, NDB, PRMG) avec de vraies coordonnées.
+  - **101 aérodromes sur 5 cartes** au lieu de 21 sur une seule, et *plus
+    complets* : DCS déclare 6 TACAN et 13 ILS pour le Caucase là où le jeu curaté
+    n'en avait que 5 et 10.
+  - Les données du simulateur font foi et se mettent à jour à chaque patch ; le
+    jeu embarqué reste en repli (et fournit les codes OACI, pistes, coalitions et
+    cartes que DCS n'expose pas, appariés par proximité).
+  - L'onglet Aérodromes indique la provenance (« Lu depuis DCS » ou
+    « Données embarquées »).
+- **Couche villes.** `Mods/terrains/<carte>/map/towns.lua` contient des milliers
+  de localités géolocalisées (1691 pour le Caucase, 385 pour le golfe Persique).
+  Elles sont exposées via `/api/towns` et peuvent être affichées sur la carte,
+  lui donnant du contexte sans aucune donnée de mission.
+- **`DCSMM_SAVED_GAMES`** permet de forcer le dossier Saved Games. L'installation
+  DCS est localisée via le registre, avec un repli sur la ligne `Command line:`
+  de `Logs/dcs.log`.
+- Le parseur Lua comprend désormais les constructions des fichiers DCS : le
+  wrapper gettext `_("…")` et les constantes d'énumération (`BEACON_TYPE_TACAN`,
+  `MODULATIONTYPE_AM`, `VHF_HI`). Sans elles, lire les données de terrain est
+  impossible.
 - **Sélecteur de théâtre et étendue de la carte.** La carte live a désormais un
   sélecteur de théâtre (Caucasus, Syria, Nevada, Persian Gulf, Marianas, Sinai,
   Kola, Afghanistan, Iraq, Falklands, Normandy, The Channel). En choisir un cadre

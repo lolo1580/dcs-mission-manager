@@ -24,6 +24,8 @@
     aerodromes,
     showOnMap as showAerodromes,
     selectAerodrome,
+    towns,
+    showTowns,
   } from './aerodromes.js';
   import { focusRequest } from './ui.js';
 
@@ -35,6 +37,7 @@
   let historyLayer;
   let heatLayer;
   let aerodromeLayer;
+  let townLayer;
   let boundsLayer;
   let userMoved = false;
   let followOwnship = true;
@@ -61,6 +64,7 @@
     historyLayer = L.layerGroup();
     heatLayer = L.layerGroup();
     aerodromeLayer = L.layerGroup();
+    townLayer = L.layerGroup();
     boundsLayer = L.layerGroup();
 
     try {
@@ -95,6 +99,8 @@
     const unsubTrails = trailsStore.subscribe(() => renderHistory());
     const unsubAeroList = aerodromes.subscribe(() => renderAerodromes());
     const unsubAeroToggle = showAerodromes.subscribe(() => renderAerodromes());
+    const unsubTowns = towns.subscribe(() => renderTowns());
+    const unsubTownsToggle = showTowns.subscribe(() => renderTowns());
     const unsubBounds = showBounds.subscribe(() => renderBounds());
     const unsubTheatre = theatre.subscribe(() => onTheatreChange());
     const unsubFocus = focusRequest.subscribe((a) => {
@@ -116,6 +122,8 @@
       unsubTrails?.();
       unsubAeroList?.();
       unsubAeroToggle?.();
+      unsubTowns?.();
+      unsubTownsToggle?.();
       unsubBounds?.();
       unsubTheatre?.();
       unsubFocus?.();
@@ -235,6 +243,37 @@
           selectAerodrome(a);
         })
         .addTo(aerodromeLayer);
+    }
+  }
+
+  /** Draws settlements when the toggle is on. Thousands of points, so a canvas
+   *  circle marker is used rather than a DOM marker. */
+  function renderTowns() {
+    if (!map) return;
+    townLayer.clearLayers();
+
+    let on = false;
+    showTowns.subscribe((v) => (on = v))();
+    if (!on) {
+      map.removeLayer(townLayer);
+      return;
+    }
+    townLayer.addTo(map);
+    // Settlements are context, not content: keep them behind the units.
+    townLayer.bringToBack();
+
+    let list = [];
+    towns.subscribe((v) => (list = v))();
+    for (const t of list) {
+      L.circleMarker([t.lat, t.lng], {
+        radius: 2,
+        stroke: false,
+        fillColor: '#e8e2d0',
+        fillOpacity: 0.55,
+        interactive: true,
+      })
+        .bindTooltip(t.name, { direction: 'top' })
+        .addTo(townLayer);
     }
   }
 

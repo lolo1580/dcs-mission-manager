@@ -39,7 +39,7 @@ d'un jeu de données maintenu à la main.
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
-| Aérodromes | ✅ Phase 6 | 21 terrains du Caucase : coordonnées, Tower, TACAN, ILS, cartes ; affichés sur la carte avec fiche au clic |
+| Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : 101 aérodromes sur 5 cartes, avec Tower/TACAN/ILS/VOR/RSBN/NDB, affichés sur la carte avec fiche au clic |
 | Fog of war | ✅ Phase 7 | Respect des options de mission F10 (filtrage côté serveur) |
 
 ### Statistiques avancées (prévues)
@@ -154,6 +154,7 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMM_TRACK_INTERVAL` | `3` (secondes) | Fréquence d'échantillonnage des positions |
 | `DCSMM_TRACK_GRACE` | `15` (secondes) | Absence avant de compter une unité comme perdue |
 | `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
+| `DCSMM_SAVED_GAMES` | *(auto)* | Dossier Saved Games de DCS, si la détection échoue |
 | `DCSMM_REVEAL_ALL_UNITS` | `false` | Désactive le fog of war (tout diffuser ; solo/conception) |
 | `DCSMM_SOURCE` | *(auto)* | Force la source de la session : `live` ou `test` (voir plus bas) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

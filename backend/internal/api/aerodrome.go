@@ -42,10 +42,40 @@ func (s *Server) handleAerodromes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Report where the data came from: "dcs" when read from the simulator's own
+	// terrain files, "embedded" when served from the dataset in the binary.
+	source := aerodrome.SourceEmbedded
+	for _, a := range list {
+		if a.Source == aerodrome.SourceDCS {
+			source = aerodrome.SourceDCS
+			break
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"count":      len(list),
 		"theatres":   s.aerodromes.Theatres(),
+		"source":     source,
 		"aerodromes": list,
+	})
+}
+
+// handleTowns returns the settlements of a theatre, read from DCS's
+// map/towns.lua. They are real, geolocated place names, useful as a map layer
+// and available with no mission data at all.
+//
+// Query: ?theatre=Caucasus (required).
+func (s *Server) handleTowns(w http.ResponseWriter, r *http.Request) {
+	if s.aerodromes == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"towns": []any{}})
+		return
+	}
+	theatre := r.URL.Query().Get("theatre")
+	towns := s.aerodromes.Towns(theatre)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"theatre": theatre,
+		"count":   len(towns),
+		"towns":   towns,
 	})
 }
 

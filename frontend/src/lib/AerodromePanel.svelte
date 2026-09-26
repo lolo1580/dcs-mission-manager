@@ -3,8 +3,11 @@
   import {
     filteredAerodromes,
     aerodromeError,
+    aerodromeSource,
     search,
     showOnMap,
+    towns,
+    showTowns,
     selectedAerodrome,
     loadAerodromes,
     loadNearest,
@@ -39,6 +42,15 @@
 <section class="aerodromes">
   <header>
     <h2>{$t('aerodromes.title')} <span class="count">{$filteredAerodromes.length}</span></h2>
+    {#if $aerodromeSource}
+      <span
+        class="source"
+        class:dcs={$aerodromeSource === 'dcs'}
+        title={$aerodromeSource === 'dcs' ? $t('aerodromes.source.dcsHint') : $t('aerodromes.source.embeddedHint')}
+      >
+        {$aerodromeSource === 'dcs' ? $t('aerodromes.source.dcs') : $t('aerodromes.source.embedded')}
+      </span>
+    {/if}
     {#if $theatres.length}
       <select
         class="theatre"
@@ -75,6 +87,12 @@
       <input type="checkbox" bind:checked={$showOnMap} />
       {$t('aerodromes.onMap')}
     </label>
+    {#if $towns.length}
+      <label class="onmap" title={$t('aerodromes.townsHint')}>
+        <input type="checkbox" bind:checked={$showTowns} />
+        {$t('aerodromes.towns')} ({$towns.length})
+      </label>
+    {/if}
   </div>
 
   <p class="hint">{$t('aerodromes.clickHint')}</p>
@@ -185,6 +203,22 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
+  }
+
+  .source {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.68rem;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: help;
+    white-space: nowrap;
+  }
+
+  .source.dcs {
+    color: var(--green);
+    border-color: color-mix(in srgb, var(--green) 45%, var(--border));
   }
 
   .theatre:focus {

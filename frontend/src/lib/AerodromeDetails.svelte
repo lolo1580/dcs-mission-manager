@@ -29,25 +29,43 @@
       <button class="close" title={$t('unit.close')} on:click={close}>×</button>
     </header>
     <dl>
-      <div><dt>ICAO</dt><dd>{a.id}</dd></div>
-      <div><dt>{$t('aerodromes.coalition')}</dt><dd>{$t('coalition.' + a.coalition)}</dd></div>
+      <div><dt>{$t('aerodromes.icao')}</dt><dd>{a.icaoCode && a.icaoCode.length === 4 ? a.icaoCode : a.id}</dd></div>
+      {#if a.coalition}
+        <div><dt>{$t('aerodromes.coalition')}</dt><dd>{$t('coalition.' + a.coalition)}</dd></div>
+      {/if}
       <div><dt>{$t('aerodromes.coordinates')}</dt><dd>{fmtCoords(a)}</dd></div>
-      <div><dt>{$t('aerodromes.elevation')}</dt><dd>{fmt(a.elevationM)} m</dd></div>
-      <div><dt>{$t('aerodromes.runway')}</dt><dd>{a.runway}</dd></div>
-      <div class="hl"><dt>{$t('aerodromes.tower')}</dt><dd>{fmtMHz(a.tower)}</dd></div>
+      {#if a.elevationM}<div><dt>{$t('aerodromes.elevation')}</dt><dd>{fmt(a.elevationM)} m</dd></div>{/if}
+      {#if a.runway}<div><dt>{$t('aerodromes.runway')}</dt><dd>{a.runway}</dd></div>{/if}
+      {#if a.tower}
+        <div class="hl"><dt>{$t('aerodromes.tower')}</dt><dd>{fmtMHz(a.tower)}</dd></div>
+      {/if}
       {#if a.tacan}
         <div class="hl"><dt>TACAN</dt><dd>{a.tacan}</dd></div>
       {/if}
-      {#if a.ils?.length}
-        {#each a.ils as ils (ils.runway)}
-          <div class="hl"><dt>ILS {ils.runway}</dt><dd>{fmtMHz(ils.mhz)}</dd></div>
-        {/each}
+      {#if a.vor}
+        <div class="hl"><dt>{$t('aerodromes.vor')}</dt><dd>{a.vor}{a.vorMhz ? ` (${fmtMHz(a.vorMhz)})` : ''}</dd></div>
       {/if}
+      {#if a.rsbn}
+        <div class="hl"><dt>{$t('aerodromes.rsbn')}</dt><dd>{a.rsbn}</dd></div>
+      {/if}
+      {#each a.ils ?? [] as ils, i (i)}
+        <div class="hl"><dt>ILS{ils.runway ? ` ${ils.runway}` : ''}</dt><dd>{fmtMHz(ils.mhz)}</dd></div>
+      {/each}
+      {#each a.prmg ?? [] as prmg, i (i)}
+        <div class="hl"><dt>{$t('aerodromes.prmg')}{prmg.runway ? ` ${prmg.runway}` : ''}</dt><dd>{fmtMHz(prmg.mhz)}</dd></div>
+      {/each}
+      {#each a.ndb ?? [] as ndb, i (i)}
+        <div class="hl"><dt>{$t('aerodromes.ndb')}{ndb.name ? ` ${ndb.name}` : ''}</dt><dd>{ndb.khz ? `${ndb.khz} kHz` : '—'}</dd></div>
+      {/each}
     </dl>
 
     {#if a.charts?.length}
       <p class="charts">{$t('aerodromes.charts')} : {a.charts.length}</p>
     {/if}
+
+    <p class="src" title={a.source === 'dcs' ? $t('aerodromes.source.dcsHint') : $t('aerodromes.source.embeddedHint')}>
+      {a.source === 'dcs' ? $t('aerodromes.source.dcs') : $t('aerodromes.source.embedded')}
+    </p>
 
     <button class="reveal" on:click={reveal}>{$t('aerodromes.showOnMap')}</button>
   </div>
@@ -140,6 +158,13 @@
     margin: 0.6rem 0 0;
     font-size: 0.74rem;
     color: var(--muted);
+  }
+
+  .src {
+    margin: 0.35rem 0 0;
+    font-size: 0.7rem;
+    color: var(--muted);
+    cursor: help;
   }
 
   .reveal {

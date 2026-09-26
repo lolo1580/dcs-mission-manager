@@ -11,19 +11,46 @@ to [semantic versioning](https://semver.org/).
 
 ### Changed
 
+- **Airfield data is no longer transcribed by hand for the Caucasus.** DCS is
+  read first; the curated entry is only used to enrich it.
 - **The manager is now local-only.** It runs on the same Windows machine as DCS.
   The Docker/Linux deployment is removed: `deploy/`, `.dockerignore`,
   `docs/deployment.md`, the `make docker` / `make docker-multiarch` targets and
   the `build.ps1 -Target docker` option are gone, along with every LAN-address and
-  container-port caveat in the documentation. This is what makes the next change
-  possible: a local backend can read DCS's own files, and it removes the whole
-  class of "wrong IP / firewall / port publishing" support questions.
+  container-port caveat in the documentation. This is what makes the airfield
+  reading possible: a local backend can read DCS's own files, and it removes the
+  whole class of "wrong IP / firewall / port publishing" support questions.
 - CI and the release workflow now build and smoke-test **`dcsmm.exe` on Windows**
   rather than a Linux stand-in, so the artifact that is verified is the artifact
   users download.
 
 ### Added
 
+- **Airfields read from DCS itself.** Because the manager is local, it reads the
+  simulator's own terrain files (`Mods/terrains/<map>/radio.lua` and
+  `beacons.lua`) instead of relying on a hand-transcribed dataset. The two files
+  share an identifier (`airfield22_0` = Batumi in both): the first gives the name
+  and the ATC frequency, the second every navigation aid (TACAN, ILS, VOR, RSBN,
+  NDB, PRMG) with real coordinates.
+  - **101 airfields across 5 maps** instead of 21 on one, and *more complete*:
+    DCS declares 6 TACAN and 13 ILS for the Caucasus where the curated dataset
+    had 5 and 10.
+  - The simulator's data is authoritative and updates with each patch; the
+    bundled dataset remains as a fallback (and supplies the ICAO codes, runways,
+    coalitions and charts that DCS does not expose, matched by proximity).
+  - The Airfields tab shows where the data came from ("Read from DCS" vs
+    "Bundled data").
+- **Towns layer.** `Mods/terrains/<map>/map/towns.lua` holds thousands of
+  geolocated settlements (1691 for the Caucasus, 385 for the Persian Gulf). They
+  are exposed as `/api/towns` and can be drawn on the map, giving it context
+  with no mission data at all.
+- **`DCSMM_SAVED_GAMES`** overrides the Saved Games folder. The DCS installation
+  is located through the registry, with a fallback to the `Command line:` line of
+  `Logs/dcs.log`.
+- The Lua parser now understands the constructs DCS data files use: the gettext
+  wrapper `_("…")` and bare enum constants (`BEACON_TYPE_TACAN`,
+  `MODULATIONTYPE_AM`, `VHF_HI`). Without them, reading terrain data is
+  impossible.
 - **Theatre selector and map extent.** The live map now has a theatre selector
   (Caucasus, Syria, Nevada, Persian Gulf, Marianas, Sinai, Kola, Afghanistan,
   Iraq, Falklands, Normandy, The Channel). Choosing one frames the map on that

@@ -140,6 +140,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/analytics/sorties", s.handleSorties)
 	mux.HandleFunc("/api/aerodromes", s.handleAerodromes)
 	mux.HandleFunc("/api/aerodromes/", s.handleAerodrome)
+	mux.HandleFunc("/api/towns", s.handleTowns)
 	mux.HandleFunc("/api/maintenance", s.handleMaintenance)
 	mux.HandleFunc("/api/maintenance/purge", s.handlePurge)
 	mux.Handle("/", s.webHandler())

@@ -128,6 +128,21 @@ func (p *parser) parseValue() (any, error) {
 	if p.eof() {
 		return nil, p.errorf("unexpected end of input, expected a value")
 	}
+	// DCS data files wrap localised strings in the gettext call _("..."), e.g.
+	// callsign = {{["common"] = {_("OMAA"), "OMAA"}}}. Treat it as its argument.
+	if strings.HasPrefix(p.src[p.pos:], "_(") {
+		p.pos += 2
+		p.skipSpace()
+		v, err := p.parseString()
+		if err != nil {
+			return nil, err
+		}
+		p.skipSpace()
+		if !p.consume(')') {
+			return nil, p.errorf("expected ')' to close _(")
+		}
+		return v, nil
+	}
 	switch c := p.src[p.pos]; {
 	case c == '{':
 		return p.parseTable()
@@ -144,9 +159,23 @@ func (p *parser) parseValue() (any, error) {
 	case strings.HasPrefix(p.src[p.pos:], "nil"):
 		p.pos += 3
 		return nil, nil
-	default:
-		return nil, p.errorf("unexpected character %q", string(c))
 	}
+	// A bare identifier is an enum constant from DCS data files
+	// (BEACON_TYPE_VOR_DME, MODULATIONTYPE_AM, VHF_HI…). It is returned as its
+	// own name, which is what the callers need to tell beacon types apart.
+	if c := p.src[p.pos]; isIdentChar(rune(c)) {
+		start := p.pos
+		for p.pos < len(p.src) && isIdentChar(rune(p.src[p.pos])) {
+			p.pos++
+		}
+		return p.src[start:p.pos], nil
+	}
+	return nil, p.errorf("unexpected character %q", string(p.src[p.pos]))
+}
+
+// isIdentChar reports whether c can appear in a Lua identifier.
+func isIdentChar(c rune) bool {
+	return unicode.IsLetter(c) || unicode.IsDigit(c) || c == '_'
 }
 
 func (p *parser) parseTable() (any, error) {

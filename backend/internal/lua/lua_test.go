@@ -28,6 +28,70 @@ neg = -42
 	if got["mission_time"] != 1913.748 {
 		t.Errorf("mission_time = %v", got["mission_time"])
 	}
+
+	// --- DCS data-file constructs -------------------------------------------
+	// These appear in Mods/terrains/<map>/radio.lua and beacons.lua. Without
+	// support for them, reading DCS's own terrain data is impossible.
+	extra := `
+radio = {
+	{
+		radioId = 'airfield12_0';
+		callsign = {{["common"] = {_("Anapa"), "Anapa"}}};
+		frequency = {[VHF_HI] = {MODULATIONTYPE_AM, 121000000.000000}};
+	};
+}
+beacons = {
+	{
+		beaconId = 'airfield12_0';
+		type = BEACON_TYPE_ILS_FAR_HOMER;
+		callsign = 'AP';
+		positionGeo = { latitude = 45.039907, longitude = 37.396435 };
+	};
+}
+`
+	got2, err := Parse([]byte(extra))
+	if err != nil {
+		t.Fatalf("parse DCS constructs: %v", err)
+	}
+
+	radio, ok := got2["radio"].(map[string]any)
+	if !ok {
+		t.Fatalf("radio should be a map, got %T", got2["radio"])
+	}
+	entry, ok := radio["1"].(map[string]any)
+	if !ok {
+		t.Fatalf("radio[1] should be a map, got %T", radio["1"])
+	}
+	if entry["radioId"] != "airfield12_0" {
+		t.Errorf("radioId = %v", entry["radioId"])
+	}
+
+	// _("...") must unwrap to the string, and the enum constant must survive as
+	// its own name so beacon types can be told apart.
+	cs, ok := entry["callsign"].(map[string]any)
+	if !ok {
+		t.Fatalf("callsign should be a map, got %T", entry["callsign"])
+	}
+	first, _ := cs["1"].(map[string]any)
+	lang, _ := first["common"].(map[string]any)
+	if lang["1"] != "Anapa" {
+		t.Errorf("gettext call not unwrapped: %v", lang["1"])
+	}
+
+	freq, _ := entry["frequency"].(map[string]any)
+	band, _ := freq["VHF_HI"].(map[string]any)
+	if band["1"] != "MODULATIONTYPE_AM" {
+		t.Errorf("enum constant lost: %v", band["1"])
+	}
+	if band["2"] != float64(121000000) {
+		t.Errorf("frequency = %v", band["2"])
+	}
+
+	beacons, _ := got2["beacons"].(map[string]any)
+	b, _ := beacons["1"].(map[string]any)
+	if b["type"] != "BEACON_TYPE_ILS_FAR_HOMER" {
+		t.Errorf("beacon type = %v", b["type"])
+	}
 	if got["enabled"] != true {
 		t.Errorf("enabled = %v", got["enabled"])
 	}

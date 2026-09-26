@@ -8,6 +8,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,10 @@ type Config struct {
 	// RevealAllUnits disables fog-of-war filtering. Off by default: a live map
 	// must not reveal units the mission deliberately hides.
 	RevealAllUnits bool
+	// SavedGames is the DCS Saved Games folder, when it could be located. It is
+	// used to find the installation (through Logs\dcs.log) and to read mission
+	// and debrief data. Empty means "not found".
+	SavedGames string
 }
 
 func env(key, def string) string {
@@ -57,6 +62,29 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// savedGamesDir locates the DCS Saved Games folder, honouring an explicit
+// DCSMM_SAVED_GAMES override. It is best-effort: an empty result is normal when
+// DCS is not installed, and callers must cope with it rather than fail.
+func savedGamesDir() string {
+	if v := os.Getenv("DCSMM_SAVED_GAMES"); v != "" {
+		return v
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	base := filepath.Join(home, "Saved Games")
+	// OpenBeta first: a machine usually has only one, and the beta is the one
+	// that is actively used.
+	for _, name := range []string{"DCS.openbeta", "DCS"} {
+		candidate := filepath.Join(base, name)
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
 }
 
 func envInt(key string, def int) int {
@@ -110,5 +138,6 @@ func Load() Config {
 		TrackGrace:     envDuration("DCSMM_TRACK_GRACE", 15*time.Second),
 		TrackRetention: envDuration("DCSMM_TRACK_RETENTION", 24*time.Hour),
 		RevealAllUnits: envBool("DCSMM_REVEAL_ALL_UNITS", false),
+		SavedGames:     savedGamesDir(),
 	}
 }

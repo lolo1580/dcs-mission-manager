@@ -35,7 +35,7 @@ Because it is local, it can read DCS's **own terrain data** — the airfields, f
 | Server control | 🚧 Partial | Chat to DCS (command channel) coming |
 | Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission) |
 | Analytical maps & sortie | ✅ Phase 4 bis | Heatmaps, trails, sortie analysis, ownship telemetry |
-| Aerodromes | ✅ Phase 6 | 21 Caucasus terrains: coordinates, Tower, TACAN, ILS, charts; shown on the map with a click-through data card |
+| Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: 101 airfields across 5 maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, shown on the map with a click-through data card |
 | Fog of war | ✅ Phase 7 | Respects F10 mission options (server-side filtering) |
 
 ### Advanced statistics (planned)
@@ -150,6 +150,7 @@ defaults. None of them is required for a normal install.
 | `DCSMM_TRACK_INTERVAL` | `3` (seconds) | Position sampling frequency |
 | `DCSMM_TRACK_GRACE` | `15` (seconds) | Absence before a unit counts as lost |
 | `DCSMM_TRACK_RETENTION` | `86400` (seconds) | History retention duration |
+| `DCSMM_SAVED_GAMES` | *(auto)* | DCS Saved Games folder, when auto-detection fails |
 | `DCSMM_REVEAL_ALL_UNITS` | `false` | Disables fog of war (broadcast everything; solo/design) |
 | `DCSMM_SOURCE` | *(auto)* | Force the session source: `live` or `test` (see below) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

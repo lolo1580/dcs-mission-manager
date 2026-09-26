@@ -31,6 +31,7 @@ import (
 	"dcsmm/internal/category"
 	"dcsmm/internal/config"
 	"dcsmm/internal/db"
+	"dcsmm/internal/dcsdir"
 	"dcsmm/internal/debriefstore"
 	"dcsmm/internal/ingest"
 	"dcsmm/internal/install"
@@ -393,12 +394,40 @@ func runServer() {
 
 	// ---- HTTP: API + UI ---------------------------------------------------
 	statsService := stats.New(database, classifier)
-	airfields, err := aerodrome.Load()
+
+	// Airfields come from DCS's own terrain files when they can be read, and
+	// fall back to the dataset embedded in the binary otherwise. Reading them is
+	// possible because the manager runs on the same machine as the simulator.
+	dcsInstall := dcsdir.Find(cfg.SavedGames)
+	terrainsDir := dcsdir.TerrainsDir(dcsInstall)
+	if dcsInstall == "" {
+		log.Printf("dcs: installation not found, using the embedded airfield dataset")
+	} else if terrainsDir == "" {
+		log.Printf("dcs: %s has no Mods/terrains, using the embedded airfield dataset", dcsInstall)
+	} else {
+		log.Printf("dcs: installation at %s", dcsInstall)
+	}
+
+	airfields, terrainReports, err := aerodrome.LoadWithDCS(terrainsDir)
 	if err != nil {
 		log.Printf("aerodrome: dataset unavailable: %v", err)
 		airfields = nil
 	} else {
-		log.Printf("aerodrome: %d airfields loaded", airfields.Count())
+		total := 0
+		for _, r := range terrainReports {
+			if r.Error != "" {
+				log.Printf("aerodrome: %s: %s", r.Theatre, r.Error)
+				continue
+			}
+			log.Printf("aerodrome: %s: %d airfields (%d radio, %d beacons, %d towns)",
+				r.Theatre, r.Airfields, r.RadioAirfields, r.BeaconTotal, r.Towns)
+			total += r.Airfields
+		}
+		if len(terrainReports) > 0 {
+			log.Printf("aerodrome: %d airfields read from DCS", total)
+		} else {
+			log.Printf("aerodrome: %d airfields loaded from the embedded dataset", airfields.Count())
+		}
 	}
 	visibilityPolicy := visibility.New(cfg.RevealAllUnits)
 	if cfg.RevealAllUnits {

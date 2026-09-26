@@ -10,6 +10,11 @@ export const aerodromeError = writable('');
 export const search = writable('');
 /** When true, airfield markers are drawn on the map. */
 export const showOnMap = writable(false);
+/** Where the airfield data comes from: "dcs" or "embedded". */
+export const aerodromeSource = writable('');
+/** Settlements of the active theatre (from DCS data), and whether to draw them. */
+export const towns = writable([]);
+export const showTowns = writable(false);
 /**
  * Airfield selected on the map. Set from MapView, consumed by UnitDetails (which
  * shares the map's bottom-right corner with the unit card).
@@ -29,7 +34,10 @@ export const filteredAerodromes = derived(
       (a) =>
         a.name.toLowerCase().includes(q) ||
         a.id.toLowerCase().includes(q) ||
-        (a.tacan || '').toLowerCase().includes(q)
+        (a.icaoCode || '').toLowerCase().includes(q) ||
+        (a.tacan || '').toLowerCase().includes(q) ||
+        (a.vor || '').toLowerCase().includes(q) ||
+        (a.rsbn || '').toLowerCase().includes(q)
     );
   }
 );
@@ -43,8 +51,27 @@ export async function loadAerodromes() {
     if (!res.ok) throw new Error(`${res.status}`);
     const body = await res.json();
     aerodromes.set(body.aerodromes ?? []);
+    aerodromeSource.set(body.source ?? '');
+    loadTowns(th);
   } catch (e) {
     aerodromeError.set(tNow('error.aerodromes', { detail: e.message }));
+  }
+}
+
+/** Loads the settlements of a theatre. Empty when DCS data is unavailable. */
+export async function loadTowns(theatreId) {
+  if (!theatreId) {
+    towns.set([]);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/towns?theatre=${encodeURIComponent(theatreId)}`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const body = await res.json();
+    towns.set(body.towns ?? []);
+  } catch {
+    // Towns are a bonus layer: never surface an error for them.
+    towns.set([]);
   }
 }
 
