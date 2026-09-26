@@ -29,14 +29,14 @@ Because it is local, it can read DCS's **own terrain data** — the airfields, f
 |---|---|---|
 | Real-time live map | ✅ Phase 1 | All objects, categories, filters, trails, search |
 | Basemaps | ✅ Phase 8 | Satellite, Relief, Road, **Aeronautical**, Dark — all key-free |
-| Theatre & extent | ✅ Phase 8 | 12 DCS maps: framing, extent outline, per-theatre airfields |
+| Theatre & extent | ✅ Phase 8 | 15 DCS maps: framing, extent outline, per-theatre airfields |
 | Authentic DCS tiles | 📋 Planned | F10 tile exporter (`tiles/` folder) |
 | Events & players | ✅ Phase 2 | Kills, crashes, chat, players, SQLite history |
 | Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
 | Server control | 🚧 Partial | Chat to DCS (command channel) coming |
 | Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission) |
 | Analytical maps & sortie | ✅ Phase 4 bis | Heatmaps, trails, sortie analysis, ownship telemetry |
-| Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: 101 airfields across 5 maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, shown on the map with a click-through data card |
+| Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **101 airfields listed, 69 mappable** across 5 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, shown on the map with a click-through data card |
 | Fog of war | ✅ Phase 7 | Respects F10 mission options (server-side filtering) |
 
 ### Advanced statistics (planned)
@@ -314,7 +314,7 @@ DCS mission manager/
 - [x] **Phase 4 — Advanced stats**: overview, pilots, weapons, engines, balance, network
 - [x] **Phase 4 bis — Analytical maps & sortie**: heatmaps, trails, telemetry
 - [x] **Phase 5 — Packaging**: CLI, safe Lua injector, single self-contained binary
-- [x] **Phase 6 — Aerodromes**: 21 Caucasus terrains (frequencies, charts)
+- [x] **Phase 6 — Aerodromes**: read from DCS's own terrain files (frequencies, aids, charts)
 - [x] **Phase 7 — Fog of war**: respects the mission's F10 options (server filtering)
 
 The full, detailed plan is available in the project's plan file.

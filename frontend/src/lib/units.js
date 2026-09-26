@@ -113,8 +113,26 @@ export async function fetchTheatres() {
   const meta = await res.json();
   // Cache the theatre list (with its geographic bounds) so the map can frame
   // itself and outline the DCS map extent without another round trip.
-  if (Array.isArray(meta.theatres)) theatres.set(meta.theatres);
+  if (Array.isArray(meta.theatres)) {
+    theatres.set(meta.theatres);
+    validateTheatrePreference(meta.theatres);
+  }
   return meta;
+}
+
+/**
+ * Corrects a stored theatre that no longer exists. An earlier release used
+ * "Marianas" and "Sinai" where DCS says "MarianaIslands" and "SinaiMap"; anyone
+ * who saved one of those would be stuck on an empty theatre, with a selector
+ * showing no matching option.
+ */
+function validateTheatrePreference(list) {
+  if (!list.length) return;
+  const stored = get(theatre);
+  if (!list.some((t) => t.id === stored)) {
+    const fallback = list.find((t) => t.id === 'Caucasus') ?? list[0];
+    theatre.set(fallback.id);
+  }
 }
 
 /** Known DCS theatres, as returned by /api/theatres. */

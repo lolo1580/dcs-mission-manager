@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"dcsmm/internal/aerodrome"
+	"dcsmm/internal/theatre"
 )
 
 // handleAerodromes returns the airfield reference data.
@@ -21,11 +22,13 @@ func (s *Server) handleAerodromes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	theatre := q.Get("theatre")
+	// Follow the published aliases, so a saved preference from an earlier
+	// release ("Marianas", "Sinai") still resolves to the real theatre.
+	theatreID := theatre.Resolve(q.Get("theatre"))
 
 	var list []aerodrome.Aerodrome
-	if theatre != "" {
-		list = s.aerodromes.ByTheatre(theatre)
+	if theatreID != "" {
+		list = s.aerodromes.ByTheatre(theatreID)
 	} else {
 		for _, th := range s.aerodromes.Theatres() {
 			list = append(list, s.aerodromes.ByTheatre(th)...)

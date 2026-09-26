@@ -423,6 +423,13 @@ func runServer() {
 			}
 			log.Printf("aerodrome: %s: %d airfields (%d radio, %d beacons, %d towns)",
 				r.Theatre, r.Airfields, r.RadioAirfields, r.BeaconTotal, r.Towns)
+			// An airfield DCS gives no position for cannot be placed on the map.
+			// Saying so beats letting it vanish silently. Marianas WWII is the
+			// case in point: the terrain ships no beacon data at all.
+			if missing := r.Airfields - r.WithPosition; missing > 0 {
+				log.Printf("aerodrome: %s: %d airfield(s) have no position in DCS data and cannot be mapped",
+					r.Theatre, missing)
+			}
 			for _, d := range r.Dropped {
 				log.Printf("aerodrome: dropped %s", d)
 			}

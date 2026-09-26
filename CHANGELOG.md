@@ -11,6 +11,19 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **Wrong theatre identifiers hid airfields that had been read correctly.** DCS
+  declares `MarianaIslands` and `SinaiMap`; the code used `Marianas` and `Sinai`,
+  so the Marianas' 5 airfields were unreachable while `MarianaIslandsWWII`,
+  `GermanyCW` and `SouthEastAsia` were missing from the list entirely. The ids
+  are now DCS's own (15 theatres), the old spellings still resolve as aliases so
+  a saved preference does not strand anyone on an empty map, and a stored theatre
+  that no longer exists falls back to Caucasus. Covered by `TestDCSIdentifiers`.
+- **An airfield DCS gives no position for is now reported.** 32 of the 101
+  airfields come from a radio entry with no matching beacon, so they have no
+  coordinates and cannot be placed (all 11 of Marianas WWII, 17 of Kola,
+  Novorossiysk and Soganlug in the Caucasus). They were silently unmappable; the
+  startup log now states how many per theatre, so the gap is visible rather than
+  mysterious. **69 airfields are mappable, 101 are listed.**
 - **Authentic DCS tiles could never load.** The tile handler appended ".png" to
   the `y` segment while Leaflet already sends it (the template is
   `/{z}/{x}/{y}.png`), so every request resolved to `11.png.png` and returned

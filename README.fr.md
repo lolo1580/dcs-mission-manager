@@ -33,14 +33,14 @@ d'un jeu de données maintenu à la main.
 |---|---|---|
 | Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
 | Fonds de carte | ✅ Phase 8 | Satellite, Relief, Routier, **Aéronautique**, Sombre — tous sans clé |
-| Théâtre & étendue | ✅ Phase 8 | 12 cartes DCS : cadrage, contour de l'étendue, aérodromes par théâtre |
+| Théâtre & étendue | ✅ Phase 8 | 15 cartes DCS : cadrage, contour de l'étendue, aérodromes par théâtre |
 | Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
 | Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
-| Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : 101 aérodromes sur 5 cartes, avec Tower/TACAN/ILS/VOR/RSBN/NDB, affichés sur la carte avec fiche au clic |
+| Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **101 aérodromes listés, 69 plaçables** sur 5 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, affichés sur la carte avec fiche au clic |
 | Fog of war | ✅ Phase 7 | Respect des options de mission F10 (filtrage côté serveur) |
 
 ### Statistiques avancées (prévues)

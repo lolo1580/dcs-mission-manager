@@ -11,6 +11,22 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **De mauvais identifiants de théâtre masquaient des aérodromes pourtant lus
+  correctement.** DCS déclare `MarianaIslands` et `SinaiMap` ; le code utilisait
+  `Marianas` et `Sinai`, donc les 5 aérodromes des Mariannes étaient
+  inaccessibles, et `MarianaIslandsWWII`, `GermanyCW` et `SouthEastAsia`
+  manquaient purement et simplement. Les identifiants sont désormais ceux de DCS
+  (15 théâtres), les anciennes graphies restent acceptées en alias pour qu'une
+  préférence enregistrée ne bloque personne sur une carte vide, et un théâtre
+  mémorisé qui n'existe plus retombe sur le Caucase. Couvert par
+  `TestDCSIdentifiers`.
+- **Un aérodrome sans position fournie par DCS est maintenant signalé.** 32 des
+  101 aérodromes proviennent d'une entrée radio sans balise correspondante : ils
+  n'ont pas de coordonnées et ne peuvent pas être placés (les 11 de Marianas
+  WWII, 17 de Kola, Novorossiysk et Soganlug au Caucase). Ils étaient
+  silencieusement inutilisables ; le journal de démarrage indique désormais
+  combien par théâtre, pour que l'écart soit visible plutôt que mystérieux.
+  **69 aérodromes sont plaçables, 101 sont listés.**
 - **Les tuiles DCS authentiques ne pouvaient jamais se charger.** Le handler
   ajoutait « .png » au segment `y` alors que Leaflet l'envoie déjà (le template
   est `/{z}/{x}/{y}.png`) : chaque requête aboutissait à `11.png.png` et un 404.
