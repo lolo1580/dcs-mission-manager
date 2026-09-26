@@ -3,6 +3,7 @@
   import Sidebar from './lib/Sidebar.svelte';
   import UnitDetails from './lib/UnitDetails.svelte';
   import AerodromeDetails from './lib/AerodromeDetails.svelte';
+  import ChartViewer from './lib/ChartViewer.svelte';
   import PlayerPanel from './lib/PlayerPanel.svelte';
   import EventPanel from './lib/EventPanel.svelte';
   import ChatPanel from './lib/ChatPanel.svelte';
@@ -199,6 +200,9 @@
     {/if}
   </main>
 </div>
+
+<!-- Modal chart viewer: a scan is displayed whole, on top of everything. -->
+<ChartViewer />
 
 <style>
   .layout {

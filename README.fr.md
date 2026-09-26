@@ -156,6 +156,7 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMM_TRACK_GRACE` | `15` (secondes) | Absence avant de compter une unité comme perdue |
 | `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
 | `DCSMM_SAVED_GAMES` | *(auto)* | Dossier Saved Games de DCS, si la détection échoue |
+| `DCSMM_CHARTS_DIR` | `./maps_dcs` | Scans de cartes aéronautiques (approches, plans de mouvement) |
 | `DCSMM_REVEAL_ALL_UNITS` | `false` | Désactive le fog of war (tout diffuser ; solo/conception) |
 | `DCSMM_SOURCE` | *(auto)* | Force la source de la session : `live` ou `test` (voir plus bas) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

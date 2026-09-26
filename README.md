@@ -152,6 +152,7 @@ defaults. None of them is required for a normal install.
 | `DCSMM_TRACK_GRACE` | `15` (seconds) | Absence before a unit counts as lost |
 | `DCSMM_TRACK_RETENTION` | `86400` (seconds) | History retention duration |
 | `DCSMM_SAVED_GAMES` | *(auto)* | DCS Saved Games folder, when auto-detection fails |
+| `DCSMM_CHARTS_DIR` | `./maps_dcs` | Aeronautical chart scans (approach plates, ground plans) |
 | `DCSMM_REVEAL_ALL_UNITS` | `false` | Disables fog of war (broadcast everything; solo/design) |
 | `DCSMM_SOURCE` | *(auto)* | Force the session source: `live` or `test` (see below) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

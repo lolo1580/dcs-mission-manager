@@ -55,6 +55,10 @@ type Config struct {
 	// used to find the installation (through Logs\dcs.log) and to read mission
 	// and debrief data. Empty means "not found".
 	SavedGames string
+	// ChartsDir is the folder holding aeronautical chart scans (approach plates,
+	// ground plans). They are documents, never shipped: only indexed and
+	// displayed. Empty disables the feature.
+	ChartsDir string
 }
 
 func env(key, def string) string {
@@ -139,5 +143,6 @@ func Load() Config {
 		TrackRetention: envDuration("DCSMM_TRACK_RETENTION", 24*time.Hour),
 		RevealAllUnits: envBool("DCSMM_REVEAL_ALL_UNITS", false),
 		SavedGames:     savedGamesDir(),
+		ChartsDir:      env("DCSMM_CHARTS_DIR", "./maps_dcs"),
 	}
 }

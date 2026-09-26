@@ -23,12 +23,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"dcsmm/internal/aerodrome"
 	"dcsmm/internal/api"
 	"dcsmm/internal/category"
+	"dcsmm/internal/charts"
 	"dcsmm/internal/config"
 	"dcsmm/internal/db"
 	"dcsmm/internal/dcsdir"
@@ -435,7 +437,20 @@ func runServer() {
 	} else {
 		log.Printf("visibility: fog of war enforced (restrictive)")
 	}
-	srv := api.New(cfg, store, liveStore, database, statsService, airfields, visibilityPolicy)
+	// Aeronautical charts live on disk as scans and are never shipped: they are
+	// documents, indexed by name and displayed as-is.
+	chartCatalog, err := charts.Load(cfg.ChartsDir)
+	if err != nil {
+		log.Printf("charts: index unavailable: %v", err)
+		chartCatalog = nil
+	} else if chartCatalog.Count() > 0 {
+		log.Printf("charts: %d charts indexed from %s (%s)",
+			chartCatalog.Count(), cfg.ChartsDir, strings.Join(chartCatalog.Theatres(), ", "))
+	} else {
+		log.Printf("charts: none found in %s (optional)", cfg.ChartsDir)
+	}
+
+	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, visibilityPolicy)
 	// The mission's F10 view options drive fog-of-war filtering.
 	tcpListener.OnOptions = srv.ApplyMissionOptions
 

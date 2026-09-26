@@ -26,6 +26,21 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **Aeronautical charts viewer.** The approach plates, ground plans and
+  procedure charts kept in `maps_dcs/` are indexed by name (file name, kind,
+  runway) and listed on each airfield's data card: choose an airfield, see its
+  charts, click one to read it full screen with zoom, and open it in a tab if
+  wanted. 114 charts across 8 theatres are found in the current folder.
+  - They are matched to an airfield by name, which is how the scans are named
+    ("01_VAD_UG5X_Kobuleti.png", "NORWAY_LAKSELV-ILS-RWY34.jpg"), so the Kola
+    instrument charts work without any extra dataset.
+  - They are shown **as documents**, never overlaid: the scans are not
+    georeferenced and are in a conic projection, so warping them onto the map
+    would be wrong. A note in the viewer says so.
+  - They are never shipped and never redistributed; the folder is local and each
+    scan keeps its own licence. `DCSMM_CHARTS_DIR` changes the folder.
+  - The file endpoint serves only files present in the index, so a crafted URL
+    cannot read anything else.
 - **Aeronautical basemap style.** A fifth basemap, "Aeronautical", renders the
   topographic base in a pale, muted style and shows the airfields as permanent
   chart callouts (name, ICAO, Tower, TACAN, ILS) that appear as the map is zoomed

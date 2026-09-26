@@ -18,6 +18,7 @@ import (
 
 	"dcsmm/internal/aerodrome"
 	"dcsmm/internal/basemap"
+	"dcsmm/internal/charts"
 	"dcsmm/internal/config"
 	"dcsmm/internal/db"
 	"dcsmm/internal/live"
@@ -80,15 +81,17 @@ type Server struct {
 	db         *db.DB
 	stats      *stats.Service
 	aerodromes *aerodrome.Catalog
+	charts     *charts.Catalog
 	visibility *visibility.Policy
 	hub        *hub
 	theatres   []theatre.Theatre
 	tilesDir   string
+	chartsDir  string
 	basemaps   []basemap.Basemap
 }
 
 // New creates a server backed by store. live, database and statsService may be nil.
-func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, vis *visibility.Policy) *Server {
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, vis *visibility.Policy) *Server {
 	theatres := theatre.All()
 	for i := range theatres {
 		theatres[i].Tiles = hasTiles(cfg.TilesDir, theatres[i].ID)
@@ -103,10 +106,12 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		db:         database,
 		stats:      statsService,
 		aerodromes: aerodromes,
+		charts:     chartCatalog,
 		visibility: vis,
 		hub:        newHub(),
 		theatres:   theatres,
 		tilesDir:   cfg.TilesDir,
+		chartsDir:  cfg.ChartsDir,
 		basemaps:   basemap.All(cfg.BasemapURL),
 	}
 }
@@ -141,6 +146,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/aerodromes", s.handleAerodromes)
 	mux.HandleFunc("/api/aerodromes/", s.handleAerodrome)
 	mux.HandleFunc("/api/towns", s.handleTowns)
+	mux.HandleFunc("/api/charts", s.handleCharts)
+	mux.HandleFunc("/api/charts/file/", s.handleChartFile)
 	mux.HandleFunc("/api/maintenance", s.handleMaintenance)
 	mux.HandleFunc("/api/maintenance/purge", s.handlePurge)
 	mux.Handle("/", s.webHandler())

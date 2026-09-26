@@ -1,6 +1,14 @@
 <script>
   import { selectedUnit } from './units.js';
-  import { selectedAerodrome, selectAerodrome, fmtMHz, fmtCoords } from './aerodromes.js';
+  import {
+    selectedAerodrome,
+    selectAerodrome,
+    fmtMHz,
+    fmtCoords,
+    aerodromeCharts,
+    chartsError,
+    viewingChart,
+  } from './aerodromes.js';
   import { revealAerodrome } from './ui.js';
   import { coalitionColor } from './icons.js';
   import { t } from './i18n.js';
@@ -59,8 +67,22 @@
       {/each}
     </dl>
 
-    {#if a.charts?.length}
-      <p class="charts">{$t('aerodromes.charts')} : {a.charts.length}</p>
+    {#if $chartsError}
+      <p class="charts muted">{$chartsError}</p>
+    {:else if $aerodromeCharts.length}
+      <h4>{$t('aerodromes.charts')}</h4>
+      <ul class="charts">
+        {#each $aerodromeCharts as c (c.path)}
+          <li>
+            <button class="chart" on:click={() => viewingChart.set(c)}>
+              <span class="kind">{$t('charts.kind.' + c.kind)}</span>
+              <span class="cname">{c.name}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="charts muted">{$t('aerodromes.noChart')}</p>
     {/if}
 
     <p class="src" title={a.source === 'dcs' ? $t('aerodromes.source.dcsHint') : $t('aerodromes.source.embeddedHint')}>
@@ -155,9 +177,57 @@
   }
 
   .charts {
-    margin: 0.6rem 0 0;
-    font-size: 0.74rem;
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .charts.muted {
+    font-size: 0.72rem;
     color: var(--muted);
+  }
+
+  h4 {
+    margin: 0.7rem 0 0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .chart {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.74rem;
+    text-align: left;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .chart:hover {
+    border-color: var(--blue);
+  }
+
+  .kind {
+    flex: none;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  .cname {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .src {

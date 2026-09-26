@@ -27,6 +27,23 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Visualiseur de cartes aéronautiques.** Les cartes d'approche, plans de
+  mouvement et cartes de procédure conservés dans `maps_dcs/` sont indexés par
+  nom (fichier, type, piste) et listés sur la fiche de chaque aérodrome : on
+  choisit un aérodrome, on voit ses cartes, on clique pour la lire en plein écran
+  avec zoom, et on peut l'ouvrir dans un onglet. 114 cartes sur 8 théâtres sont
+  trouvées dans le dossier actuel.
+  - Elles sont associées à un aérodrome par leur nom, qui est la façon dont les
+    scans sont nommés (« 01_VAD_UG5X_Kobuleti.png »,
+    « NORWAY_LAKSELV-ILS-RWY34.jpg ») : les cartes d'instrument de Kola
+    fonctionnent donc sans jeu de données supplémentaire.
+  - Elles sont affichées **comme documents**, jamais superposées : les scans ne
+    sont pas géoréférencés et sont en projection conique, les déformer sur la
+    carte serait faux. Une note dans le visualiseur le dit.
+  - Elles ne sont ni embarquées ni rediffusées ; le dossier est local et chaque
+    scan garde sa licence. `DCSMM_CHARTS_DIR` change le dossier.
+  - L'endpoint de fichier ne sert que les fichiers présents dans l'index : une
+    URL forgée ne peut donc rien lire d'autre.
 - **Style de carte aéronautique.** Un cinquième fond, « Aéronautique », rend la
   base topographique en version pâle et atténuée, et affiche les aérodromes sous
   forme d'appels cartographiques permanents (nom, OACI, Tower, TACAN, ILS) qui

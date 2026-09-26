@@ -6,7 +6,7 @@
  * A store keeps that free of prop drilling.
  */
 import { writable } from 'svelte/store';
-import { selectedAerodrome } from './aerodromes.js';
+import { selectAerodrome } from './aerodromes.js';
 
 /** Active tab id ('map', 'session', 'debriefs', 'stats', 'analytics', …). */
 export const activeTab = writable('map');
@@ -21,10 +21,13 @@ export const focusRequest = writable(null);
 /**
  * Ask the map to reveal an airfield, switching to the map tab. The airfield is
  * also selected, so its data card opens on arrival.
+ *
+ * It goes through selectAerodrome rather than writing the store directly, so the
+ * side effects (loading the airfield's charts) always run.
  */
 export function revealAerodrome(a) {
   if (!a) return;
-  selectedAerodrome.set(a);
+  selectAerodrome(a);
   activeTab.set('map');
   focusRequest.set(a);
 }
