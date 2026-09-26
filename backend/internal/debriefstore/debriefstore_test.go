@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"dcsmm/internal/db"
 	"dcsmm/internal/model"
@@ -146,6 +147,49 @@ func TestNonDebriefMessageNotHandled(t *testing.T) {
 	a, _ := newAssembler(t)
 	if a.Handle(model.Message{Type: "event", Event: "kill"}) {
 		t.Fatal("event messages should not be handled by the debrief assembler")
+	}
+}
+
+// TestAbandonedTransferIsDropped covers the leak: a transfer whose connection
+// dropped mid-stream used to keep its chunks for the life of the process, since a
+// reconnecting client starts a new transferId.
+func TestAbandonedTransferIsDropped(t *testing.T) {
+	a, _ := newAssembler(t)
+
+	// Half a transfer, then silence.
+	a.Handle(model.Message{
+		Type: "debrief", TransferID: "abandoned", Chunk: 0, Chunks: 4,
+		Data: base64.StdEncoding.EncodeToString([]byte("half")),
+	})
+	if got := a.InFlight(); got != 1 {
+		t.Fatalf("want 1 transfer in flight, got %d", got)
+	}
+
+	// Age it past the TTL, then let the expiry run.
+	a.mu.Lock()
+	a.transfers["abandoned"].lastSeen = time.Now().Add(-2 * transferTTL)
+	a.mu.Unlock()
+	a.ExpireNow()
+
+	if got := a.InFlight(); got != 0 {
+		t.Fatalf("an abandoned transfer should have been dropped, %d still in flight", got)
+	}
+}
+
+// TestInFlightTransfersAreCapped covers the other bound: a flood of incomplete
+// transfers must not grow without limit either.
+func TestInFlightTransfersAreCapped(t *testing.T) {
+	a, _ := newAssembler(t)
+
+	payload := base64.StdEncoding.EncodeToString([]byte("x"))
+	for i := 0; i < maxInFlight+5; i++ {
+		a.Handle(model.Message{
+			Type: "debrief", TransferID: string(rune('a' + i)), Chunk: 0, Chunks: 3,
+			Data: payload,
+		})
+	}
+	if got := a.InFlight(); got > maxInFlight {
+		t.Fatalf("in-flight transfers should be capped at %d, got %d", maxInFlight, got)
 	}
 }
 

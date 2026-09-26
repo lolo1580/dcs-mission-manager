@@ -7,6 +7,7 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"time"
 
 	"dcsmm/internal/db"
 	"dcsmm/internal/debrief"
@@ -32,13 +33,37 @@ type transfer struct {
 	size    int
 	theatre string
 	mission string
+	// lastSeen is when a chunk last arrived, used to expire a transfer whose
+	// connection dropped mid-stream.
+	lastSeen time.Time
 }
+
+// Transfer lifetime limits. A transfer whose TCP connection drops keeps its
+// received chunks forever otherwise, because a reconnecting client starts a new
+// transferId. Neither time nor volume may accumulate without bound.
+const (
+	transferTTL     = 10 * time.Minute
+	maxInFlight     = 16
+	maxTransferSize = 64 << 20 // 64 MiB, well above any real debrief.log
+)
 
 // New creates an assembler writing to database.
 func New(database *db.DB) *Assembler {
 	return &Assembler{
 		db:        database,
 		transfers: make(map[string]*transfer),
+	}
+}
+
+// expire drops transfers that have seen no chunk for too long, and any that
+// grew past the size cap. It must be called with a.mu held.
+func (a *Assembler) expireLocked(now time.Time) {
+	for id, tr := range a.transfers {
+		if now.Sub(tr.lastSeen) > transferTTL {
+			log.Printf("debrief: dropping transfer %s (no chunk for %s, %d/%d received)",
+				id, transferTTL, len(tr.chunks), tr.total)
+			delete(a.transfers, id)
+		}
 	}
 }
 
@@ -55,12 +80,23 @@ func (a *Assembler) Handle(m model.Message) bool {
 		return true
 	}
 
+	now := time.Now()
+
 	a.mu.Lock()
+	a.expireLocked(now)
+
 	tr := a.transfers[m.TransferID]
 	if tr == nil {
+		// A flood of incomplete transfers must not grow without bound either.
+		if len(a.transfers) >= maxInFlight {
+			log.Printf("debrief: refusing transfer %s, %d already in flight", m.TransferID, len(a.transfers))
+			a.mu.Unlock()
+			return true
+		}
 		tr = &transfer{chunks: make(map[int][]byte), total: m.Chunks}
 		a.transfers[m.TransferID] = tr
 	}
+	tr.lastSeen = now
 	tr.chunks[m.Chunk] = raw
 	if m.Chunks > 0 {
 		tr.total = m.Chunks
@@ -73,6 +109,18 @@ func (a *Assembler) Handle(m model.Message) bool {
 	}
 	if m.Name != "" {
 		tr.mission = m.Name
+	}
+
+	// Guard against a transfer that never completes but keeps growing.
+	received := 0
+	for _, c := range tr.chunks {
+		received += len(c)
+	}
+	if received > maxTransferSize {
+		log.Printf("debrief: dropping transfer %s, %d bytes exceeds the cap", m.TransferID, received)
+		delete(a.transfers, m.TransferID)
+		a.mu.Unlock()
+		return true
 	}
 
 	if len(tr.chunks) < tr.total {
@@ -140,4 +188,12 @@ func (a *Assembler) InFlight() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return len(a.transfers)
+}
+
+// ExpireNow drops transfers idle for longer than the TTL. It exists so the
+// expiry can be tested without waiting ten minutes.
+func (a *Assembler) ExpireNow() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.expireLocked(time.Now())
 }
