@@ -9,6 +9,16 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### À venir
+
+- Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,
+  symboles MIL-STD-2525C, visionneuse de kneeboards
+
+## [1.0.0-beta.2] — 2026-09-26
+
+Corrige un premier lancement cassé en beta.1 : le `dcsmm.exe` téléchargé ne
+pouvait pas exécuter `install-lua`.
+
 ### Corrigé
 
 - **`install-lua` ne fonctionnait pas depuis un binaire téléchargé.** Les scripts
@@ -19,11 +29,15 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   `tools/gen-lua-embed.mjs`), le dossier sur disque gardant la priorité en
   développement. Couvert par `TestEmbeddedFallback`, et la CI échoue si
   `dcs-lua/` change sans régénérer la copie embarquée.
+- Bug de séparateur de chemin : `Hooks/dcsmm.lua` se résolvait sous Linux mais
+  `Hooks\dcsmm.lua` échouait sous Windows. Les chemins relatifs sont désormais
+  normalisés avant la résolution.
 
-### À venir
+### Notes
 
-- Autres fonctions inspirées de MizMap / MovingMap : mesure BRA, cercles SAM,
-  symboles MIL-STD-2525C, visionneuse de kneeboards
+- `v1.0.0-beta.1` est remplacée. Son binaire ne pouvait pas installer les scripts
+  Lua : préférez `beta.2`. Le tag est laissé en place plutôt que déplacé, un tag
+  publié devant rester immuable.
 
 ## [1.0.0-beta.1] — 2026-09-26
 
