@@ -11,6 +11,14 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Le bandeau de pause cassait toute la mise en page.** L'ajouter comme
+  quatrième enfant d'une grille qui n'en déclarait que trois lignes le plaçait sur
+  une ligne implicite : la zone principale se retrouvait dimensionnée sur son
+  contenu et le bandeau s'étirait sur toute la page. La mise en page est
+  désormais une colonne flex, qui gère n'importe quel nombre de bandeaux
+  optionnels — ce qu'une grille à nombre de lignes fixe ne peut pas faire.
+  Vérifié avec les deux bandeaux affichés : en-tête 48 px, chaque bandeau 32 px,
+  carte 1133 px, total exactement la hauteur du viewport.
 - **Les options de vue de la mission n'atteignaient jamais le backend : seule ta
   propre coalition était donc affichée.** Deux bugs indépendants dans la même
   chaîne, tous deux trouvés en lançant le jeu pour de vrai :

@@ -214,12 +214,14 @@
 
 <style>
   .layout {
-    display: grid;
-    /* minmax(0, 1fr) stops a wide, non-wrapping header from expanding the grid
-       column and pushing the map (and its overlay cards) off screen. */
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
+    /* A flex column rather than a grid: the banners are optional, so the number
+       of rows varies. A grid with a fixed row count put a fourth child on an
+       implicit row, which sized the main area to its content and gave a banner
+       the whole height. */
+    display: flex;
+    flex-direction: column;
     height: 100%;
+    min-width: 0;
   }
 
   header {
@@ -419,6 +421,10 @@
 
   main {
     display: flex;
+    /* Take all the height the header and the banners leave, and never shrink
+       below the viewport: min-height: 0 is what allows the inner panels to
+       scroll instead of stretching the page. */
+    flex: 1 1 auto;
     min-height: 0;
     min-width: 0;
   }

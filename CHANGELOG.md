@@ -11,6 +11,12 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **The pause banner broke the whole layout.** Adding it as a fourth child of a
+  grid that declared three rows put it on an implicit row, which sized the main
+  area to its content and stretched the banner across the page. The layout is a
+  flex column now, so any number of optional banners is handled — a grid with a
+  fixed row count cannot be. Verified with both banners visible: header 48 px,
+  each banner 32 px, map 1133 px, total exactly the viewport height.
 - **The mission's view options never reached the backend, so only your own
   coalition was ever shown.** Two independent bugs in the same chain, both found
   by running the game for real:
