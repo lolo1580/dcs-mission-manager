@@ -34,6 +34,13 @@
 /tiles/*
 !/tiles/.gitkeep
 
+# Terrain vectors (roads, rivers, borders…) exported from DCS terrain data.
+# Large and reproducible with `dcsmm import-vectors`; only the placeholder is
+# tracked, so a fresh checkout still has the folder the loader looks for.
+/vectors/*
+!/vectors/.gitkeep
+!/vectors/README.md
+
 # Editor / OS
 .vscode/
 .idea/
