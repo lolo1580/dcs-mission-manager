@@ -22,8 +22,7 @@ export const showVectors = writable(false);
 /** One entry per layer, with the label shown in the UI.
  *
  * Order matters: the first match wins, and "railroads" contains "roads", so the
- * longer, more specific names come first. Getting this wrong labelled the
- * railroad layer "Roads" and put two identical entries in the menu.
+ * longer, more specific names come first.
  */
 const LAYER_LABELS = [
   ['railroad', 'Railroads'],
@@ -35,6 +34,25 @@ const LAYER_LABELS = [
   ['roads', 'Roads'],
   ['towns', 'Towns'],
 ];
+
+/**
+ * Layers that add something over the DCS basemap.
+ *
+ * The map's own tiles already draw roads, railroads, rivers, water, urban areas,
+ * borders and settlements: enabling those as vectors paints the same thing twice.
+ * The airfield footprints are the exception — DCS's raster map does not outline
+ * them, so that layer is the one worth offering.
+ *
+ * The importer and the server still handle every layer, so re-offering one is a
+ * one-line change here. They are genuinely useful over a satellite or relief
+ * basemap, where nothing is drawn by the tiles.
+ */
+const USEFUL_LAYERS = ['airbase'];
+
+/** Whether a layer is worth showing in the picker. */
+export function isUsefulLayer(name) {
+  return USEFUL_LAYERS.some((k) => name.toLowerCase().includes(k));
+}
 
 /** Human label for a layer file name. */
 export function layerLabel(name) {
@@ -66,7 +84,9 @@ export async function loadVectors() {
     const res = await fetch(`/api/vectors?theatre=${encodeURIComponent(th)}`);
     if (!res.ok) throw new Error(String(res.status));
     const data = await res.json();
-    const layers = (data.layers ?? []).slice().sort((a, b) => layerRank(a.name) - layerRank(b.name));
+    const layers = (data.layers ?? [])
+      .filter((l) => isUsefulLayer(l.name))
+      .sort((a, b) => layerRank(a.name) - layerRank(b.name));
     vectorLayers.set(layers);
   } catch {
     vectorLayers.set([]);

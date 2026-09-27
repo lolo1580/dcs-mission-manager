@@ -136,7 +136,17 @@
       >
         {$t('app.airfields')}
       </button>
-      {#if $vectorLayers.length}
+      {#if $vectorLayers.length === 1}
+        <!-- A single layer needs no menu: the button is a plain toggle. -->
+        <button
+          class="action"
+          class:on={$showVectors}
+          on:click={() => toggleVector($vectorLayers[0].name)}
+          title={$t('app.vectorsTitle')}
+        >
+          {$t('app.vectors')}
+        </button>
+      {:else if $vectorLayers.length > 1}
         <div class="layers" on:mouseleave={() => (vectorMenu = false)}>
           <button
             class="action"
