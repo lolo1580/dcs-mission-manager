@@ -81,6 +81,13 @@
       const meta = await fetchTheatres();
       basemaps = meta.basemaps ?? [];
       tilesAttribution = meta.tilesAttribution ?? '';
+      // A basemap that no longer exists (an earlier release offered Satellite,
+      // Relief and Road) must not leave the map on a layer it cannot draw.
+      const stored = localStorage.getItem('dcsmm.basemap');
+      if (stored && !basemaps.some((b) => b.id === stored)) {
+        localStorage.removeItem('dcsmm.basemap');
+        basemapId.set(meta.basemap && basemaps.some((b) => b.id === meta.basemap) ? meta.basemap : basemaps[0]?.id ?? 'aero');
+      }
       if (meta.default && !localStorage.getItem('dcsmm.theatre')) {
         theatre.set(meta.default);
       }
@@ -94,7 +101,7 @@
       basemapsStore.set(basemaps);
     }
 
-    applyBasemap($basemapId ?? 'osm');
+    applyBasemap($basemapId ?? 'aero');
     basemapsStore.set(basemaps);
     const unsubBase = basemapId.subscribe(applyBasemap);
     // Stop auto-following as soon as the user pans or zooms manually.

@@ -38,7 +38,7 @@ type Config struct {
 	UnitTTL time.Duration
 	// TilesDir is the directory holding DCS map tiles (per theatre).
 	TilesDir string
-	// Basemap is the default basemap id (satellite, topo, osm, dark).
+	// Basemap is the default basemap id (aero, dark, or a custom one).
 	Basemap string
 	// BasemapURL is an optional custom basemap tile template ({z}/{x}/{y}).
 	BasemapURL string
@@ -145,7 +145,7 @@ func Load() Config {
 		LogLevel:       strings.ToLower(env("DCSMM_LOG_LEVEL", "info")),
 		UnitTTL:        envDuration("DCSMM_UNIT_TTL", 5*time.Second),
 		TilesDir:       env("DCSMM_TILES_DIR", "./tiles"),
-		Basemap:        strings.ToLower(env("DCSMM_BASEMAP", "satellite")),
+		Basemap:        strings.ToLower(env("DCSMM_BASEMAP", "aero")),
 		BasemapURL:     env("DCSMM_BASEMAP_URL", ""),
 		CategoriesFile: env("DCSMM_CATEGORIES", "./categories.json"),
 		MaxUnits:       envInt("DCSMM_MAX_UNITS", 5000),

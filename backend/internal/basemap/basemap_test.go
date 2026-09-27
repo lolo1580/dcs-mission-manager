@@ -4,13 +4,27 @@ import "testing"
 
 func TestAllIncludesBuiltins(t *testing.T) {
 	all := All("")
-	if len(all) < 4 {
-		t.Fatalf("want at least 4 basemaps, got %d", len(all))
+	if len(all) != 2 {
+		t.Fatalf("want exactly 2 built-in basemaps, got %d", len(all))
 	}
-	for _, id := range []string{"satellite", "topo", "osm", "dark"} {
+	for _, id := range []string{"aero", "dark"} {
 		if _, ok := Get(id); !ok {
 			t.Errorf("built-in %q should exist", id)
 		}
+	}
+	// The real-world basemaps were removed on purpose: they say nothing about
+	// the simulator. Keep them from creeping back in.
+	for _, id := range []string{"satellite", "topo", "osm"} {
+		if _, ok := Get(id); ok {
+			t.Errorf("%q should no longer be a built-in basemap", id)
+		}
+	}
+}
+
+// TestDefaultExists checks the configured default is actually offered.
+func TestDefaultExists(t *testing.T) {
+	if _, ok := Get(DefaultID); !ok {
+		t.Fatalf("DefaultID %q is not a built-in basemap", DefaultID)
 	}
 }
 

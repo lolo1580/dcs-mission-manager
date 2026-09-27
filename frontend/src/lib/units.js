@@ -176,7 +176,7 @@ export const showBounds = writable(false);
 
 /** Selected basemap id, persisted across reloads. */
 export const basemapId = writable(
-  (typeof localStorage !== 'undefined' && localStorage.getItem('dcsmm.basemap')) || 'satellite'
+  (typeof localStorage !== 'undefined' && localStorage.getItem('dcsmm.basemap')) || 'aero'
 );
 
 /** Basemaps available from the backend (filled once the map is mounted). */

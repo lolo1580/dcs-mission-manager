@@ -42,35 +42,19 @@ type Basemap struct {
 	ClassName string `json:"className,omitempty"`
 }
 
-// Built-in basemaps, ordered by usefulness for tactical overlays.
+// Built-in basemaps, in the order they are offered.
 //
 // Every entry must be usable without an API key, so that the map keeps working
 // out of the box. Dark mode is therefore implemented as a CSS filter over the
 // standard OSM raster tiles rather than a third-party dark tile service.
+//
+// The list is deliberately short. A satellite image, a relief map and a road map
+// all say nothing about the simulator: they show the real world, where the roads,
+// rivers and towns are not the ones DCS models. The aeronautical style draws the
+// airfields over a chart-like base, and Dark is there for a dark cockpit; the
+// DCS basemap — imported from a DCS-accurate pack — is the one that shows the
+// map as flown. Anything else is reachable through DCSMM_BASEMAP_URL.
 var builtin = []Basemap{
-	{
-		ID:          "satellite",
-		Name:        "Satellite",
-		URL:         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-		Attribution: "Imagery © Esri, Maxar, Earthstar Geographics",
-		MaxZoom:     19,
-	},
-	{
-		ID:          "topo",
-		Name:        "Relief",
-		URL:         "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-		Attribution: "© OpenStreetMap contributors, SRTM | © OpenTopoMap (CC-BY-SA)",
-		MaxZoom:     17,
-		Subdomains:  []string{"a", "b", "c"},
-	},
-	{
-		ID:          "osm",
-		Name:        "Road",
-		URL:         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-		Attribution: "© OpenStreetMap contributors",
-		MaxZoom:     19,
-		Subdomains:  []string{"a", "b", "c"},
-	},
 	{
 		// Aeronautical look: the relief base, which already carries contour
 		// lines, shaded relief and land use — close to what a chart shows — with
@@ -119,7 +103,7 @@ func All(customURL string) []Basemap {
 }
 
 // DefaultID is the basemap used when none is configured.
-const DefaultID = "satellite"
+const DefaultID = "aero"
 
 // Get returns a built-in basemap by id.
 func Get(id string) (Basemap, bool) {
