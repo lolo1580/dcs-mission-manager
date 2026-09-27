@@ -11,6 +11,21 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **La carte live ne recevait rien : `setpayloadsize` n'existe pas dans la
+  LuaSocket de DCS.** La séquence de connexion était `socket.udp()` →
+  `setpayloadsize(65507)` → `setpeername(host, port)`. L'appel du milieu lève une
+  erreur, et comme la connexion passait par un `pcall`, l'erreur était avalée :
+  **`setpeername` n'était jamais atteint**, le socket n'avait donc aucune
+  destination et chaque envoi échouait en silence. Vérifié dans
+  `bin/lua-socket.dll`, où le symbole est absent.
+  - Le socket est désormais configuré défensivement, une connexion ratée est
+    signalée dans `dcs.log` au lieu d'être cachée, et un échec d'envoi est
+    journalisé plutôt qu'avalé. C'est ce silence qui a coûté une session entière.
+  - Les messages « world » sont découpés en lots sous la limite du datagramme,
+    puisque la taille de charge utile par défaut s'applique et qu'un gros message
+    échoue d'emblée.
+  - `tools/check-lua.mjs` analyse les scripts Lua avant une session : une erreur de
+    syntaxe est attrapée ici au lieu de coûter un redémarrage du jeu.
 - **Le bandeau de pause cassait toute la mise en page.** L'ajouter comme
   quatrième enfant d'une grille qui n'en déclarait que trois lignes le plaçait sur
   une ligne implicite : la zone principale se retrouvait dimensionnée sur son

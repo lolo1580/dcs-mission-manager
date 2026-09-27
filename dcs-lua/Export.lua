@@ -79,15 +79,47 @@ do
   local conn
   local nextWorldAt
 
+  -- Largest UDP payload we will build. LuaSocket's send() fails outright when a
+  -- datagram exceeds the socket limit, and DCS's build has no setpayloadsize to
+  -- raise it, so the default applies: world messages are split to fit.
+  local MAX_DATAGRAM = 7000
+
   local function connect()
     conn = socket.udp()
-    conn:setpayloadsize(65507)          -- maximize datagram size
-    conn:setpeername(host, udpPort)
+    -- setpayloadsize does NOT exist in the LuaSocket shipped with DCS. Calling it
+    -- raised an error that aborted connect() before setpeername, leaving the
+    -- socket with no destination: every send then failed silently, which is why
+    -- the map received nothing and no error ever reached the log.
+    if conn and conn.setpayloadsize then
+      pcall(conn.setpayloadsize, conn, 65507)
+    end
+    local ok, err = pcall(conn.setpeername, conn, host, udpPort)
+    if not ok then
+      conn = nil
+      return false, tostring(err)
+    end
+    return true
   end
 
+  local sendFailures = 0
   local function send(payload)
-    if not conn then pcall(connect) end
-    if conn then pcall(function() conn:send(payload) end) end
+    if not conn then
+      local ok = connect()
+      if not ok then
+        if sendFailures == 0 then say("UDP connect failed (" .. host .. ":" .. tostring(udpPort) .. ")") end
+        sendFailures = sendFailures + 1
+        return false
+      end
+    end
+    local ok, err = pcall(conn.send, conn, payload)
+    if not ok then
+      -- Never swallow this again: silence was the real bug.
+      if sendFailures < 3 then say("UDP send failed: " .. tostring(err)) end
+      sendFailures = sendFailures + 1
+      conn = nil -- force a reconnect on the next attempt
+      return false
+    end
+    return true
   end
 
   ---------------------------------------------------------------------------
@@ -143,7 +175,12 @@ do
     local data = getSelf and getSelf() or nil
     if not data or not data.LatLongAlt then return end
 
-    local name = (getPilot and getPilot()) or "Player"
+    -- Name the ownship so the app can identify the player. It used to send only
+    -- the aircraft type, which meant the unit list showed an unnamed aircraft.
+    local okName, pilot = pcall(function()
+      return getPilot and getPilot()
+    end)
+    local name = (okName and pilot) or "Player"
     ownshipLat = data.LatLongAlt.Lat
     ownshipLng = data.LatLongAlt.Long
 
@@ -240,8 +277,23 @@ do
     end
 
     if count == 0 then return end
-    send('{"type":"world","count":' .. count .. ',"units":[' ..
-      table.concat(parts, ",") .. ']}')
+
+    -- Send in batches whose JSON stays under the datagram limit: a single large
+    -- message (hundreds of units) used to fail at the socket level and vanish.
+    local batch, batchBytes = {}, 0
+    local function flush()
+      if #batch == 0 then return end
+      send('{"type":"world","count":' .. #batch .. ',"units":[' .. table.concat(batch, ",") .. ']}')
+      batch, batchBytes = {}, 0
+    end
+
+    for i = 1, count do
+      local part = parts[i]
+      if batchBytes + #part > MAX_DATAGRAM then flush() end
+      batch[#batch + 1] = part
+      batchBytes = batchBytes + #part + 1
+    end
+    flush()
   end
 
   ---------------------------------------------------------------------------
@@ -249,8 +301,12 @@ do
   ---------------------------------------------------------------------------
   function LuaExportStart()
     if not enabled then return end
-    pcall(connect)
-    say("export enabled (" .. host .. ":" .. tostring(udpPort) .. ")")
+    local ok = connect()
+    if ok then
+      say("export enabled (" .. host .. ":" .. tostring(udpPort) .. ")")
+    else
+      say("export FAILED to open the UDP socket (" .. host .. ":" .. tostring(udpPort) .. ")")
+    end
   end
 
   function LuaExportStop()

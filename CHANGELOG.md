@@ -11,6 +11,19 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **The live map received nothing: `setpayloadsize` does not exist in DCS's
+  LuaSocket.** The connect sequence was `socket.udp()` → `setpayloadsize(65507)` →
+  `setpeername(host, port)`. The middle call raises an error, and because connect
+  ran inside a `pcall`, the error was swallowed: **`setpeername` was never
+  reached**, so the socket had no destination and every send failed silently.
+  Verified against `bin/lua-socket.dll`, where the symbol is absent.
+  - The socket is now configured defensively, a failed connect is reported in
+    `dcs.log` instead of hidden, and a send failure is logged rather than
+    swallowed. That silence is what made this take a full session to find.
+  - World messages are split into batches under the datagram limit, since
+    LuaSocket's default payload size applies and a large message fails outright.
+  - `tools/check-lua.mjs` parses the Lua scripts before a session, so a syntax
+    error is caught here rather than costing a game restart.
 - **The pause banner broke the whole layout.** Adding it as a fourth child of a
   grid that declared three rows put it on an implicit row, which sized the main
   area to its content and stretched the banner across the page. The layout is a
