@@ -59,6 +59,12 @@ do
     return
   end
 
+  -- Base64 lives in LuaSocket's "mime" module (mime.b64), not in "socket".
+  -- Requiring it separately is what makes debrief transfer work at all; the
+  -- previous attempt to call socket.base64 always failed and the debrief was
+  -- silently never sent.
+  local mime_ok, mime = pcall(require, "mime")
+
   ---------------------------------------------------------------------------
   -- Persistent TCP connection (automatic reconnection)
   ---------------------------------------------------------------------------
@@ -246,15 +252,17 @@ do
     return data
   end
 
-  -- Base64 encoding (LuaSocket provides it; otherwise we don't send).
+  -- Base64 encoding. LuaSocket provides it through mime.b64; socket.base64 is
+  -- not part of the API. If neither is present we do not send, rather than send
+  -- something the backend cannot decode.
   local function b64(data)
+    if mime_ok and mime and mime.b64 then
+      local ok, v = pcall(mime.b64, data)
+      if ok and v then return v end
+    end
     if socket and socket.base64 then
       local ok, v = pcall(socket.base64, data)
-      if ok then return v end
-    end
-    if mime and mime.b64 then
-      local ok, v = pcall(mime.b64, data)
-      if ok then return v end
+      if ok and v then return v end
     end
     return nil
   end
@@ -300,13 +308,31 @@ do
   function dcsmm.onSimulationStart()
     local name = (Sim and Sim.getMissionName and Sim.getMissionName()) or "?"
     refreshSlotTypes()
-    -- We forward the mission options: the backend needs them to
-    -- respect the mission's visibility rules (fog of war).
+    -- We forward the mission options: the backend needs them to respect the
+    -- mission's visibility rules (fog of war).
+    --
+    -- The API is DCS.getMissionOptions, NOT Sim.getMissionOptions. The latter
+    -- does not exist, so the previous code always failed and sent no options:
+    -- the backend then fell back to its restrictive default and only ever
+    -- displayed the player's own coalition.
     local options = nil
-    if Sim and Sim.getMissionOptions then
-      local ok, opts = pcall(Sim.getMissionOptions)
-      if ok and type(opts) == "table" then options = opts end
+    local optSource = "none"
+    if DCS and DCS.getMissionOptions then
+      local ok, opts = pcall(DCS.getMissionOptions)
+      if ok and type(opts) == "table" then
+        options = opts
+        optSource = "DCS.getMissionOptions"
+      end
     end
+    if not options and Sim and Sim.getMissionOptions then
+      -- Kept as a fallback in case a future build exposes it there.
+      local ok, opts = pcall(Sim.getMissionOptions)
+      if ok and type(opts) == "table" then
+        options = opts
+        optSource = "Sim.getMissionOptions"
+      end
+    end
+
     sendLine(toJson({
       type = "mission",
       phase = "start",
@@ -314,7 +340,11 @@ do
       options = options,
     }))
     sendPlayers()
-    say("mission started: " .. tostring(name))
+    if options then
+      say(string.format("mission started: %s (options from %s)", tostring(name), optSource))
+    else
+      say("mission started: " .. tostring(name) .. " (no mission options available)")
+    end
   end
 
   function dcsmm.onSimulationStop()

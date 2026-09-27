@@ -11,6 +11,23 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Les options de vue de la mission n'atteignaient jamais le backend : seule ta
+  propre coalition était donc affichée.** Deux bugs indépendants dans la même
+  chaîne, tous deux trouvés en lançant le jeu pour de vrai :
+  - le hook appelait `Sim.getMissionOptions`, qui **n'existe pas**. La bonne API
+    est `DCS.getMissionOptions` (`MissionEditor/GameGUI.lua`).
+  - le backend cherchait ensuite `optionsView` à la racine de la table, alors que
+    DCS l'imbrique sous `difficulty`. Il restait donc sur son défaut restrictif,
+    ce qui explique exactement pourquoi seuls les alliés — et en fait seulement
+    ton propre appareil — apparaissaient.
+  Le hook appelle désormais la bonne API, journalise la source utilisée, et le
+  backend accepte les deux formes, imbriquée et à plat. Couvert par
+  `TestOptionStringNested` et `TestApplyMissionOptionsSetsMode`.
+- **Le débrief n'était jamais envoyé.** Le hook cherchait base64 dans
+  `socket.base64`, qui ne fait pas partie de LuaSocket : il se trouve dans le
+  module `mime`. Le journal le disait clairement (« base64 encoding unavailable,
+  debrief not sent ») et le code ne se rabattait sur rien. `mime` est maintenant
+  requis et utilisé en premier.
 - **Mettre DCS en pause enregistrait toutes les unités comme détruites.**
   `LuaExportActivityNextEvent` n'est appelé que tant que le temps de simulation
   avance : une pause arrête donc complètement la télémétrie. Le backend lisait ce

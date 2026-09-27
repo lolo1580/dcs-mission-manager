@@ -10,15 +10,23 @@ import (
 // the fog-of-war policy. It is called from the TCP listener whenever DCS
 // announces a mission with its options.
 //
-// DCS exposes the whole `mission.options` table; the field that matters for
-// visibility is `optionsView`. The complete option set is stored in the live
-// session so it can be surfaced in the UI later.
+// DCS nests the view options under "difficulty":
+//
+//	{ difficulty = { optionsView = "optview_all", ... }, ... }
+//
+// Looking for "optionsView" at the top level (as this used to) never matched, so
+// the mode stayed "unknown" and the map stayed restricted no matter what the
+// mission allowed. The flat form is still accepted, so a future build that
+// flattens the table does not break it again.
 func (s *Server) ApplyMissionOptions(options map[string]any) {
 	if s.live != nil {
 		s.live.SetOptions(options)
 	}
 
-	raw, _ := options["optionsView"].(string)
+	raw := optionString(options, "optionsView")
+	if raw == "" {
+		log.Printf("visibility: no optionsView in the mission options (restrictive default kept)")
+	}
 	mode := visibility.FromDCSOption(raw)
 
 	s.visibility.SetMode(mode)
@@ -33,4 +41,21 @@ func (s *Server) ApplyMissionOptions(options map[string]any) {
 		"type":       "visibility",
 		"visibility": s.visibility.Describe(),
 	})
+}
+
+// optionString reads a string option, looking inside "difficulty" first because
+// that is where DCS puts the view settings, then at the top level.
+func optionString(options map[string]any, key string) string {
+	if options == nil {
+		return ""
+	}
+	if diff, ok := options["difficulty"].(map[string]any); ok {
+		if v, ok := diff[key].(string); ok && v != "" {
+			return v
+		}
+	}
+	if v, ok := options[key].(string); ok {
+		return v
+	}
+	return ""
 }

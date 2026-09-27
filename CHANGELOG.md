@@ -11,6 +11,21 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **The mission's view options never reached the backend, so only your own
+  coalition was ever shown.** Two independent bugs in the same chain, both found
+  by running the game for real:
+  - the hook called `Sim.getMissionOptions`, which **does not exist**. The correct
+    API is `DCS.getMissionOptions` (`MissionEditor/GameGUI.lua`).
+  - the backend then looked for `optionsView` at the top level of the table, but
+    DCS nests it under `difficulty`. It stayed on its restrictive default, which
+    is exactly why only allies — and in fact only your own aircraft — appeared.
+  The hook now calls the right API, logs which source it used, and the backend
+  accepts both nested and flat shapes. Covered by `TestOptionStringNested` and
+  `TestApplyMissionOptionsSetsMode`.
+- **The debrief was never sent.** The hook looked for base64 in `socket.base64`,
+  which is not part of LuaSocket: it lives in the `mime` module. The log said so
+  plainly ("base64 encoding unavailable, debrief not sent") and the code fell
+  back to nothing. `mime` is now required and used first.
 - **Pausing DCS recorded every unit as destroyed.** `LuaExportActivityNextEvent`
   is only called while simulation time advances, so pausing the game stops the
   telemetry entirely. The backend read that silence as "all units vanished" and
