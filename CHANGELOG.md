@@ -11,6 +11,14 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **The map can be shown full screen, and the overlays can be pinned.** A ⤢
+  button hides the header and the side panels so the map fills the window
+  (Escape brings them back, and Leaflet is told to remeasure so it does not keep
+  drawing at the old size). A **Pin** button turns the airfields, terrain and
+  bounds overlays from toggles into part of the map view: their buttons
+  disappear and they stay drawn when switching tabs. Pinned state is remembered
+  across restarts, since it is a statement about the map rather than a momentary
+  look.
 - **DCS terrain vectors can be drawn over the map: roads, railroads, rivers,
   water bodies, urban areas, borders, airfields.** This is the geography that
   exists *in the game*, not a real-world approximation, which is what makes the

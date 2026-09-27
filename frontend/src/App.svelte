@@ -25,7 +25,13 @@
     setTheatre,
     showBounds,
   } from './lib/units.js';
-  import { vectorLayers, showVectors, shownVectors, toggleAllVectors, toggleVector, layerLabel } from './lib/vectors.js';
+  import { vectorLayers, showVectors, shownVectors, toggleAllVectors, toggleVector, layerLabel, overlaysFixed } from './lib/vectors.js';
+  import { onMount, onDestroy } from 'svelte';
+
+  onMount(() => {
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
   import { players, events, mission } from './lib/session.js';
   import { loadAnalytics } from './lib/analytics.js';
   import { showOnMap as showAerodromes } from './lib/aerodromes.js';
@@ -37,9 +43,26 @@
   let history = false;
   /** Whether the terrain-layer menu is open. */
   let vectorMenu = false;
+  /** Whether the map alone fills the window, without the panels around it. */
+  let mapFullscreen = false;
 
   // The tab can be driven by other panels (for example "show on the map").
   activeTab.subscribe((v) => (tab = v));
+
+  // Escape leaves the full-screen map. A window that fills the screen and hides
+  // its own controls needs an obvious way back, and Escape is what every
+  // full-screen view uses.
+  function onKey(e) {
+    if (e.key === 'Escape' && mapFullscreen) mapFullscreen = false;
+  }
+
+  // Leaflet caches the container size; entering or leaving full screen changes
+  // it, so it has to be told or the map keeps the old dimensions.
+  let wasFullscreen = false;
+  $: if (mapFullscreen !== wasFullscreen) {
+    wasFullscreen = mapFullscreen;
+    setTimeout(() => mapView?.resize(), 0);
+  }
 
   function goTo(id) {
     tab = id;
@@ -67,7 +90,8 @@
   }
 </script>
 
-<div class="layout">
+<div class="layout" class:immersive={mapFullscreen && tab === 'map'}>
+  {#if !(mapFullscreen && tab === 'map')}
   <header>
     <strong>{$t('app.title')}</strong>
     <span class="live">
@@ -128,74 +152,80 @@
           </select>
         </label>
       {/if}
-      <button
-        class="action"
-        class:on={$showAerodromes}
-        on:click={() => showAerodromes.update((v) => !v)}
-        title={$t('app.airfieldsTitle')}
-      >
-        {$t('app.airfields')}
-      </button>
-      {#if $vectorLayers.length === 1}
-        <!-- A single layer needs no menu: the button is a plain toggle. -->
+      {#if !$overlaysFixed}
         <button
           class="action"
-          class:on={$showVectors}
-          on:click={() => toggleVector($vectorLayers[0].name)}
-          title={$t('app.vectorsTitle')}
+          class:on={$showAerodromes}
+          on:click={() => showAerodromes.update((v) => !v)}
+          title={$t('app.airfieldsTitle')}
         >
-          {$t('app.vectors')}
+          {$t('app.airfields')}
         </button>
-      {:else if $vectorLayers.length > 1}
-        <div class="layers" on:mouseleave={() => (vectorMenu = false)}>
+      {/if}
+      {#if !$overlaysFixed}
+        {#if $vectorLayers.length === 1}
+          <!-- A single layer needs no menu: the button is a plain toggle. -->
           <button
             class="action"
             class:on={$showVectors}
-            on:click={() => (vectorMenu = !vectorMenu)}
+            on:click={() => toggleVector($vectorLayers[0].name)}
             title={$t('app.vectorsTitle')}
-            aria-expanded={vectorMenu}
           >
             {$t('app.vectors')}
-            {#if $shownVectors.size > 0 && $shownVectors.size < $vectorLayers.length}
-              <span class="count">{$shownVectors.size}</span>
-            {/if}
           </button>
-          {#if vectorMenu}
-            <div class="menu">
-              <label class="item all">
-                <input
-                  type="checkbox"
-                  checked={$shownVectors.size === $vectorLayers.length}
-                  use:indeterminate={$shownVectors.size > 0 && $shownVectors.size < $vectorLayers.length}
-                  on:change={(e) => toggleAllVectors(e.currentTarget.checked)}
-                />
-                {$t('app.vectorsAll')}
-              </label>
-              <div class="sep"></div>
-              {#each $vectorLayers as layer (layer.name)}
-                <label class="item">
+        {:else if $vectorLayers.length > 1}
+          <div class="layers" on:mouseleave={() => (vectorMenu = false)}>
+            <button
+              class="action"
+              class:on={$showVectors}
+              on:click={() => (vectorMenu = !vectorMenu)}
+              title={$t('app.vectorsTitle')}
+              aria-expanded={vectorMenu}
+            >
+              {$t('app.vectors')}
+              {#if $shownVectors.size > 0 && $shownVectors.size < $vectorLayers.length}
+                <span class="count">{$shownVectors.size}</span>
+              {/if}
+            </button>
+            {#if vectorMenu}
+              <div class="menu">
+                <label class="item all">
                   <input
                     type="checkbox"
-                    checked={$shownVectors.has(layer.name)}
-                    on:change={() => toggleVector(layer.name)}
+                    checked={$shownVectors.size === $vectorLayers.length}
+                    use:indeterminate={$shownVectors.size > 0 && $shownVectors.size < $vectorLayers.length}
+                    on:change={(e) => toggleAllVectors(e.currentTarget.checked)}
                   />
-                  {layerLabel(layer.name)}
+                  {$t('app.vectorsAll')}
                 </label>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {:else}
-        <button class="action" disabled title={$t('app.vectorsNone')}>{$t('app.vectors')}</button>
+                <div class="sep"></div>
+                {#each $vectorLayers as layer (layer.name)}
+                  <label class="item">
+                    <input
+                      type="checkbox"
+                      checked={$shownVectors.has(layer.name)}
+                      on:change={() => toggleVector(layer.name)}
+                    />
+                    {layerLabel(layer.name)}
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <button class="action" disabled title={$t('app.vectorsNone')}>{$t('app.vectors')}</button>
+        {/if}
       {/if}
-      <button
-        class="action"
-        class:on={$showBounds}
-        on:click={() => showBounds.update((v) => !v)}
-        title={$t('app.boundsTitle')}
-      >
-        {$t('app.bounds')}
-      </button>
+      {#if !$overlaysFixed}
+        <button
+          class="action"
+          class:on={$showBounds}
+          on:click={() => showBounds.update((v) => !v)}
+          title={$t('app.boundsTitle')}
+        >
+          {$t('app.bounds')}
+        </button>
+      {/if}
       <button
         class="action"
         class:on={history}
@@ -203,6 +233,17 @@
         title={$t('app.historyTitle')}
       >
         {$t('app.history')}
+      </button>
+      <button
+        class="action"
+        class:on={$overlaysFixed}
+        on:click={() => overlaysFixed.update((v) => !v)}
+        title={$t('app.overlaysFixedTitle')}
+      >
+        {$t('app.overlaysFixed')}
+      </button>
+      <button class="action" on:click={() => (mapFullscreen = !mapFullscreen)} title={$t('app.fullscreenTitle')}>
+        {mapFullscreen ? '⤡' : '⤢'}
       </button>
     {:else if tab === 'session'}
       <span class="meta">
@@ -221,15 +262,16 @@
       </select>
     </label>
   </header>
+  {/if}
 
-  {#if $paused && tab === 'map'}
+  {#if $paused && tab === 'map' && !mapFullscreen}
     <div class="pause-banner" title={$t('app.pausedNote')}>
       <span class="pause-icon">⏸</span>
       {$t('app.paused')} — <span class="pause-note">{$t('app.pausedNote')}</span>
     </div>
   {/if}
 
-  {#if $visibility && $visibility.mode !== 'all' && !$visibility.override}
+  {#if $visibility && $visibility.mode !== 'all' && !$visibility.override && !mapFullscreen}
     <div
       class="fog-banner"
       title={$t(`visibility.note.${$visibility.mode}`)}
@@ -241,13 +283,15 @@
     </div>
   {/if}
 
-  <main>
+  <main class:fullscreen={mapFullscreen && tab === 'map'}>
     {#if tab === 'map'}
-      <Sidebar />
+      {#if !mapFullscreen}<Sidebar />{/if}
       <div class="map-wrap">
         <MapView bind:this={mapView} bind:history />
-        <UnitDetails />
-        <AerodromeDetails />
+        {#if !mapFullscreen}
+          <UnitDetails />
+          <AerodromeDetails />
+        {/if}
       </div>
     {:else if tab === 'session'}
       <div class="session">
@@ -610,6 +654,13 @@
     position: relative;
     flex: 1;
     min-width: 0;
+  }
+
+  /* Full-screen map: only the map is left, so it gets the whole window.
+     The header and the panels are removed rather than hidden, so their space is
+     released instead of leaving a gap. */
+  main.fullscreen {
+    flex: 1 1 auto;
   }
 
   .session {

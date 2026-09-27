@@ -19,6 +19,22 @@ export const shownVectors = writable(new Set());
 /** Whether the whole vector overlay is on. */
 export const showVectors = writable(false);
 
+/**
+ * Whether the terrain and airfield overlays are pinned on.
+ *
+ * When on, they stop being toggles and are simply always drawn: the "Terrain"
+ * and "Airfields" buttons disappear, and switching map tabs no longer turns them
+ * off. Persisted, because it expresses an intent about the whole map view rather
+ * than a momentary look.
+ */
+export const overlaysFixed = writable(
+  typeof localStorage !== 'undefined' && localStorage.getItem('dcsmm.overlaysFixed') === '1'
+);
+
+overlaysFixed.subscribe((on) => {
+  if (typeof localStorage !== 'undefined') localStorage.setItem('dcsmm.overlaysFixed', on ? '1' : '0');
+});
+
 /** One entry per layer, with the label shown in the UI.
  *
  * Order matters: the first match wins, and "railroads" contains "roads", so the

@@ -11,6 +11,14 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **La carte peut s'afficher en plein écran, et les calques peuvent être
+  fixés.** Un bouton ⤢ masque l'en-tête et les panneaux latéraux pour que la
+  carte occupe toute la fenêtre (Échap les fait revenir, et Leaflet est prévenu
+  de se remesurer pour ne pas continuer à dessiner à l'ancienne taille). Un
+  bouton **Fixer** transforme les calques aérodromes, terrain et limites en
+  partie intégrante de la vue : leurs boutons disparaissent et ils restent
+  affichés en changeant d'onglet. L'état fixé est mémorisé entre les
+  redémarrages, car il exprime un choix sur la carte et non un coup d'œil.
 - **Les vecteurs de terrain de DCS peuvent être dessinés par-dessus la carte :
   routes, voies ferrées, rivières, plans d'eau, zones urbaines, frontières,
   aérodromes.** C'est la géographie qui existe *dans le jeu*, pas une

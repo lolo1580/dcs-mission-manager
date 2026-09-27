@@ -28,7 +28,7 @@
     showTowns,
   } from './aerodromes.js';
   import { focusRequest } from './ui.js';
-  import { vectorLayers, shownVectors, vectorURL, loadVectors } from './vectors.js';
+  import { vectorLayers, shownVectors, vectorURL, loadVectors, overlaysFixed } from './vectors.js';
 
   /** True when the aeronautical style is active: chart-like labels are used. */
   let aero = false;
@@ -129,6 +129,10 @@
     const unsubBounds = showBounds.subscribe(() => renderBounds());
     const unsubVectors = shownVectors.subscribe(() => renderVectors());
     const unsubVectorList = vectorLayers.subscribe(() => renderVectors());
+    const unsubFixed = overlaysFixed.subscribe(() => {
+      renderVectors();
+      renderAerodromes();
+    });
     const unsubTheatre = theatre.subscribe(() => onTheatreChange());
     const unsubFocus = focusRequest.subscribe((a) => {
       if (a) {
@@ -154,6 +158,7 @@
       unsubBounds?.();
       unsubVectors?.();
       unsubVectorList?.();
+      unsubFixed?.();
       unsubTheatre?.();
       unsubFocus?.();
       stop?.();
@@ -270,9 +275,13 @@
     if (!map) return;
     aerodromeLayer.clearLayers();
 
+    // When the overlays are pinned, the toggle is bypassed: the layer is simply
+    // always drawn, and the UI hides the button that would turn it off.
+    let fixed = false;
+    overlaysFixed.subscribe((v) => (fixed = v))();
     let on = false;
     showAerodromes.subscribe((v) => (on = v))();
-    if (!on) {
+    if (!fixed && !on) {
       map.removeLayer(aerodromeLayer);
       return;
     }
@@ -384,9 +393,12 @@
     shownVectors.subscribe((v) => (shown = v))();
     let layers = [];
     vectorLayers.subscribe((v) => (layers = v))();
+    // Pinned overlays ignore the per-layer selection: every layer is drawn.
+    let fixed = false;
+    overlaysFixed.subscribe((v) => (fixed = v))();
 
     for (const layer of layers) {
-      const want = shown.has(layer.name);
+      const want = fixed || shown.has(layer.name);
       let entry = vectorShapes.get(layer.name);
       if (!want) {
         if (entry) map.removeLayer(entry);
@@ -416,10 +428,13 @@
             interactive: false,
           });
           vectorShapes.set(layer.name, group);
-          // The layer may have been switched off while it was downloading.
+          // The layer may have been switched off (or the mode changed) while it
+          // was downloading, so re-read both sources of truth here.
           let stillWanted = false;
           shownVectors.subscribe((v) => (stillWanted = v.has(layer.name)))();
-          if (stillWanted) {
+          let stillFixed = false;
+          overlaysFixed.subscribe((v) => (stillFixed = v))();
+          if (stillWanted || stillFixed) {
             group.addTo(map);
             group.bringToFront();
           }
@@ -641,6 +656,15 @@
       `${escapeHTML(u.type)}<br/>` +
       `alt ${Math.round(u.alt)} m · cap ${Math.round(u.heading)}°`
     );
+  }
+
+  /**
+   * Tells Leaflet its container changed size. Needed when the map gains or
+   * loses the panels around it: Leaflet caches the size and would otherwise keep
+   * drawing at the old dimensions, leaving grey bands.
+   */
+  export function resize() {
+    map?.invalidateSize();
   }
 
   export function recenter() {
