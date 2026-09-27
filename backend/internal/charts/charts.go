@@ -81,7 +81,6 @@ var theatreHints = []struct {
 	{"afghanistan", "Afghanistan"},
 	{"iraq", "Iraq"},
 	{"germany", "GermanyCW"},
-	{"southeastasia", "SouthEastAsia"},
 }
 
 // Load indexes every chart under dir. A missing directory yields an empty

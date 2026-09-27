@@ -19,16 +19,25 @@ type Theatre struct {
 	// Tiles is true when map tiles are available for this theatre. It is
 	// filled in at runtime by the API layer, which checks the tiles directory.
 	Tiles bool `json:"tiles"`
+	// TileMaxZoom is the highest zoom level present on disk for this theatre,
+	// filled in at runtime. The UI uses it so a detailed tile pack is shown at
+	// its full resolution instead of being capped at an arbitrary level.
+	TileMaxZoom int `json:"tileMaxZoom,omitempty"`
+	// TileMinZoom is the lowest zoom level present on disk. A pack whose tiles
+	// start at zoom 8 shows nothing below that, so the UI must not frame the map
+	// at a wider zoom or the map appears empty.
+	TileMinZoom int `json:"tileMinZoom,omitempty"`
 }
 
 // builtin lists the DCS maps. The IDs are the ones DCS itself uses (declared in
 // each terrain's entry.lua, and visible in the mission file's `theatre` field),
-// so a theatre sent by the simulator always matches a known entry.
+// so a theatre sent by the simulator always matches a known entry. This is the
+// full set of terrains DCS sells, plus Marianas WWII.
 //
 // Getting these wrong is not cosmetic: airfields are indexed by theatre, so a
 // mismatch makes them unreachable even though they were read successfully.
 // "MarianaIslands" and "SinaiMap" are DCS's spellings, not "Marianas" and
-// "Sinai".
+// "Sinai", and the South Atlantic map is "Falklands".
 //
 // Bounds are a FALLBACK only. The real extent is measured from the map's own
 // airfields and settlements at startup (see aerodrome.Catalog.Extent), which is
@@ -49,7 +58,6 @@ var builtin = []Theatre{
 	{ID: "Normandy", Name: "Normandy", Bounds: Bounds{48.5, -2.0, 50.2, 1.5}},
 	{ID: "TheChannel", Name: "The Channel", Bounds: Bounds{50.0, -2.0, 51.6, 3.0}},
 	{ID: "GermanyCW", Name: "Cold War Germany", Bounds: Bounds{47.0, 5.5, 55.5, 15.5}},
-	{ID: "SouthEastAsia", Name: "South East Asia", Bounds: Bounds{8.0, 100.0, 24.0, 112.0}},
 }
 
 // aliases maps the spellings that are not DCS's own onto the real theatre id.

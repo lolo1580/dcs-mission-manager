@@ -20,16 +20,28 @@ func TestGet(t *testing.T) {
 // makes them unreachable even though they were read successfully. "Marianas" and
 // "Sinai" were both wrong, which silently hid 5 airfields of the Marianas.
 func TestDCSIdentifiers(t *testing.T) {
-	// These are the ids DCS declares in each terrain's entry.lua.
+	// These are the ids DCS declares in each terrain's entry.lua: the full set of
+	// terrains DCS sells (plus Marianas WWII, which shares the Marianas id set).
+	// SouthEastAsia is deliberately absent: it is not a DCS terrain, and listing
+	// it advertised a map that cannot be flown.
 	required := []string{
 		"Caucasus", "Syria", "Nevada", "PersianGulf",
 		"MarianaIslands", "MarianaIslandsWWII", "SinaiMap", "Kola",
 		"Afghanistan", "Iraq", "Falklands", "Normandy", "TheChannel",
-		"GermanyCW", "SouthEastAsia",
+		"GermanyCW",
 	}
 	for _, id := range required {
 		if _, ok := Get(id); !ok {
 			t.Errorf("theatre %q must exist: it is the id DCS uses", id)
+		}
+	}
+
+	// A theatre that DCS does not have must not be offered.
+	for _, bogus := range []string{"SouthEastAsia", "Sinai", "Marianas"} {
+		for _, th := range All() {
+			if th.ID == bogus {
+				t.Errorf("%q must not be a theatre id: DCS has no such terrain", bogus)
+			}
 		}
 	}
 

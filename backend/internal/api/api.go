@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"dcsmm/internal/state"
 	"dcsmm/internal/stats"
 	"dcsmm/internal/theatre"
+	"dcsmm/internal/vectors"
 	"dcsmm/internal/visibility"
 )
 
@@ -84,6 +86,7 @@ type Server struct {
 	stats      *stats.Service
 	aerodromes *aerodrome.Catalog
 	charts     *charts.Catalog
+	vectors    *vectors.Catalog
 	visibility *visibility.Policy
 	hub        *hub
 	theatres   []theatre.Theatre
@@ -97,10 +100,13 @@ type Server struct {
 }
 
 // New creates a server backed by store. live, database and statsService may be nil.
-func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, vis *visibility.Policy) *Server {
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, vectorCatalog *vectors.Catalog, vis *visibility.Policy) *Server {
 	theatres := theatre.All()
 	for i := range theatres {
 		theatres[i].Tiles = hasTiles(cfg.TilesDir, theatres[i].ID)
+		if theatres[i].Tiles {
+			theatres[i].TileMinZoom, theatres[i].TileMaxZoom = tileZoomRange(cfg.TilesDir, theatres[i].ID)
+		}
 	}
 	if vis == nil {
 		vis = visibility.New(false)
@@ -113,6 +119,7 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		stats:      statsService,
 		aerodromes: aerodromes,
 		charts:     chartCatalog,
+		vectors:    vectorCatalog,
 		visibility: vis,
 		hub:        newHub(),
 		theatres:   theatres,
@@ -229,6 +236,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/towns", s.handleTowns)
 	mux.HandleFunc("/api/charts", s.handleCharts)
 	mux.HandleFunc("/api/charts/file/", s.handleChartFile)
+	mux.HandleFunc("/api/vectors", s.handleVectors)
+	mux.HandleFunc("/api/vectors/file/", s.handleVectorFile)
 	mux.HandleFunc("/api/maintenance", s.handleMaintenance)
 	mux.HandleFunc("/api/maintenance/purge", s.handlePurge)
 	mux.Handle("/", s.webHandler())
@@ -331,8 +340,9 @@ func (s *Server) stateJSON() ([]byte, error) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status": "ok",
-		"units":  s.store.Count(),
+		"status":  "ok",
+		"service": "dcsmm",
+		"units":   s.store.Count(),
 	})
 }
 
@@ -419,6 +429,8 @@ func (s *Server) handleTheatres(w http.ResponseWriter, _ *http.Request) {
 		"theatres": s.theatres,
 		"basemaps": s.basemaps,
 		"basemap":  s.cfg.Basemap,
+		// Credits the source of the imported map tiles, when the user set one.
+		"tilesAttribution": s.cfg.TilesAttribution,
 	})
 }
 
@@ -483,6 +495,36 @@ func hasTiles(dir, theatreID string) bool {
 	}
 	info, err := os.Stat(filepath.Join(dir, theatreID))
 	return err == nil && info.IsDir()
+}
+
+// tileZoomRange returns the lowest and highest zoom levels present for a
+// theatre. The levels are the numeric directory names directly under the theatre
+// folder (tiles/<theatre>/<z>/...). A zero means "not known".
+func tileZoomRange(dir, theatreID string) (minZ, maxZ int) {
+	entries, err := os.ReadDir(filepath.Join(dir, theatreID))
+	if err != nil {
+		return 0, 0
+	}
+	minZ = -1
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		z, err := strconv.Atoi(e.Name())
+		if err != nil || z < 0 || z > 30 {
+			continue
+		}
+		if minZ < 0 || z < minZ {
+			minZ = z
+		}
+		if z > maxZ {
+			maxZ = z
+		}
+	}
+	if minZ < 0 {
+		minZ = 0
+	}
+	return minZ, maxZ
 }
 
 // handleEvents implements a Server-Sent Events stream.

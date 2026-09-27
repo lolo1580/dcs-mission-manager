@@ -13,11 +13,15 @@
 //   - open flightmaps has no public tile endpoint.
 //   - VFRMAP serves FAA charts, which cover the United States only: a request
 //     for the Caucasus returns an empty placeholder tile.
-//   - DCS itself ships the F10 map imagery (Mods/terrains/<map>/RasterCharts,
-//     around 5 GB). It is georeferenced by DCS, but the georeferencing lives in
-//     a proprietary index (rasterCharts.sup5), the pixels are DDS/DXT5, and the
-//     imagery is Eagle Dynamics' copyrighted work. Re-serving it as a feature is
-//     a different matter from reading factual data such as frequencies.
+//   - DCS itself ships the F10 map imagery (Mods/terrains/<map>/RasterCharts).
+//     The pixels are DDS/DXT5 tiles of 1024x1024, decodable in pure Go, but they
+//     turn out to be overlay layers (roads, rivers, labels) drawn on black, not
+//     the coloured terrain the F10 map shows. The projection problem is solved —
+//     DCS's terrain coordinates are a transverse Mercator, fitted per map from
+//     beacons.lua to a few tens of metres (see docs/terrain-projection.md) — but
+//     the base imagery it would sit on is Eagle Dynamics' copyrighted work, so
+//     re-serving it is a different matter from reading factual data such as
+//     frequencies.
 //
 // The honest conclusion is the "aero" style below: a chart-like rendering of a
 // free topographic base, with the aeronautical content (airfields, navaids,

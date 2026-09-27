@@ -63,6 +63,13 @@ type Config struct {
 	// ground plans). They are documents, never shipped: only indexed and
 	// displayed. Empty disables the feature.
 	ChartsDir string
+	// TilesAttribution credits the source of the imported map tiles. It is shown
+	// in the map's corner when a DCS basemap is active. Tile sets are community
+	// work and several licences require attribution.
+	TilesAttribution string
+	// VectorsDir is the folder holding GeoJSON terrain layers (roads, rivers,
+	// borders…) imported from DCS terrain data. Empty disables the feature.
+	VectorsDir string
 }
 
 func env(key, def string) string {
@@ -148,5 +155,9 @@ func Load() Config {
 		RevealAllUnits: envBool("DCSMM_REVEAL_ALL_UNITS", false),
 		SavedGames:     savedGamesDir(),
 		ChartsDir:      env("DCSMM_CHARTS_DIR", "./maps_dcs"),
+		// Not defaulted to a specific author: the credit belongs to whoever made
+		// the tile set the user installed.
+		TilesAttribution: env("DCSMM_TILES_ATTRIBUTION", ""),
+		VectorsDir:       env("DCSMM_VECTORS_DIR", "./vectors"),
 	}
 }
