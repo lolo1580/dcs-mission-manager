@@ -17,11 +17,18 @@ const (
 	beaconTACAN   = "BEACON_TYPE_TACAN"
 	beaconVOR     = "BEACON_TYPE_VOR"
 	beaconVORDME  = "BEACON_TYPE_VOR_DME"
+	beaconVORTAC  = "BEACON_TYPE_VORTAC"
 	beaconRSBN    = "BEACON_TYPE_RSBN"
 	beaconILS     = "BEACON_TYPE_ILS_LOCALIZER"
 	beaconPRMG    = "BEACON_TYPE_PRMG_LOCALIZER"
 	beaconNDB     = "BEACON_TYPE_AIRPORT_HOMER"
 	beaconNDBMark = "BEACON_TYPE_AIRPORT_HOMER_WITH_MARKER"
+	// A plain homer is a stand-alone non-directional beacon (an ADF the pilot can
+	// tune), and the far/near homers are the outer/inner markers of an ILS. All
+	// three carry an LF frequency and are shown as NDBs.
+	beaconHomer   = "BEACON_TYPE_HOMER"
+	beaconILSFar  = "BEACON_TYPE_ILS_FAR_HOMER"
+	beaconILSNear = "BEACON_TYPE_ILS_NEAR_HOMER"
 )
 
 // Frequency bands, used to reject a navigation aid whose declared frequency
@@ -403,7 +410,7 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 			switch b.kind {
 			case beaconTACAN:
 				a.TACAN = formatTACAN(b.callsign, b.channel)
-			case beaconVOR, beaconVORDME:
+			case beaconVOR, beaconVORDME, beaconVORTAC:
 				mhz := roundMHz(b.hz)
 				if !hasFrequency(b.hz) || inVORband(mhz) {
 					a.VOR = formatTACAN(b.callsign, b.channel)
@@ -412,6 +419,10 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 					}
 				} else {
 					reject(b, "VOR", mhz)
+				}
+				// A VORTAC also carries a TACAN, so the pilot gets both.
+				if b.kind == beaconVORTAC && b.channel > 0 && a.TACAN == "" {
+					a.TACAN = formatTACAN(b.callsign, b.channel)
 				}
 			case beaconRSBN:
 				a.RSBN = b.callsign
@@ -428,7 +439,7 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 				} else {
 					reject(b, "PRMG", mhz)
 				}
-			case beaconNDB, beaconNDBMark:
+			case beaconNDB, beaconNDBMark, beaconHomer, beaconILSFar, beaconILSNear:
 				khz := roundKHz(b.hz)
 				if hasFrequency(b.hz) && inNDBband(khz) {
 					a.NDB = append(a.NDB, NDB{Name: b.callsign, KHz: khz})

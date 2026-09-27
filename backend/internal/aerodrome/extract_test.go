@@ -177,6 +177,108 @@ func TestLoadTerrain(t *testing.T) {
 	}
 }
 
+// TestLoadTerrainReadsEveryBeaconType locks the beacon types DCS actually ships
+// to the fields the UI shows. BEACON_TYPE_HOMER and the ILS far/near homers are
+// plain non-directional beacons (an ADF or the markers of an ILS), not the
+// airport-homer type handled before: leaving them out dropped most of DCS's NDBs
+// (64 of the 164 Caucasus beacons) and every marker of every ILS. A VORTAC is a
+// VOR that also carries a TACAN, so it must fill both fields.
+func TestLoadTerrainReadsEveryBeaconType(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "map"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	beacons := `
+beacons = {
+	{
+		display_name = _('Kobuleti');
+		beaconId = 'airfield1_0';
+		type = BEACON_TYPE_ILS_LOCALIZER;
+		callsign = 'IKO';
+		frequency = 109900000.000000;
+		positionGeo = { latitude = 41.9, longitude = 41.8 };
+	};
+	{
+		display_name = _('Kobuleti');
+		beaconId = 'airfield1_1';
+		type = BEACON_TYPE_ILS_FAR_HOMER;
+		callsign = 'KO';
+		frequency = 443000.000000;
+		channel = 1;
+		positionGeo = { latitude = 41.91, longitude = 41.81 };
+	};
+	{
+		display_name = _('Kobuleti');
+		beaconId = 'airfield1_2';
+		type = BEACON_TYPE_ILS_NEAR_HOMER;
+		callsign = 'K';
+		frequency = 215000.000000;
+		positionGeo = { latitude = 41.905, longitude = 41.805 };
+	};
+	{
+		display_name = _('Kobuleti');
+		beaconId = 'airfield1_3';
+		type = BEACON_TYPE_HOMER;
+		callsign = 'KB';
+		frequency = 682000.000000;
+		positionGeo = { latitude = 41.92, longitude = 41.82 };
+	};
+	{
+		display_name = _('AlDhafra');
+		beaconId = 'airfield4_0';
+		type = BEACON_TYPE_VORTAC;
+		callsign = 'MA';
+		frequency = 114900000.000000;
+		channel = 96;
+		positionGeo = { latitude = 24.24, longitude = 54.54 };
+	};
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "beacons.lua"), []byte(beacons), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	terrain, err := LoadTerrain(dir, "Caucasus")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	// Without radio.lua there is no callsign, so the airfields keep their DCS
+	// numeric id (A1, A4) — the beacons are still matched by airfield number.
+	byID := map[string]Aerodrome{}
+	for _, a := range terrain.Airfields {
+		byID[a.ID] = a
+	}
+
+	kobuleti, ok := byID["A1"]
+	if !ok {
+		t.Fatalf("airfield 1 missing, got %+v", byID)
+	}
+	// 443, 215 and 682 kHz — the far homer, the near homer and the plain homer.
+	got := map[float64]bool{}
+	for _, n := range kobuleti.NDB {
+		got[n.KHz] = true
+	}
+	for _, want := range []float64{443, 215, 682} {
+		if !got[want] {
+			t.Errorf("airfield 1 NDBs = %+v, missing %v kHz", kobuleti.NDB, want)
+		}
+	}
+	if len(kobuleti.ILS) != 1 || kobuleti.ILS[0].MHz != 109.9 {
+		t.Errorf("airfield 1 ILS = %+v, want 109.9 MHz", kobuleti.ILS)
+	}
+
+	aldhafra, ok := byID["A4"]
+	if !ok {
+		t.Fatalf("airfield 4 missing, got %+v", byID)
+	}
+	if aldhafra.VOR != "96X MA" || aldhafra.VORMHz != 114.9 {
+		t.Errorf("airfield 4 VOR = %q / %v MHz, want 96X MA / 114.9", aldhafra.VOR, aldhafra.VORMHz)
+	}
+	if aldhafra.TACAN != "96X MA" {
+		t.Errorf("a VORTAC should also provide the TACAN, got %q", aldhafra.TACAN)
+	}
+}
+
 // TestAirfieldNumber covers the id parsing that joins the two files.
 func TestAirfieldNumber(t *testing.T) {
 	cases := map[string]int{
