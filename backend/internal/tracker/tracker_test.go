@@ -100,13 +100,18 @@ func TestTickSamplesPositions(t *testing.T) {
 }
 
 func TestTickDetectsLoss(t *testing.T) {
-	tr, database, _ := setup(t)
+	tr, database, store := setup(t)
 	// A zero grace means any unit missing from this tick is reported.
 	tr.grace = 0
 
-	// Unit 1 was seen a while ago and is no longer reported.
-	tr.seen["1"] = sampleAt("1", time.Now().Add(-time.Second).UnixMilli())
+	// A real sequence: the unit is reported, sampled, then disappears.
+	store.Update(&state.Unit{ID: "1", Type: "F-16C_50", Category: "plane", Lat: 42, Lng: 41})
+	tr.Tick()
+	if _, tracked := tr.seen["1"]; !tracked {
+		t.Fatal("the unit should have been sampled")
+	}
 
+	store.Remove("1")
 	tr.Tick()
 
 	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
@@ -128,6 +133,44 @@ func TestTickDetectsLoss(t *testing.T) {
 	after, _ := database.Heatmap(tr.missionID, "losses", 0.05, 100)
 	if len(after) != before {
 		t.Fatalf("loss reported twice: %d -> %d", before, len(after))
+	}
+}
+
+// TestPausedFeedDoesNotReportLosses covers the pause bug: DCS stops calling the
+// export script while the simulation is paused, so the feed goes silent. That
+// silence used to be read as "every unit vanished", recording a batch of losses
+// at every pause.
+func TestPausedFeedDoesNotReportLosses(t *testing.T) {
+	tr, database, store := setup(t)
+	tr.grace = 0
+
+	store.Update(&state.Unit{ID: "1", Type: "F-16C_50", Category: "plane", Lat: 42, Lng: 41})
+	tr.Tick()
+
+	// The simulator pauses: no telemetry arrives, and the store expires the unit.
+	// Simulate the expiry by rewinding the feed, then removing the unit.
+	store.Remove("1")
+	store.SimulateSilence(time.Minute + time.Second)
+
+	tr.Tick()
+
+	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
+	if err != nil {
+		t.Fatalf("heatmap: %v", err)
+	}
+	if len(points) != 0 {
+		t.Fatalf("a paused simulator must not produce losses, got %d", len(points))
+	}
+	// The tracked state is kept, so the map resumes where it left off.
+	if _, tracked := tr.seen["1"]; !tracked {
+		t.Error("a pause must not discard the tracked units")
+	}
+
+	// When telemetry returns, tracking resumes normally.
+	store.Update(&state.Unit{ID: "1", Type: "F-16C_50", Category: "plane", Lat: 42.1, Lng: 41.1})
+	tr.Tick()
+	if _, tracked := tr.seen["1"]; !tracked {
+		t.Error("tracking should resume once telemetry returns")
 	}
 }
 

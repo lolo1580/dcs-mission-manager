@@ -50,6 +50,13 @@ type Store struct {
 	units map[string]*Unit
 	ttl   time.Duration
 	max   int
+	// lastUpdate is when any unit was last written. It is what tells a paused
+	// simulator apart from a genuine end of export: DCS stops calling the export
+	// script entirely while the simulation is paused, so the feed goes silent
+	// without the mission ending.
+	lastUpdate time.Time
+	// everUpdated records whether any unit has ever been stored.
+	everUpdated bool
 }
 
 // New creates a store whose entries expire after ttl. A non-positive ttl
@@ -60,6 +67,43 @@ func New(ttl time.Duration, max int) *Store {
 		ttl:   ttl,
 		max:   max,
 	}
+}
+
+// FeedStopped reports whether the telemetry feed has gone quiet. DCS pauses the
+// whole export while the simulation is paused, so silence longer than the unit
+// TTL means "no data is coming", not "the units are gone".
+//
+// A caller must not treat a stopped feed as a mass destruction: doing so records
+// every unit as lost, which is exactly what a pause used to produce.
+func (s *Store) FeedStopped() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.everUpdated {
+		return true // nothing has ever arrived
+	}
+	if s.ttl <= 0 {
+		return false // no TTL configured: cannot judge
+	}
+	return time.Since(s.lastUpdate) > s.ttl
+}
+
+// FeedAge returns how long ago telemetry last arrived, and whether any ever did.
+func (s *Store) FeedAge() (time.Duration, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.everUpdated {
+		return 0, false
+	}
+	return time.Since(s.lastUpdate), true
+}
+
+// SimulateSilence makes the feed look as if nothing had arrived for the given
+// duration. It exists so the pause behaviour can be tested without waiting.
+func (s *Store) SimulateSilence(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastUpdate = time.Now().Add(-d)
+	s.everUpdated = true
 }
 
 // Update inserts or replaces the state of a unit. It returns false if the unit
@@ -74,7 +118,10 @@ func (s *Store) Update(u *Unit) bool {
 	if _, known := s.units[u.ID]; !known && s.max > 0 && len(s.units) >= s.max {
 		return false
 	}
-	u.UpdatedAt = time.Now()
+	now := time.Now()
+	u.UpdatedAt = now
+	s.lastUpdate = now
+	s.everUpdated = true
 	s.units[u.ID] = u
 	return true
 }

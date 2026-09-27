@@ -11,6 +11,17 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **Pausing DCS recorded every unit as destroyed.** `LuaExportActivityNextEvent`
+  is only called while simulation time advances, so pausing the game stops the
+  telemetry entirely. The backend read that silence as "all units vanished" and
+  wrote a batch of losses at every pause — polluting the analytics and the loss
+  map. The tracker now samples nothing and declares nothing lost while the feed
+  is stopped, and keeps its tracked state so the map resumes where it left off.
+  Covered by `TestPausedFeedDoesNotReportLosses`.
+  - The state is now surfaced instead of being silent: the session frame carries
+    `paused` and `feedAgeMs`, and the map shows a banner explaining that the
+    simulation is not advancing. Without it, a paused game looked like a broken
+    app, which is exactly how it was first reported.
 - **The map extents were wrong for every theatre, and are now measured instead of
   guessed.** The bounds were literals typed by hand, and comparing them with
   DCS's own data showed they were wrong everywhere: Kola really spans 11.7 to

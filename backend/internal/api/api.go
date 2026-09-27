@@ -266,6 +266,12 @@ func (s *Server) sessionJSON() ([]byte, error) {
 		"events":  s.live.Events(),
 		"players": s.live.Players(),
 		"chat":    s.live.Chat(),
+		// A paused simulator stops sending telemetry entirely. Reporting it lets
+		// the UI say so instead of looking broken.
+		"paused": s.store.FeedStopped(),
+	}
+	if age, ok := s.store.FeedAge(); ok {
+		payload["feedAgeMs"] = age.Milliseconds()
 	}
 	if m, ok := s.live.Mission(); ok {
 		payload["mission"] = m

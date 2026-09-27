@@ -50,6 +50,8 @@ const en = {
   'app.theatreTitle': 'DCS theatre: frames the map and lists its airfields',
   'app.bounds': 'Bounds',
   'app.boundsTitle': 'Outline the DCS map extent',
+  'app.paused': 'DCS paused',
+  'app.pausedNote': 'The simulation is not advancing, so no telemetry is sent. Resume the game to get updates.',
   'app.airfields': 'Airfields',
   'app.airfieldsTitle': 'Show the theatre airfields on the map (click one for its data)',
 
@@ -294,6 +296,8 @@ const fr = {
   'app.theatreTitle': 'Théâtre DCS : cadre la carte et liste ses aérodromes',
   'app.bounds': 'Limites',
   'app.boundsTitle': 'Contour de la carte DCS',
+  'app.paused': 'DCS en pause',
+  'app.pausedNote': "La simulation n'avance pas, aucune télémétrie n'est envoyée. Reprends la partie pour recevoir des mises à jour.",
   'app.airfields': 'Aérodromes',
   'app.airfieldsTitle': 'Afficher les aérodromes du théâtre sur la carte (cliquer pour les données)',
 

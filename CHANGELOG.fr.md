@@ -11,6 +11,18 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Mettre DCS en pause enregistrait toutes les unités comme détruites.**
+  `LuaExportActivityNextEvent` n'est appelé que tant que le temps de simulation
+  avance : une pause arrête donc complètement la télémétrie. Le backend lisait ce
+  silence comme « toutes les unités ont disparu » et écrivait un lot de pertes à
+  chaque pause — polluant l'analyse et la carte des pertes. Le tracker
+  n'échantillonne plus rien et ne déclare plus aucune perte tant que le flux est
+  arrêté, et conserve son état de suivi pour que la carte reprenne où elle
+  s'était arrêtée. Couvert par `TestPausedFeedDoesNotReportLosses`.
+  - L'état est désormais exposé au lieu d'être muet : la trame de session porte
+    `paused` et `feedAgeMs`, et la carte affiche un bandeau expliquant que la
+    simulation n'avance pas. Sans cela, un jeu en pause ressemblait à une
+    application cassée — exactement la façon dont le problème a été signalé.
 - **Les étendues des cartes étaient fausses pour tous les théâtres, et sont
   désormais mesurées au lieu d'être devinées.** Les bornes étaient des littéraux
   saisis à la main, et la comparaison avec les données de DCS montre qu'ils

@@ -241,6 +241,15 @@ func (t *Tracker) Tick() {
 		return
 	}
 
+	// A paused simulator stops calling the export script entirely, so the feed
+	// goes silent. Treating that as "every unit vanished" recorded a batch of
+	// losses every time the game was paused. Nothing is sampled and nothing is
+	// declared lost while the feed is stopped; the tracked state is kept so the
+	// map resumes exactly where it left off.
+	if t.store.FeedStopped() {
+		return
+	}
+
 	missionID := t.currentMissionID()
 
 	seenNow := make(map[string]bool, len(units))

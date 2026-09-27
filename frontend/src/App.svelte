@@ -19,6 +19,7 @@
     basemaps,
     basemapId,
     visibility,
+    paused,
     theatres,
     theatre,
     setTheatre,
@@ -152,6 +153,13 @@
       </select>
     </label>
   </header>
+
+  {#if $paused && tab === 'map'}
+    <div class="pause-banner" title={$t('app.pausedNote')}>
+      <span class="pause-icon">⏸</span>
+      {$t('app.paused')} — <span class="pause-note">{$t('app.pausedNote')}</span>
+    </div>
+  {/if}
 
   {#if $visibility && $visibility.mode !== 'all' && !$visibility.override}
     <div
@@ -424,6 +432,25 @@
     color: #f0b429;
     background: color-mix(in srgb, #f0b429 12%, var(--panel));
     border-bottom: 1px solid var(--border);
+  }
+
+  .pause-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.78rem;
+    color: #9aa4b2;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pause-icon {
+    font-size: 0.9rem;
+  }
+
+  .pause-note {
+    color: var(--muted);
   }
 
   .fog-banner.fog {

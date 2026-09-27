@@ -13,6 +13,12 @@ export const lastUpdate = writable(null);
 /** Fog-of-war policy reported by the backend. */
 export const visibility = writable({ mode: 'unknown', label: '—', override: false });
 
+/**
+ * True when DCS has stopped sending telemetry, which happens when the
+ * simulation is paused: the export script is only called while time advances.
+ */
+export const paused = writable(false);
+
 /** @type {import('svelte/store').Writable<string|null>} */
 export const selectedId = writable(null);
 
@@ -84,6 +90,9 @@ export function connect() {
         if (msg.players) players.set(msg.players);
         if (msg.chat) chat.set(msg.chat);
         mission.set(msg.mission ?? null);
+        // A paused simulator sends nothing at all; say so rather than looking
+        // like a broken app.
+        paused.set(Boolean(msg.paused));
         sessionRev.update((n) => n + 1);
         return;
       }
