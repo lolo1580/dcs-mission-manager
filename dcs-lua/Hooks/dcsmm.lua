@@ -96,12 +96,42 @@ do
     end)
   end
 
+  -- Sends every byte of data, never just the first part.
+  --
+  -- LuaSocket's send() may write only a fraction of the buffer and still return
+  -- success. The previous code checked only "not ok", so a partial write looked
+  -- like a success and the rest of the line was dropped: the backend never saw
+  -- the closing newline and discarded the message as incomplete. A 25 KB debrief
+  -- line is exactly the kind of message that gets cut this way.
+  local function sendAll(data)
+    local n = #data
+    local i = 1
+    while i <= n do
+      local last, err, partial = conn:send(data, i)
+      if last and last >= i then
+        i = last + 1
+      elseif type(partial) == "number" and partial >= i then
+        i = partial + 1
+      else
+        return false, err or "send failed"
+      end
+    end
+    return true
+  end
+
+  local sendFailures = 0
   local function sendLine(line)
     if not conn and not connect() then
       return false
     end
-    local ok, err = conn:send(line .. "\n")
+    local ok, err = sendAll(line .. "\n")
     if not ok then
+      -- Report it: silence is what hid the loss of the debrief and of the
+      -- mission-end message.
+      if sendFailures < 3 then
+        say("TCP send failed: " .. tostring(err))
+      end
+      sendFailures = sendFailures + 1
       pcall(function() conn:close() end)
       conn = nil
       return false
@@ -287,7 +317,9 @@ do
         say("base64 encoding unavailable, debrief not sent")
         return
       end
-      sendLine(toJson({
+      -- A chunk that cannot be written is a failure to report, not something to
+      -- announce as sent: that false "debrief sent" is what hid the loss.
+      if not sendLine(toJson({
         type = "debrief",
         transferId = transferId,
         chunk = i,
@@ -295,7 +327,10 @@ do
         size = #data,
         name = missionName,
         data = encoded,
-      }))
+      })) then
+        say(string.format("debrief chunk %d/%d could not be sent", i + 1, chunks))
+        return
+      end
     end
     say(string.format("debrief sent (%d bytes, %d chunks)", #data, chunks))
   end

@@ -309,6 +309,111 @@ func TestExtractBlockMissing(t *testing.T) {
 	}
 }
 
+// TestSpliceBlockRepairsDuplicateBlocks covers the real-world file produced by an
+// older installer whose marker punctuation no longer matched: the block was
+// appended a second time instead of replacing the first. Both defined the same
+// Lua globals, and the duplicates had to be collapsed to a single block.
+func TestSpliceBlockRepairsDuplicateBlocks(t *testing.T) {
+	existing := "before\n" +
+		BeginMarker + "\nold-a\n" + EndMarker + "\n" +
+		"middle\n" +
+		BeginMarker + "\nold-b\n" + EndMarker + "\n" +
+		"after\n"
+	block := BeginMarker + "\nnew\n" + EndMarker
+
+	out, changed := spliceBlock(existing, block)
+	if !changed {
+		t.Fatal("expected a change")
+	}
+	if strings.Contains(out, "old-a") || strings.Contains(out, "old-b") {
+		t.Fatal("both old blocks must be removed")
+	}
+	if strings.Count(out, BeginMarker) != 1 || strings.Count(out, EndMarker) != 1 {
+		t.Fatalf("expected exactly one block, got: %q", out)
+	}
+	for _, keep := range []string{"before", "middle", "after", "new"} {
+		if !strings.Contains(out, keep) {
+			t.Fatalf("surrounding content %q must be preserved", keep)
+		}
+	}
+	want := "before\n" + block + "\nmiddle\nafter\n"
+	if out != want {
+		t.Fatalf("unexpected collapse:\n got: %q\nwant: %q", out, want)
+	}
+}
+
+// TestSpliceBlockToleratesDamagedMarkerPunctuation covers a marker that went
+// through an encoding round-trip: the em dash became "â€"". The keyword is still
+// recognisable, so the block is repaired rather than duplicated again.
+func TestSpliceBlockToleratesDamagedMarkerPunctuation(t *testing.T) {
+	damagedBegin := "-- >>> DCSMM-BEGIN (managed block \xc3\xa2\xc2\x80\xc2\x94 do not edit by hand) >>>"
+	if damagedBegin == BeginMarker {
+		t.Fatal("the damaged marker must differ from the current one")
+	}
+
+	existing := "keep-me\n" + damagedBegin + "\nstale\n" + EndMarker + "\n"
+	block := BeginMarker + "\nfresh\n" + EndMarker
+
+	out, changed := spliceBlock(existing, block)
+	if !changed {
+		t.Fatal("expected a change")
+	}
+	if strings.Contains(out, "stale") {
+		t.Fatal("the stale block must be replaced")
+	}
+	if !strings.Contains(out, "fresh") || !strings.Contains(out, "keep-me") {
+		t.Fatalf("unexpected result: %q", out)
+	}
+	if strings.Count(out, beginKeyword) != 1 {
+		t.Fatalf("expected a single managed block, got: %q", out)
+	}
+}
+
+// TestSpliceBlockIgnoresKeywordInCode guards the safety rule: a mere mention of
+// the keyword in real Lua code must never be treated as a block boundary.
+func TestSpliceBlockIgnoresKeywordInCode(t *testing.T) {
+	existing := "local s = \"DCSMM-BEGIN is just a string\"\nlocal t = \"DCSMM-END\"\n"
+	block := BeginMarker + "\nnew\n" + EndMarker
+
+	out, changed := spliceBlock(existing, block)
+	if !changed {
+		t.Fatal("expected the block to be appended")
+	}
+	if !strings.Contains(out, "just a string") {
+		t.Fatal("the user's code must be preserved")
+	}
+	if strings.Count(out, BeginMarker) != 1 {
+		t.Fatalf("expected exactly one real block, got: %q", out)
+	}
+}
+
+// TestUninstallRemovesEveryBlock covers the same duplicate-block file: removal
+// must not leave a stale block behind to keep defining the Lua globals.
+func TestUninstallRemovesEveryBlock(t *testing.T) {
+	in, sg := setup(t)
+
+	existing := "Tacview\n" +
+		BeginMarker + "\nold-a\n" + EndMarker + "\n" +
+		BeginMarker + "\nold-b\n" + EndMarker + "\n"
+	mustWrite(t, filepath.Join(sg, "Scripts", "Export.lua"), existing)
+
+	if _, err := in.Uninstall(); err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(sg, "Scripts", "Export.lua"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(got)
+	if strings.Contains(content, beginKeyword) || strings.Contains(content, endKeyword) {
+		t.Fatalf("every block should be gone, got: %q", content)
+	}
+	if !strings.Contains(content, "Tacview") {
+		t.Fatal("the surrounding content must be preserved")
+	}
+}
+
 // TestEmbeddedFallback covers the released-binary case: no dcs-lua folder next
 // to the executable, so the scripts must come from the embedded copies. This
 // guards the regression where a lone dcsmm.exe could not install anything.

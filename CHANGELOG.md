@@ -11,6 +11,27 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **The debrief and the mission-end message were lost: `conn:send` only wrote part
+  of the line, and the partial write looked like success.** LuaSocket's `send`
+  may write a fraction of the buffer and still return a value, so the code's
+  `if not ok` check passed while the rest of the line — including the closing
+  newline — was dropped. The backend, reading newline-delimited JSON, discarded
+  the incomplete line as malformed. The log said "debrief sent" because the
+  message had merely been *attempted*.
+  - Sends now loop until every byte is written, and a real failure is reported in
+    `dcs.log` instead of being announced as sent. Reproduced end to end: the same
+    debrief sent by hand over the same socket is stored correctly, which is how
+    the transport, not the parser, was identified as the culprit.
+- **Installing on top of an older marker appended a second block instead of
+  updating the first.** A file written by an earlier installer carried a marker
+  whose punctuation had been damaged by an encoding round-trip (the em dash had
+  become `â€"`), so the byte-for-byte search no longer matched it and the block
+  was appended again. Both blocks defined the same Lua globals, and the older one
+  kept the `setpayloadsize` bug. The installer now recognises a block by its
+  keyword on a comment line, collapses duplicates into a single block, keeps the
+  content between them, and removes every block on uninstall. Covered by tests,
+  including one that a keyword merely mentioned in user code is never taken for a
+  block boundary — a mistake there would delete real content.
 - **The live map received nothing: `setpayloadsize` does not exist in DCS's
   LuaSocket.** The connect sequence was `socket.udp()` → `setpayloadsize(65507)` →
   `setpeername(host, port)`. The middle call raises an error, and because connect

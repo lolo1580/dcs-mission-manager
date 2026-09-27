@@ -226,46 +226,116 @@ func (in *Installer) mergeBlock(destRel, dest string, content []byte) (Result, e
 	return Result{DestRel: destRel, Action: "merged", Backup: backup}, nil
 }
 
-// extractBlock returns the text from the BEGIN marker to the END marker of a
-// distribution file, inclusive. Returns "" when the markers are absent.
+// Marker keywords, without the punctuation. The full markers are matched first;
+// the keyword is a fallback so that a marker whose punctuation was damaged by an
+// encoding round-trip (a tool that read the file as Latin-1 and wrote it back as
+// UTF-8 turns the em dash into "â€"") is still recognised for what it is.
+const (
+	beginKeyword = "DCSMM-BEGIN"
+	endKeyword   = "DCSMM-END"
+)
+
+// lineContaining returns the whole line holding kw, at or after from, with its
+// byte range (end includes the trailing newline).
+//
+// Only a Lua comment line is accepted. The markers are always comments, and
+// requiring that keeps a passing mention of the keyword in real code from being
+// mistaken for a block boundary — a mistake here would delete user content.
+func lineContaining(s string, from int, kw string) (start, end int, ok bool) {
+	search := from
+	for {
+		i := strings.Index(s[search:], kw)
+		if i < 0 {
+			return 0, 0, false
+		}
+		i += search
+		start = strings.LastIndexByte(s[:i], '\n') + 1
+		end = len(s)
+		if j := strings.IndexByte(s[i:], '\n'); j >= 0 {
+			end = i + j + 1
+		}
+		if strings.HasPrefix(strings.TrimSpace(s[start:end]), "--") {
+			return start, end, true
+		}
+		search = end
+	}
+}
+
+// findBlocks returns the byte ranges of every DCSMM managed block in s, in order.
+//
+// Every block is found, not just the first, on purpose: an Export.lua that, for
+// whatever reason, ended up with two blocks must be repaired rather than left
+// with the old one still defining the same Lua globals.
+func findBlocks(s string) [][2]int {
+	var spans [][2]int
+	from := 0
+	for {
+		bStart, bEnd, ok := lineContaining(s, from, beginKeyword)
+		if !ok {
+			break
+		}
+		_, eEnd, ok := lineContaining(s, bEnd, endKeyword)
+		if !ok {
+			break
+		}
+		spans = append(spans, [2]int{bStart, eEnd})
+		from = eEnd
+	}
+	return spans
+}
+
+// extractBlock returns the managed block of a distribution file, markers
+// included, ending with a newline so that it always spans whole lines. Returns
+// "" when no block is present.
 func extractBlock(content string) string {
-	start := strings.Index(content, BeginMarker)
-	if start < 0 {
+	spans := findBlocks(content)
+	if len(spans) == 0 {
 		return ""
 	}
-	end := strings.Index(content[start:], EndMarker)
-	if end < 0 {
-		return ""
-	}
-	return content[start : start+end+len(EndMarker)]
+	return content[spans[0][0]:spans[0][1]]
 }
 
 // spliceBlock merges a managed block into an existing file:
 //
-//   - if the file already contains the markers, the block is replaced in place;
-//   - otherwise the block is appended at the end, on its own lines.
+//   - duplicate blocks are collapsed into a single one;
+//   - the block replaces the first one in place, so surrounding content and the
+//     position of the block are preserved;
+//   - the block is appended at the end when none is present.
 //
 // It returns the new content and whether anything changed.
 func spliceBlock(existing, block string) (string, bool) {
-	if start := strings.Index(existing, BeginMarker); start >= 0 {
-		if rel := strings.Index(existing[start:], EndMarker); rel >= 0 {
-			end := start + rel + len(EndMarker)
-			if existing[start:end] == block {
-				return existing, false
-			}
-			return existing[:start] + block + existing[end:], true
+	block = strings.TrimRight(block, "\n") + "\n"
+
+	spans := findBlocks(existing)
+	if len(spans) == 0 {
+		// Append, ensuring a clean separation from the previous content.
+		out := existing
+		if out != "" && !strings.HasSuffix(out, "\n") {
+			out += "\n"
 		}
+		if out != "" {
+			out += "\n"
+		}
+		out += block
+		return out, true
 	}
 
-	// Append, ensuring a clean separation from the previous content.
-	out := existing
-	if out != "" && !strings.HasSuffix(out, "\n") {
-		out += "\n"
+	// The block takes the place of the first one; anything sitting between two
+	// blocks belongs to the user and is kept.
+	var b strings.Builder
+	b.WriteString(existing[:spans[0][0]])
+	b.WriteString(block)
+	prev := spans[0][1]
+	for _, span := range spans[1:] {
+		b.WriteString(existing[prev:span[0]])
+		prev = span[1]
 	}
-	if out != "" {
-		out += "\n"
+	b.WriteString(existing[prev:])
+
+	out := b.String()
+	if out == existing {
+		return existing, false
 	}
-	out += block + "\n"
 	return out, true
 }
 
@@ -316,36 +386,39 @@ func (in *Installer) backup(dest string, content []byte) (string, error) {
 func (in *Installer) Uninstall() ([]Result, error) {
 	var results []Result
 
-	// Export.lua: strip the block.
+	// Export.lua: strip every managed block (there may be more than one in a
+	// file that an older installer appended to), preserving the rest.
 	exportPath := filepath.Join(in.SavedGames, "Scripts", "Export.lua")
 	if existing, err := os.ReadFile(exportPath); err == nil {
-		begin := strings.Index(string(existing), BeginMarker)
-		if begin >= 0 {
-			if rel := strings.Index(string(existing[begin:]), EndMarker); rel >= 0 {
-				end := begin + rel + len(EndMarker)
-				remaining := strings.TrimRight(string(existing[:begin]), "\n")
-				if end < len(existing) {
-					remaining += string(existing[end:])
-				}
-				remaining = strings.TrimRight(remaining, "\n")
-				if remaining != "" {
-					remaining += "\n"
-				}
-
-				backup, berr := in.backup(exportPath, existing)
-				if berr != nil {
-					return results, berr
-				}
-				if !in.DryRun {
-					if err := writeFile(exportPath, []byte(remaining)); err != nil {
-						return results, err
-					}
-				}
-				results = append(results, Result{
-					DestRel: filepath.Join("Scripts", "Export.lua"),
-					Action:  "block-removed", Backup: backup,
-				})
+		spans := findBlocks(string(existing))
+		if len(spans) > 0 {
+			src := string(existing)
+			var out strings.Builder
+			prev := 0
+			for _, span := range spans {
+				out.WriteString(src[prev:span[0]])
+				prev = span[1]
 			}
+			out.WriteString(src[prev:])
+
+			remaining := strings.TrimRight(out.String(), "\n")
+			if remaining != "" {
+				remaining += "\n"
+			}
+
+			backup, berr := in.backup(exportPath, existing)
+			if berr != nil {
+				return results, berr
+			}
+			if !in.DryRun {
+				if err := writeFile(exportPath, []byte(remaining)); err != nil {
+					return results, err
+				}
+			}
+			results = append(results, Result{
+				DestRel: filepath.Join("Scripts", "Export.lua"),
+				Action:  "block-removed", Backup: backup,
+			})
 		} else {
 			results = append(results, Result{
 				DestRel: filepath.Join("Scripts", "Export.lua"),

@@ -11,6 +11,31 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Le débrief et le message de fin de mission étaient perdus : `conn:send`
+  n'écrivait qu'une partie de la ligne, et l'écriture partielle passait pour un
+  succès.** Le `send` de LuaSocket peut n'écrire qu'une fraction du tampon tout en
+  renvoyant une valeur : le test `if not ok` laissait donc passer, alors que le
+  reste de la ligne — dont le retour à la ligne final — était abandonné. Le
+  backend, qui lit du JSON délimité par des retours à la ligne, jetait la ligne
+  incomplète comme malformée. Le journal affichait « debrief sent » alors que le
+  message avait seulement été *tenté*.
+  - Les envois bouclent désormais jusqu'à ce que tous les octets soient écrits, et
+    un échec réel est signalé dans `dcs.log` au lieu d'être annoncé comme envoyé.
+    Reproduit de bout en bout : le même débrief envoyé à la main sur le même
+    socket est bien stocké, ce qui a permis d'identifier le transport, et non le
+    parseur, comme coupable.
+- **Une installation par-dessus un ancien marqueur ajoutait un second bloc au
+  lieu de mettre à jour le premier.** Un fichier écrit par un installeur
+  précédent portait un marqueur dont la ponctuation avait été abîmée par un
+  aller-retour d'encodage (le tiret cadratin était devenu `â€"`) : la recherche
+  octet pour octet ne le reconnaissait plus et le bloc était ajouté de nouveau.
+  Les deux blocs définissaient les mêmes globales Lua, et l'ancien gardait le bug
+  `setpayloadsize`. L'installeur reconnaît maintenant un bloc par son mot-clé sur
+  une ligne de commentaire, fusionne les doublons en un seul bloc, conserve le
+  contenu qui les sépare, et retire tous les blocs à la désinstallation. Couvert
+  par des tests, dont un vérifiant qu'un mot-clé simplement mentionné dans du code
+  utilisateur n'est jamais pris pour une borne de bloc — une erreur ici
+  supprimerait du vrai contenu.
 - **La carte live ne recevait rien : `setpayloadsize` n'existe pas dans la
   LuaSocket de DCS.** La séquence de connexion était `socket.udp()` →
   `setpayloadsize(65507)` → `setpeername(host, port)`. L'appel du milieu lève une
