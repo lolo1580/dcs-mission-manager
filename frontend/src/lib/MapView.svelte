@@ -28,6 +28,7 @@
     showTowns,
   } from './aerodromes.js';
   import { focusRequest } from './ui.js';
+  import { vectorLayers, shownVectors, vectorURL, loadVectors } from './vectors.js';
 
   /** True when the aeronautical style is active: chart-like labels are used. */
   let aero = false;
@@ -44,6 +45,8 @@
   let aerodromeLayer;
   let townLayer;
   let boundsLayer;
+  /** Rendered DCS vector layers, keyed by layer name, reused across toggles. */
+  const vectorShapes = new Map();
   let userMoved = false;
   let followOwnship = true;
 
@@ -51,6 +54,8 @@
   let basemaps = [];
   let dcsTiles = null; // {theatre, bounds} when authentic DCS tiles exist
   let currentLayer = null;
+  /** Credit for imported map tiles, from /api/theatres. Set in onMount. */
+  let tilesAttribution = '';
   /** Theatre whose bounds have already been framed, so a manual pan is kept. */
   let framedTheatre = null;
   /** Airfield to focus once the map exists (set before mount completes). */
@@ -75,6 +80,7 @@
     try {
       const meta = await fetchTheatres();
       basemaps = meta.basemaps ?? [];
+      tilesAttribution = meta.tilesAttribution ?? '';
       if (meta.default && !localStorage.getItem('dcsmm.theatre')) {
         theatre.set(meta.default);
       }
@@ -114,6 +120,8 @@
     const unsubTowns = towns.subscribe(() => renderTowns());
     const unsubTownsToggle = showTowns.subscribe(() => renderTowns());
     const unsubBounds = showBounds.subscribe(() => renderBounds());
+    const unsubVectors = shownVectors.subscribe(() => renderVectors());
+    const unsubVectorList = vectorLayers.subscribe(() => renderVectors());
     const unsubTheatre = theatre.subscribe(() => onTheatreChange());
     const unsubFocus = focusRequest.subscribe((a) => {
       if (a) {
@@ -137,6 +145,8 @@
       unsubTowns?.();
       unsubTownsToggle?.();
       unsubBounds?.();
+      unsubVectors?.();
+      unsubVectorList?.();
       unsubTheatre?.();
       unsubFocus?.();
       stop?.();
@@ -149,14 +159,43 @@
     if (!map) return;
     const th = $theatres.find((t) => t.id === $theatre);
 
-    // Authentic DCS tiles, when the theatre provides them.
+    // Authentic DCS tiles, when the theatre provides them. The zoom ceiling
+    // comes from what is actually on disk, so a detailed pack is not capped.
     dcsTiles = th?.tiles ? { theatre: th.id, bounds: th.bounds } : null;
-    if (th?.tiles && !basemaps.some((b) => b.id === 'dcs')) {
-      basemaps = [
-        { id: 'dcs', name: 'DCS (official)', url: `/api/tiles/${th.id}/{z}/{x}/{y}.png`, attribution: 'DCS World', maxZoom: 8 },
-        ...basemaps,
-      ];
+    if (th?.tiles) {
+      const minZoom = th.tileMinZoom > 0 ? th.tileMinZoom : 0;
+      const maxZoom = th.tileMaxZoom > 0 ? th.tileMaxZoom : 8;
+      const credit = tilesAttribution || 'DCS map tiles';
+      const existing = basemaps.find((b) => b.id === 'dcs');
+      if (existing) {
+        existing.url = `/api/tiles/${th.id}/{z}/{x}/{y}.png`;
+        existing.maxZoom = maxZoom;
+        existing.minZoom = minZoom;
+        existing.attribution = credit;
+        existing.bounds = th.bounds;
+      } else {
+        basemaps = [
+          { id: 'dcs', name: 'DCS (official)', url: `/api/tiles/${th.id}/{z}/{x}/{y}.png`, attribution: credit, maxZoom, minZoom, bounds: th.bounds },
+          ...basemaps,
+        ];
+      }
       basemapsStore.set(basemaps);
+
+      // The DCS basemap only becomes available once the theatre list is known,
+      // which is after the first applyBasemap ran. If the user's stored choice
+      // is 'dcs', that first run fell back to the default basemap (the entry did
+      // not exist yet) and nothing re-applied it: the selector said "DCS" while
+      // the map still showed another layer. Re-apply now that it exists.
+      if ($basemapId === 'dcs') {
+        applyBasemap('dcs');
+      }
+
+      // A pack that starts at zoom 8 shows nothing at zoom 6: if the map is
+      // currently wider than the pack, the basemap would look empty. Bring the
+      // view into the range the tiles actually cover.
+      if (map.getZoom() < minZoom) {
+        map.setZoom(minZoom);
+      }
     }
 
     // Frame the map on the theatre the first time it becomes active, so the
@@ -165,6 +204,8 @@
       frameBounds(th.bounds);
       framedTheatre = th.id;
     }
+    // Terrain vectors are per theatre: reload the list when it changes.
+    loadVectors();
 
     renderBounds();
     loadTheatreAerodromes(th?.id);
@@ -234,13 +275,23 @@
     aerodromes.subscribe((v) => (list = v))();
 
     for (const a of list) {
+      // Colour matters here: the DCS terrain layers draw roads in orange and
+      // urban areas in yellow, and the basemaps range from pale tan to dark
+      // blue. An amber symbol vanished against most of them. Cyan is used
+      // nowhere else on the map, and the dark halo under it keeps the marker
+      // readable on a light background too.
       const html = `
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-             stroke="#f0b429" stroke-width="2" stroke-linecap="round">
-          <circle cx="12" cy="12" r="9"/>
-          <path d="M12 3 v18 M3 12 h18"/>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke-linecap="round">
+          <g stroke="#0b1017" stroke-width="4.6" opacity=".85">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 3 v18 M3 12 h18"/>
+          </g>
+          <g stroke="#22d3ee" stroke-width="2.2">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 3 v18 M3 12 h18"/>
+          </g>
         </svg>`;
-      const icon = L.divIcon({ html, className: 'dcsmm-marker', iconSize: [18, 18], iconAnchor: [9, 9] });
+      const icon = L.divIcon({ html, className: 'dcsmm-marker', iconSize: [20, 20], iconAnchor: [10, 10] });
 
       // On the aeronautical style, airfields carry a permanent label like a
       // chart; elsewhere a tooltip on hover is enough.
@@ -315,6 +366,81 @@
   // Render the history overlays whenever the toggle or the data changes.
   $: if (mapReady) applyHistory();
 
+  /**
+   * Draws the DCS terrain vectors (roads, rivers, urban areas…) over the map.
+   * Each layer is a GeoJSON fetch; the shapes are cached once fetched, so
+   * toggling a layer on and off does not re-download it.
+   */
+  function renderVectors() {
+    if (!map) return;
+    let shown = new Set();
+    shownVectors.subscribe((v) => (shown = v))();
+    let layers = [];
+    vectorLayers.subscribe((v) => (layers = v))();
+
+    for (const layer of layers) {
+      const want = shown.has(layer.name);
+      let entry = vectorShapes.get(layer.name);
+      if (!want) {
+        if (entry) map.removeLayer(entry);
+        continue;
+      }
+      if (entry) {
+        entry.addTo(map);
+        entry.bringToFront();
+        continue;
+      }
+      // First time this layer is shown: fetch it, then attach.
+      fetch(vectorURL(layer.file))
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((geojson) => {
+          const group = L.geoJSON(geojson, {
+            style: () => vectorStyle(layer.name),
+            // Markers are drawn as small dots; the polygons and lines carry the
+            // meaning, and thousands of labels would bury the map.
+            pointToLayer: (_, latlng) =>
+              L.circleMarker(latlng, {
+                radius: 2,
+                stroke: false,
+                fillColor: vectorStyle(layer.name).color,
+                fillOpacity: 0.7,
+                interactive: false,
+              }),
+            interactive: false,
+          });
+          vectorShapes.set(layer.name, group);
+          // The layer may have been switched off while it was downloading.
+          let stillWanted = false;
+          shownVectors.subscribe((v) => (stillWanted = v.has(layer.name)))();
+          if (stillWanted) {
+            group.addTo(map);
+            group.bringToFront();
+          }
+        })
+        .catch(() => {
+          /* a missing or malformed layer is skipped, not fatal */
+        });
+    }
+  }
+
+  /** Style for one DCS vector layer. */
+  function vectorStyle(name) {
+    const n = name.toLowerCase();
+    // The palette deliberately avoids amber/yellow: that family is the
+    // airfield symbol's job, and two meanings for one colour is what made the
+    // markers unreadable in the first place.
+    if (n.includes('waterbed')) return { color: '#7fb2d9', weight: 0, fillColor: '#4f83b3', fillOpacity: 0.35 };
+    if (n.includes('rivers')) return { color: '#6aa6d6', weight: 1, opacity: 0.85, fill: false };
+    if (n.includes('urban')) return { color: '#cbd5e1', weight: 0, fillColor: '#cbd5e1', fillOpacity: 0.18 };
+    if (n.includes('borders')) return { color: '#e05252', weight: 2, dashArray: '8 5', opacity: 0.9, fill: false };
+    if (n.includes('railroad')) return { color: '#b07d3a', weight: 1.2, dashArray: '3 3', opacity: 0.85, fill: false };
+    if (n.includes('roads')) return { color: '#ff8c42', weight: 1.4, opacity: 0.9, fill: false };
+    if (n.includes('airbase')) return { color: '#22d3ee', weight: 1.5, fillColor: '#22d3ee', fillOpacity: 0.15 };
+    return { color: '#cccccc', weight: 1, opacity: 0.7, fill: false };
+  }
+
+  $: if (mapReady) renderVectors();
+
   function applyHistory() {
     if (!map) return;
     if (history) {
@@ -373,6 +499,29 @@
     if (!bm) return;
     if (currentLayer) map.removeLayer(currentLayer);
 
+    // A tile layer cannot exceed the map's own limits, and a pack only has the
+    // levels that were imported. Apply both, so selecting a detailed pack is not
+    // capped by the previous basemap and does not fall below the pack's floor.
+    if (bm.maxZoom && map.getMaxZoom() !== bm.maxZoom) {
+      map.setMaxZoom(bm.maxZoom);
+    }
+    map.setMinZoom(bm.minZoom ?? 0);
+
+    // A pack covers one rectangle: keep the view inside it, so panning never
+    // shows empty space beyond the tiles. Other basemaps release the limit.
+    if (bm.bounds) {
+      const box = L.latLngBounds(
+        [bm.bounds.minLat, bm.bounds.minLng],
+        [bm.bounds.maxLat, bm.bounds.maxLng],
+      );
+      map.setMaxBounds(box.pad(0.02));
+      if (!box.contains(map.getBounds()) || map.getZoom() < (bm.minZoom ?? 0)) {
+        map.fitBounds(box, { maxZoom: bm.maxZoom });
+      }
+    } else {
+      map.setMaxBounds(null);
+    }
+
     // The aeronautical style is meant to show airfields: switch them on, and use
     // permanent chart-style labels rather than hover tooltips.
     aero = bm.id === 'aero';
@@ -386,8 +535,8 @@
       maxZoom: bm.maxZoom ?? 19,
       subdomains: bm.subdomains ?? 'abc',
       className: bm.className ?? '',
-      // DCS tile sets are only available at low zoom levels.
-      minZoom: bm.id === 'dcs' ? 0 : 0,
+      // Tiles are addressed top-left (XYZ), which is what the importer writes;
+      // Leaflet's default matches it, so `tms` must stay off.
       errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
     }).addTo(map);
     currentLayer.bringToBack();
@@ -552,10 +701,13 @@
     font-size: 0.68rem;
     line-height: 1.25;
     color: #1b1f24;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.9);
+    /* A cyan edge ties the label to the airfield marker, which is the only
+       other cyan thing on the map. */
     border: 1px solid #6b7280;
+    border-left: 3px solid #22d3ee;
     border-radius: 3px;
-    box-shadow: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
     white-space: nowrap;
   }
 

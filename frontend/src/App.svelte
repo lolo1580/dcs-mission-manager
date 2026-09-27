@@ -25,6 +25,7 @@
     setTheatre,
     showBounds,
   } from './lib/units.js';
+  import { vectorLayers, showVectors, shownVectors, toggleAllVectors, toggleVector, layerLabel } from './lib/vectors.js';
   import { players, events, mission } from './lib/session.js';
   import { loadAnalytics } from './lib/analytics.js';
   import { showOnMap as showAerodromes } from './lib/aerodromes.js';
@@ -34,6 +35,8 @@
   let mapView;
   let tab = 'map';
   let history = false;
+  /** Whether the terrain-layer menu is open. */
+  let vectorMenu = false;
 
   // The tab can be driven by other panels (for example "show on the map").
   activeTab.subscribe((v) => (tab = v));
@@ -48,6 +51,19 @@
     // The analytics data lives in its own store, loaded by the Analytics panel.
     // Refresh it here so overlays appear even if that tab was never opened.
     if (history) loadAnalytics();
+  }
+
+  /**
+   * Reflects a partial selection on the "all layers" checkbox. `indeterminate`
+   * is a DOM property, not an attribute, so Svelte's binding cannot set it.
+   */
+  function indeterminate(node, value) {
+    node.indeterminate = value;
+    return {
+      update(v) {
+        node.indeterminate = v;
+      },
+    };
   }
 </script>
 
@@ -120,6 +136,48 @@
       >
         {$t('app.airfields')}
       </button>
+      {#if $vectorLayers.length}
+        <div class="layers" on:mouseleave={() => (vectorMenu = false)}>
+          <button
+            class="action"
+            class:on={$showVectors}
+            on:click={() => (vectorMenu = !vectorMenu)}
+            title={$t('app.vectorsTitle')}
+            aria-expanded={vectorMenu}
+          >
+            {$t('app.vectors')}
+            {#if $shownVectors.size > 0 && $shownVectors.size < $vectorLayers.length}
+              <span class="count">{$shownVectors.size}</span>
+            {/if}
+          </button>
+          {#if vectorMenu}
+            <div class="menu">
+              <label class="item all">
+                <input
+                  type="checkbox"
+                  checked={$shownVectors.size === $vectorLayers.length}
+                  use:indeterminate={$shownVectors.size > 0 && $shownVectors.size < $vectorLayers.length}
+                  on:change={(e) => toggleAllVectors(e.currentTarget.checked)}
+                />
+                {$t('app.vectorsAll')}
+              </label>
+              <div class="sep"></div>
+              {#each $vectorLayers as layer (layer.name)}
+                <label class="item">
+                  <input
+                    type="checkbox"
+                    checked={$shownVectors.has(layer.name)}
+                    on:change={() => toggleVector(layer.name)}
+                  />
+                  {layerLabel(layer.name)}
+                </label>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <button class="action" disabled title={$t('app.vectorsNone')}>{$t('app.vectors')}</button>
+      {/if}
       <button
         class="action"
         class:on={$showBounds}
@@ -417,6 +475,72 @@
     color: var(--bg);
     background: var(--blue);
     border-color: var(--blue);
+  }
+
+  /* Terrain-layer picker: a button that opens a list of the DCS layers. */
+  .layers {
+    position: relative;
+  }
+
+  .layers .action {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .layers .count {
+    padding: 0 0.3rem;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    border-radius: 3px;
+    color: var(--bg);
+    background: var(--border);
+  }
+
+  .layers .action.on .count {
+    color: var(--blue);
+    background: var(--bg);
+  }
+
+  .layers .menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 1200;
+    min-width: 13rem;
+    padding: 0.35rem;
+    text-align: left;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  .layers .item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 400;
+    white-space: nowrap;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .layers .item:hover {
+    background: var(--border);
+  }
+
+  .layers .item.all {
+    font-weight: 600;
+  }
+
+  .layers .sep {
+    height: 1px;
+    margin: 0.25rem 0.1rem;
+    background: var(--border);
   }
 
   main {

@@ -9,6 +9,145 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **DCS terrain vectors can be drawn over the map: roads, railroads, rivers,
+  water bodies, urban areas, borders, airfields.** This is the geography that
+  exists *in the game*, not a real-world approximation, which is what makes the
+  map usable for mission planning. `dcsmm import-vectors` converts the shapefiles
+  published with a DCS-accurate map (Flappie, dcsmaps.com — free to reuse) into
+  GeoJSON, and the UI draws them as a **Terrain** overlay over any basemap.
+  - `internal/dcsvectors` implements the ESRI shapefile and dBase readers in pure
+    Go — no dependency — for the geometry types the data uses, with vertex
+    simplification and 5-decimal coordinates. Measured on the Caucasus: 8 layers,
+    2 726 roads, 1 650 rivers, 1 723 urban areas, 1 718 towns, in ~20 MB.
+  - `internal/vectors` indexes the layers per theatre and serves them; only an
+    indexed layer resolves, so the handler can never serve an arbitrary file.
+  - Layers are fetched once and cached client-side, so toggling the overlay does
+    not re-download it, and they are drawn in a sensible order (water under
+    roads). See `docs/f10-maps.md`.
+
+- **DCS F10 map imagery can now be imported, and it is the real thing.** DCS
+  ships no image of its F10 map (it renders it at runtime), but community
+  captures of the assembled map are freeware on Eagle Dynamics' own User Files.
+  `dcsmm import-tiles` now turns a downloaded `MBTiles` pack into the
+  `tiles/<theatre>/<z>/<x>/<y>.png` tree the manager already served, after which
+  the theatre reports `tiles: true` and the UI offers a **DCS (official)**
+  basemap.
+  - `internal/mbtiles` handles both common schemas (flat `tiles`, and
+    `map` + `images`), flips **TMS rows to XYZ** — without that every map is
+    mirrored vertically — and re-encodes JPEG tiles to PNG so the server keeps a
+    single code path. The import is resume-safe (`--force` to overwrite).
+  - The basemap's zoom ceiling is read from what is on disk, so a detailed pack
+    is no longer capped at zoom 8.
+  - Packaged tile sets (a DCS-accurate web map) are brought local with
+    `dcsmm fetch-tiles`, which flips **TMS rows to XYZ**, paces its requests so
+    a community server is not hammered, retries with a backoff, and resumes an
+    interrupted download. Verified against Flappie's DCS Caucasus map:
+    742 tiles over zooms 8-10, no failures, served by the manager afterwards.
+  - The tile set's author is credited through `DCSMM_TILES_ATTRIBUTION`, shown on
+    the map, since several licences require it.
+  - See `docs/f10-maps.md` for the sources, the flags, and why DCS's own files
+    cannot be used instead.
+
+- **The manager now opens in its own window instead of a browser tab.** Starting
+  `dcsmm.exe` shows the embedded UI in a native WebView2 window: no browser to
+  launch, no `localhost:8080` to remember, and closing the window shuts the
+  manager down. The window is driven by `github.com/jchv/go-webview2`, a pure-Go
+  binding, so the build still needs no C toolchain (`CGO_ENABLED=0` unchanged).
+  - The HTTP server is kept, not replaced: the window loads `http://<addr>/`, so
+    the page reaches the API exactly as before, and `dcsmm serve` still exposes
+    the UI to a browser (second monitor, tablet). The manager falls back to that
+    headless mode on its own when the WebView2 runtime is unavailable.
+  - `DCSMM_HTTP_ADDR` now accepts a port of `0`, in which case the OS picks a
+    free one and the window is pointed at the resolved address.
+  - The manager's wiring moved to `internal/app` so the window and the headless
+    mode share one implementation and cannot drift apart.
+
+- **DCS's terrain projection was reverse-engineered, and measured.** DCS's own
+  `beacons.lua` gives, for every beacon, both the terrain position in metres and
+  the real latitude/longitude, so the mapping could be fitted rather than
+  guessed: it is a **transverse Mercator**, recovered per map to 1-75 m RMS over
+  theatres spanning 600-1300 km (a plain affine in lat/lng is off by 7-17 km, and
+  Lambert conformal conic by 200-800 m). The fit lives in `internal/geo`
+  (`Fit`, `Forward`, `Inverse`), with an integration test that validates against
+  a real DCS install when `DCSMM_TERRAINS` is set. See
+  `docs/terrain-projection.md` and the CLI `cmd/geoexplore`.
+  - This settles the "authentic DCS tiles" question in two parts. The
+    **projection is solved**; the DDS/DXT5 tiles decode in pure Go
+    (`cmd/tileprobe`), but they turn out to be **overlay linework drawn on black**
+    — roads, rivers, labels — not the coloured terrain the F10 map shows, and DCS
+    stores no coloured map base at all (it composes the F10 map at runtime).
+    Placing imagery therefore still needs an image the project is allowed to use.
+  - Packs that ship a single large image rather than tiles (all the freeware ED
+    releases) are handled by `dcsmm import-image`, which slices a calibrated
+    image into tiles given the `--bounds` it covers. Verified end to end on a
+    generated image with known bounds: the image lands at the right place.
+  - DCS's vector geometry (`roads/*.rn4`, `Map/*.sup5`) is real and structured
+    (named layers, a `LINELIST` with a colour index), but both formats are
+    proprietary, quantized and grid-indexed, and undocumented: drawing a vector
+    map from them is a reverse-engineering project of its own.
+
+### Fixed
+
+- **Airfield markers were unreadable on the map.** They were drawn in amber
+  (`#f0b429`), which is exactly the colour of the DCS road and urban layers and
+  sits close to the tan of most basemaps: the symbols vanished into the
+  background. They are now cyan with a dark halo, a colour used nowhere else on
+  the map, which stays legible on satellite, relief and pale backgrounds alike.
+  The permanent airfield labels gained a matching cyan edge so the two read as
+  one thing, and the urban vector layer moved off amber to stop competing.
+- **Selecting the DCS basemap showed another map.** The DCS tile layer only
+  exists once the theatre list is known, which happens after the first basemap is
+  applied. A stored choice of `dcs` therefore fell back to the default layer, and
+  nothing re-applied it: the selector read "DCS (official)" while the map still
+  drew satellite imagery. The layer is now applied as soon as it becomes
+  available.
+- **A tile pack whose tiles start at zoom 8 showed a blank map.** The map was
+  framed at a wider zoom, where a pack has no tiles — 48 % of the Caucasus pack
+  is empty tiles, and below its floor every request is a 404. The pack's zoom
+  range is now read from disk (`tileMinZoom`/`tileMaxZoom`), the view is brought
+  into it, and the map is bounded to the pack's extent so panning cannot leave
+  the tiles.
+- **The tile set's author was never credited.** `DCSMM_TILES_ATTRIBUTION` is now
+  shown on the map when a DCS basemap is active, since several pack licences
+  require attribution.
+- **The native window could crash the whole manager on startup.** The WebView2
+  control, its COM objects and its message loop all have to live on one OS
+  thread, but the window was created from a goroutine Go is free to migrate
+  between threads: the completion callback then ran on a different thread and
+  dereferenced a half-initialised object, crashing the process with an access
+  violation. The window goroutine is now locked to its thread
+  (`runtime.LockOSThread`). Verified over five consecutive launches.
+- **`SouthEastAsia` was offered as a theatre, but DCS has no such terrain.** The
+  theatre list carried an entry that is not one of the 14 terrains DCS sells, so
+  the UI advertised a map that cannot be flown. The list is now exactly DCS's own
+  set (Caucasus, Syria, Nevada, Persian Gulf, Marianas, Marianas WWII, Sinai,
+  Kola, Afghanistan, Iraq, South Atlantic → `Falklands`, Normandy, The Channel,
+  Cold War Germany), and a test rejects any id DCS does not have.
+- **Most of DCS's navigation aids were missing from the airfield data.** The
+  beacon reader only handled `BEACON_TYPE_AIRPORT_HOMER` and a few VOR types, so
+  every `BEACON_TYPE_HOMER`, `BEACON_TYPE_ILS_FAR_HOMER`,
+  `BEACON_TYPE_ILS_NEAR_HOMER`, `BEACON_TYPE_VORTAC` and `BEACON_TYPE_DME` in
+  DCS's own `beacons.lua` was silently ignored. Plain homers and the ILS outer /
+  inner markers are non-directional beacons (an ADF or the markers of an ILS),
+  and a VORTAC is a VOR that also carries a TACAN: all of them belong in the data
+  card. Measured on the five installed maps:
+  - NDBs: Caucasus 0 → **47** (on 18 airfields), Persian Gulf 0 → **10**,
+    Kola 0 → **1**, Marianas 0 → **1**.
+  - VORs: Persian Gulf 1 → **16**, Kola 4 → **9**.
+  - TACANs: Persian Gulf 8 → **10** (the VORTACs).
+- **Starting the manager twice died silently.** A second `dcsmm.exe` failed on
+  the UDP bind and exited, printing to a console the user never sees when
+  double-clicking — it looked like nothing happened at all. The manager now asks
+  `GET /api/health` for its own service name before starting: in window mode it
+  shows a message box and stops, and `dcsmm serve` exits with code 3 and a
+  one-line reason. A duplicate launch now says so instead of vanishing.
+- **Window mode wrote no log.** A double-clicked executable has no console, so a
+  startup failure left no trace to investigate. Window mode now appends to
+  `data/dcsmm.log` (next to `DCSMM_DB_PATH`), which is where "it does not start"
+  finally gets an answer.
+
 ### Fixed
 
 - **The debrief and the mission-end message were lost: `conn:send` only wrote part

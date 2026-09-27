@@ -9,7 +9,159 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Ajouté
+
+- **Les vecteurs de terrain de DCS peuvent être dessinés par-dessus la carte :
+  routes, voies ferrées, rivières, plans d'eau, zones urbaines, frontières,
+  aérodromes.** C'est la géographie qui existe *dans le jeu*, pas une
+  approximation du monde réel — c'est ce qui rend la carte utile pour préparer une
+  mission. `dcsmm import-vectors` convertit les shapefiles publiés avec une carte
+  conforme à DCS (Flappie, dcsmaps.com — réutilisation libre) en GeoJSON, et l'UI
+  les dessine en calque **Terrain** par-dessus n'importe quel fond.
+  - `internal/dcsvectors` implémente les lecteurs ESRI shapefile et dBase en pur
+    Go — aucune dépendance — pour les types de géométrie utilisés, avec
+    simplification des sommets et coordonnées à 5 décimales. Mesuré sur le
+    Caucase : 8 couches, 2 726 routes, 1 650 rivières, 1 723 zones urbaines,
+    1 718 villes, en ~20 Mo.
+  - `internal/vectors` indexe les couches par théâtre et les sert ; seule une
+    couche indexée se résout, donc le handler ne peut jamais servir un fichier
+    arbitraire.
+  - Les couches sont chargées une fois puis gardées côté client : basculer le
+    calque ne les retélécharge pas, et elles sont dessinées dans un ordre
+    cohérent (l'eau sous les routes). Voir `docs/f10-maps.md`.
+
+- **L'imagerie de la carte F10 de DCS peut désormais être importée, et c'est la
+  vraie.** DCS ne livre aucune image de sa carte F10 (il la compose à
+  l'exécution), mais des captures assemblées de cette carte sont en freeware sur
+  les User Files d'Eagle Dynamics. `dcsmm import-tiles` transforme maintenant un
+  pack `MBTiles` téléchargé en l'arborescence
+  `tiles/<theatre>/<z>/<x>/<y>.png` que le manager servait déjà ; le théâtre
+  annonce alors `tiles: true` et l'UI propose un fond **DCS (official)**.
+  - `internal/mbtiles` gère les deux schémas courants (`tiles` à plat, et
+    `map` + `images`), **inverse les lignes TMS vers XYZ** — sans quoi toute
+    carte est mise en miroir verticalement — et ré-encode les tuiles JPEG en PNG
+    pour que le serveur garde un seul chemin de code. L'import est
+    reprenable (`--force` pour écraser).
+  - Le plafond de zoom du fond est lu sur le disque, donc un pack détaillé n'est
+    plus limité au zoom 8.
+  - Voir `docs/f10-maps.md` pour les sources, les options, et pourquoi les
+    fichiers de DCS ne peuvent pas être utilisés à la place.
+  - Les jeux de tuiles publiés (une webmap conforme à DCS) sont rapatriés avec
+    `dcsmm fetch-tiles`, qui **inverse les lignes TMS vers XYZ**, règle le rythme
+    des requêtes pour ne pas marteler un serveur communautaire, réessaie avec
+    temporisation et reprend un téléchargement interrompu. Vérifié sur la carte
+    du Caucase de Flappie : 742 tuiles sur les zooms 8-10, aucun échec, servies
+    ensuite par le manager.
+  - L'auteur du jeu de tuiles est crédité via `DCSMM_TILES_ATTRIBUTION`, affiché
+    sur la carte, car plusieurs licences l'exigent.
+
+- **Le manager s'ouvre désormais dans sa propre fenêtre, et non dans un onglet de
+  navigateur.** Lancer `dcsmm.exe` affiche l'UI embarquée dans une fenêtre WebView2
+  native : plus de navigateur à ouvrir, plus de `localhost:8080` à retenir, et
+  fermer la fenêtre arrête le manager. La fenêtre s'appuie sur
+  `github.com/jchv/go-webview2`, une liaison **pur Go** : le build n'a toujours
+  besoin d'aucune chaîne C (`CGO_ENABLED=0` inchangé).
+  - Le serveur HTTP est conservé, pas remplacé : la fenêtre charge `http://<addr>/`,
+    la page atteint donc l'API exactement comme avant, et `dcsmm serve` expose
+    toujours l'UI à un navigateur (second écran, tablette). Le manager bascule
+    seul dans ce mode sans fenêtre si le runtime WebView2 est absent.
+  - `DCSMM_HTTP_ADDR` accepte maintenant un port `0` : le système en choisit un
+    libre et la fenêtre pointe sur l'adresse résolue.
+  - Le câblage du manager est passé dans `internal/app`, pour que la fenêtre et le
+    mode sans interface partagent une seule implémentation.
+
+- **La projection des terrains de DCS a été rétro-conçue et mesurée.** Le
+  `beacons.lua` de DCS donne, pour chaque balise, à la fois la position terrain en
+  mètres et la latitude/longitude réelle : la correspondance a donc pu être
+  **ajustée** plutôt que devinée. C'est une **transverse Mercator**, retrouvée
+  carte par carte à 1-75 m RMS sur des théâtres de 600 à 1300 km (une simple
+  affine en lat/lng se trompe de 7-17 km, et une Lambert conforme conique de
+  200-800 m). Le calcul vit dans `internal/geo` (`Fit`, `Forward`, `Inverse`),
+  avec un test d'intégration qui valide contre une installation DCS réelle quand
+  `DCSMM_TERRAINS` est défini. Voir `docs/terrain-projection.md` et la CLI
+  `cmd/geoexplore`.
+  - Cela tranche la question des « tuiles DCS authentiques » en deux parties. La
+    **projection est résolue** ; les tuiles DDS/DXT5 se décodent en pur Go
+    (`cmd/tileprobe`), mais ce sont des **calques de traits sur fond noir** —
+    routes, rivières, étiquettes — et non l'imagerie colorée que montre la carte
+    F10. DCS ne stocke **aucune** carte colorée : il la compose à l'exécution.
+    Placer une imagerie demande donc encore une image que le projet a le droit
+    d'utiliser.
+  - Les packs qui livrent **une seule grande image** plutôt que des tuiles (toutes
+    les publications freeware d'ED) sont traités par `dcsmm import-image`, qui
+    découpe une image calibrée en tuiles d'après les `--bounds` qu'elle couvre.
+    Vérifié de bout en bout sur une image générée à bornes connues : l'image
+    arrive au bon endroit.
+  - La géométrie vectorielle de DCS (`roads/*.rn4`, `Map/*.sup5`) est réelle et
+    structurée (calques nommés, `LINELIST` avec index de couleur), mais les deux
+    formats sont propriétaires, quantifiés, indexés sur une grille et non
+    documentés : en tirer une carte vectorielle est un vrai chantier de
+    rétro-ingénierie.
+
 ### Corrigé
+
+- **Les marqueurs d'aérodrome étaient illisibles sur la carte.** Ils étaient
+  dessinés en ambre (`#f0b429`), exactement la couleur des couches DCS de routes
+  et de zones urbaines, et proche du beige de la plupart des fonds : les symboles
+  disparaissaient dans le décor. Ils sont désormais cyan avec un halo sombre, une
+  couleur utilisée nulle part ailleurs sur la carte, lisible aussi bien sur fond
+  satellite que relief ou clair. Les étiquettes permanentes d'aérodrome ont reçu
+  un liseré cyan assorti pour que l'ensemble se lise comme un tout, et la couche
+  urbaine a quitté l'ambre pour ne plus entrer en concurrence.
+- **Sélectionner le fond DCS affichait une autre carte.** La couche de tuiles DCS
+  n'existe qu'une fois la liste des théâtres connue, donc après la première
+  application du fond. Un choix enregistré de `dcs` retombait donc sur le fond par
+  défaut, et rien ne le réappliquait : le sélecteur affichait « DCS (official) »
+  alors que la carte dessinait encore l'imagerie satellite. La couche est
+  désormais appliquée dès qu'elle devient disponible.
+- **Un pack dont les tuiles commencent au zoom 8 affichait une carte vide.** La
+  carte était cadrée à un zoom plus large, où le pack n'a aucune tuile — 48 % du
+  pack Caucase est fait de tuiles vides, et sous son plancher chaque requête est
+  un 404. La plage de zoom du pack est maintenant lue sur le disque
+  (`tileMinZoom`/`tileMaxZoom`), la vue y est ramenée, et la carte est bornée à
+  l'emprise du pack pour que le déplacement ne puisse pas en sortir.
+- **L'auteur du jeu de tuiles n'était jamais crédité.** `DCSMM_TILES_ATTRIBUTION`
+  est désormais affiché sur la carte quand un fond DCS est actif, car plusieurs
+  licences de packs l'exigent.
+- **La fenêtre native pouvait faire planter tout le manager au démarrage.** Le
+  composant WebView2, ses objets COM et sa boucle de messages doivent vivre sur
+  **un seul** thread système, or la fenêtre était créée depuis une goroutine que
+  Go peut déplacer d'un thread à l'autre : la fonction de rappel s'exécutait alors
+  sur un autre thread et déréférençait un objet à moitié initialisé, ce qui tuait
+  le processus (violation d'accès). La goroutine de la fenêtre est désormais
+  verrouillée sur son thread (`runtime.LockOSThread`). Vérifié sur cinq
+  lancements consécutifs.
+- **`SouthEastAsia` était proposé comme théâtre, or DCS n'a pas ce terrain.** La
+  liste des théâtres contenait une entrée qui n'est pas l'un des 14 terrains
+  vendus par DCS : l'UI annonçait donc une carte qui ne peut pas être volée. La
+  liste correspond désormais exactement à celle de DCS (Caucasus, Syria, Nevada,
+  Persian Gulf, Marianas, Marianas WWII, Sinai, Kola, Afghanistan, Iraq, South
+  Atlantic → `Falklands`, Normandy, The Channel, Cold War Germany), et un test
+  refuse tout identifiant que DCS n'a pas.
+- **La plupart des aides à la navigation de DCS manquaient dans les données
+  d'aérodrome.** Le lecteur de balises ne gérait que
+  `BEACON_TYPE_AIRPORT_HOMER` et quelques types de VOR : tout
+  `BEACON_TYPE_HOMER`, `BEACON_TYPE_ILS_FAR_HOMER`,
+  `BEACON_TYPE_ILS_NEAR_HOMER`, `BEACON_TYPE_VORTAC` et `BEACON_TYPE_DME` du
+  `beacons.lua` de DCS était donc ignoré en silence. Les homers simples et les
+  marqueurs externe/interne d'ILS sont des radiobalises non directionnelles (un
+  ADF, ou les marqueurs d'un ILS), et un VORTAC est un VOR qui porte aussi un
+  TACAN : tous ont leur place sur la fiche. Mesuré sur les cinq cartes installées :
+  - NDB : Caucase 0 → **47** (sur 18 aérodromes), Golfe persique 0 → **10**,
+    Kola 0 → **1**, Marianas 0 → **1**.
+  - VOR : Golfe persique 1 → **16**, Kola 4 → **9**.
+  - TACAN : Golfe persique 8 → **10** (les VORTAC).
+- **Lancer le manager deux fois échouait en silence.** Un second `dcsmm.exe`
+  échouait au bind UDP et se terminait, en écrivant dans une console que
+  l'utilisateur ne voit jamais en double-clic : on avait l'impression que rien ne
+  se passait. Le manager interroge désormais `GET /api/health` sur son propre nom
+  de service avant de démarrer : en mode fenêtre, il affiche un message et
+  s'arrête ; `dcsmm serve` sort avec le code 3 et une raison en une ligne. Un
+  double lancement le dit maintenant au lieu de disparaître.
+- **Le mode fenêtre n'écrivait aucun journal.** Un exécutable lancé au
+  double-clic n'a pas de console : un échec au démarrage ne laissait donc aucune
+  trace. Le mode fenêtre écrit désormais dans `data/dcsmm.log` (à côté de
+  `DCSMM_DB_PATH`), là où « ça ne démarre pas » trouve enfin une réponse.
 
 - **Le débrief et le message de fin de mission étaient perdus : `conn:send`
   n'écrivait qu'une partie de la ligne, et l'écriture partielle passait pour un

@@ -76,29 +76,7 @@ jobs:
 
       # The Windows artifact is smoke-tested directly: it is what users download.
       - name: Smoke test the release build
-        run: |
-          .\dcsmm.exe version
-          $proc = Start-Process -FilePath .\dcsmm.exe -PassThru -WindowStyle Hidden
-          $up = $false
-          for ($i = 0; $i -lt 20; $i++) {
-            try {
-              Invoke-RestMethod http://127.0.0.1:8080/api/health -TimeoutSec 2 | Out-Null
-              $up = $true
-              break
-            } catch {
-              Start-Sleep -Milliseconds 500
-            }
-          }
-          if (-not $up) {
-            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-            throw 'the health endpoint never answered'
-          }
-          $html = (Invoke-WebRequest http://127.0.0.1:8080/ -UseBasicParsing).Content
-          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-          if ($html -notmatch '<div id="app">') {
-            throw 'the embedded UI is not served (fallback page returned)'
-          }
-          Write-Host 'OK: dcsmm.exe runs and serves the embedded UI'
+        run: pwsh -File tools/smoke-serve.ps1
 
       - name: Package the Lua scripts
         run: |
@@ -131,8 +109,9 @@ jobs:
 
             ## Download
 
-            - `dcsmm.exe` — Windows binary (web UI embedded). Run it, then open
-              http://localhost:8080.
+            - `dcsmm.exe` — Windows binary (web UI embedded). Run it and the
+              manager opens in its own window. Prefer the browser? `dcsmm serve`,
+              then open http://localhost:8080.
             - `dcsmm-lua-*.zip` — the Lua scripts to install into DCS, if you
               prefer not to use the built-in installer (`dcsmm install-lua`).
             - `SHA256SUMS.txt` — checksums.

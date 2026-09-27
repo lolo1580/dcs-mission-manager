@@ -5,6 +5,8 @@
 Un gestionnaire tout-en-un pour **DCS World** : live map en temps réel, lecture des
 débriefings, et statistiques avancées. Il tourne **en local, sur la même machine
 Windows que DCS** : un seul `dcsmm.exe`, ni serveur, ni conteneur, rien à configurer.
+Il s'ouvre dans **sa propre fenêtre**, comme un logiciel classique : pas de navigateur
+à lancer, aucune adresse à retenir.
 
 Parce qu'il est local, il peut lire les **données de terrain de DCS lui-même** — les
 aérodromes, fréquences et balises de chaque carte installée — au lieu de dépendre
@@ -71,9 +73,23 @@ d'un jeu de données maintenu à la main.
 │  • listeners UDP + TCP, état en mémoire, SQLite (data/)   │
 │  • parseur de débrief, statistiques, données aérodromes   │
 │  • lit Mods/terrains/ et Saved Games/ directement         │
-│  • REST + SSE sur http://localhost:8080                   │
+│  • REST + SSE, servis à la fenêtre native (WebView2)      │
+│    — ou à un navigateur en mode `serve`                   │
 └──────────────────────────────────────────────────────────┘
 ```
+
+### Fenêtre native
+
+L'UI web est la même qu'avant : elle est simplement affichée dans une **fenêtre
+d'application** (composant WebView2, fourni avec Windows 10/11) au lieu d'un onglet.
+Le serveur HTTP continue de tourner derrière la fenêtre — c'est lui qui sert l'API —
+donc rien de ce qui existait n'est perdu : `dcsmm serve` lance le manager en mode
+« navigateur », par exemple pour l'atteindre depuis un second écran ou une tablette.
+
+Le manager refuse de démarrer deux fois : si une instance répond déjà sur
+`DCSMM_HTTP_ADDR`, le mode fenêtre affiche un message et s'arrête, et `dcsmm serve`
+sort avec le code 3. En mode fenêtre, un journal est écrit dans `data/dcsmm.log` (à
+côté de la base), puisqu'un exécutable lancé au double-clic n'a pas de console.
 
 ### Local par conception
 
@@ -119,7 +135,8 @@ Par défaut, le backend écoute :
 - `127.0.0.1:7778` en **UDP** (positions)
 - `0.0.0.0:8080` en **HTTP** (Web UI + flux temps réel `GET /api/events` en SSE)
 
-Ouvre ensuite <http://localhost:8080>.
+Le manager s'ouvre alors dans une **fenêtre native**. En mode `serve`, il n'ouvre pas
+de fenêtre et l'interface est à consulter sur <http://localhost:8080>.
 
 ### 2. Installer les scripts Lua dans DCS
 
@@ -140,7 +157,7 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `DCSMM_HTTP_ADDR` | `127.0.0.1:8080` | Adresse d'écoute HTTP (Web UI + SSE). Mettre `0.0.0.0:8080` pour atteindre l'UI depuis un autre appareil ; l'API est alors sans authentification |
+| `DCSMM_HTTP_ADDR` | `127.0.0.1:8080` | Adresse d'écoute HTTP (Web UI + SSE). Un port `0` en choisit un libre automatiquement (fenêtre native). Mettre `0.0.0.0:8080` pour atteindre l'UI depuis un autre appareil ; l'API est alors sans authentification |
 | `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (télémétrie Live map) |
 | `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMM_DB_PATH` | `./data/dcsmm.db` | Chemin de la base SQLite |
@@ -157,6 +174,8 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
 | `DCSMM_SAVED_GAMES` | *(auto)* | Dossier Saved Games de DCS, si la détection échoue |
 | `DCSMM_CHARTS_DIR` | `./maps_dcs` | Scans de cartes aéronautiques (approches, plans de mouvement) |
+| `DCSMM_TILES_ATTRIBUTION` | *(vide)* | Crédit affiché sur la carte pour les jeux de tuiles importés (plusieurs licences de packs l'exigent) |
+| `DCSMM_VECTORS_DIR` | `./vectors` | Couches de terrain GeoJSON (routes, rivières, frontières…) importées des données de terrain DCS |
 | `DCSMM_REVEAL_ALL_UNITS` | `false` | Désactive le fog of war (tout diffuser ; solo/conception) |
 | `DCSMM_SOURCE` | *(auto)* | Force la source de la session : `live` ou `test` (voir plus bas) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
@@ -219,18 +238,43 @@ Les scripts se placent dans le dossier *Saved Games* de DCS :
 .\dcsmm.exe
 ```
 
-L'interface s'ouvre sur <http://localhost:8080>.
+Le manager s'ouvre dans sa fenêtre. Pour retrouver l'interface dans un navigateur
+(second écran, tablette), lance `.\dcsmm.exe serve` et ouvre
+<http://localhost:8080>.
 
 ### CLI
 
 ```powershell
-dcsmm                 # lance le manager (interface web + réception DCS)
+dcsmm                 # ouvre le manager dans une fenêtre native
+dcsmm serve           # lance le serveur seul ; UI sur http://localhost:8080
 dcsmm install-lua     # installe/fusionne les scripts Lua dans Saved Games
 dcsmm uninstall-lua   # retire le bloc installé (garde la config)
 dcsmm status          # installed / outdated / missing, par fichier
 dcsmm purge           # supprime des sessions enregistrées (destructif)
+dcsmm import-tiles    # importe un pack MBTiles (carte F10 DCS assemblée) en tuiles
 dcsmm version
 ```
+
+### Imagerie de la carte F10
+
+DCS ne livre **aucune image** de sa carte F10 — il la compose à l'exécution — mais
+des cartes conformes au jeu existent et sont libres. Trois façons de les installer :
+
+```powershell
+# 1. Un pack MBTiles (tuiles déjà prêtes)
+dcsmm import-tiles --mbtiles "PersianGulf-F10.mbtiles" --theatre PersianGulf
+
+# 2. Une image calibrée (les packs freeware sont un seul grand JPG)
+dcsmm import-image --image "map.jpg" --theatre Caucasus --bounds 41.0,36.5,45.5,45.0
+
+# 3. Un jeu de tuiles publié (webmap conforme DCS, ex. Caucase de Flappie)
+dcsmm fetch-tiles --url "http://dcsmaps.com/caucasus/{z}/{x}/{y}.png" --theatre Caucasus `
+    --tms --min-zoom 8 --max-zoom 12 --bounds 40.8151520679,36.55,45.8109913793,45.5349433511
+```
+
+Le fond **DCS (official)** apparaît alors sur la carte concernée. Voir
+[docs/f10-maps.md](docs/f10-maps.md) pour les sources, les options, et le crédit
+à donner aux auteurs.
 
 ### Sessions de test et `purge`
 
@@ -279,27 +323,29 @@ DCS mission manager/
 │   └─ Hooks/dcsmm.lua       # events / joueurs / chat
 ├─ backend/                  # Go
 │   ├─ go.mod
-│   ├─ cmd/dcsmm/main.go     # serveur + CLI (install/uninstall/status)
-│   └─ internal/
-│       ├─ config/           # chargement env + défauts
-│       ├─ install/          # injecteur Lua (fusion par marqueurs)
-│       ├─ aerodrome/        # aérodromes et fréquences (données embarquées)
-│       ├─ category/         # classification des engins (type DCS → famille)
-│       ├─ theatre/          # théâtres DCS et leurs emprises
-│       ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
-│       ├─ model/            # types échangés DCS ↔ backend
-│       ├─ lua/              # parseur de données Lua (debrief.log)
-│       ├─ debrief/          # analyse des débriefs
-│       ├─ debriefstore/     # réassemblage des transferts de débrief
-│       ├─ udp/              # récepteur positions (live map)
-│       ├─ tcp/              # récepteur événements / joueurs / chat
-│       ├─ live/             # état de session en mémoire
-│       ├─ ingest/           # pont live → base de données
-│       ├─ tracker/          # historique positions + détection de pertes
-│       ├─ db/               # persistance SQLite (pur Go)
-│       ├─ state/            # store unités (en mémoire)
-│       ├─ stats/            # agrégations statistiques
-│       └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
+│   ├─ cmd/dcsmm/main.go     # CLI (desktop / serve / install / purge)
+│   ├─ internal/
+│   │   ├─ desktop/          # fenêtre native (WebView2, pure Go)
+│   │   ├─ app/              # câblage du manager, partagé desktop / serve
+│   │   ├─ config/           # chargement env + défauts
+│   │   ├─ install/          # injecteur Lua (fusion par marqueurs)
+│   │   ├─ aerodrome/        # aérodromes et fréquences (données embarquées)
+│   │   ├─ category/         # classification des engins (type DCS → famille)
+│   │   ├─ theatre/          # théâtres DCS et leurs emprises
+│   │   ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
+│   │   ├─ model/            # types échangés DCS ↔ backend
+│   │   ├─ lua/              # parseur de données Lua (debrief.log)
+│   │   ├─ debrief/          # analyse des débriefs
+│   │   ├─ debriefstore/     # réassemblage des transferts de débrief
+│   │   ├─ udp/              # récepteur positions (live map)
+│   │   ├─ tcp/              # récepteur événements / joueurs / chat
+│   │   ├─ live/             # état de session en mémoire
+│   │   ├─ ingest/           # pont live → base de données
+│   │   ├─ tracker/          # historique positions + détection de pertes
+│   │   ├─ db/               # persistance SQLite (pur Go)
+│   │   ├─ state/            # store unités (en mémoire)
+│   │   ├─ stats/            # agrégations statistiques
+│   │   └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
 ├─ frontend/                 # Svelte + Vite + Leaflet
 │   └─ src/
 │       ├─ App.svelte

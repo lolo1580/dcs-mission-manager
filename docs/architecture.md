@@ -24,12 +24,14 @@ Lua installer, the debrief and the track files need no transfer or setup.
 .\dcsmm.exe
 ```
 
-The web UI is then at <http://localhost:8080>.
+The manager opens in its own window. `dcsmm serve` runs it headless instead, with the
+web UI at <http://localhost:8080>.
 
 ### CLI
 
 ```powershell
-dcsmm                 # starts the manager (web interface + DCS receive)
+dcsmm                 # opens the manager in a native window
+dcsmm serve           # starts the server only; UI at http://localhost:8080
 dcsmm install-lua     # installs/merges the Lua scripts into Saved Games
 dcsmm uninstall-lua   # removes the installed block (keeps the config)
 dcsmm status          # installed / outdated / missing, per file
@@ -72,6 +74,8 @@ dcsmm version
 | Package | Role |
 |---|---|
 | `internal/config` | Configuration via `DCSMM_*` variables |
+| `internal/app` | Manager wiring (listeners, state, DB, tracking, HTTP), shared by both entry points |
+| `internal/desktop` | Native window (WebView2, pure Go); falls back to headless if unavailable |
 | `internal/udp` | Reception and decoding of telemetry datagrams |
 | `internal/state` | In-memory store of units, with expiry (TTL) |
 | `internal/api` | REST, Server-Sent Events, serving of the embedded UI |
@@ -79,6 +83,13 @@ dcsmm version
 | `internal/aerodrome` | Airfields and frequencies, read from DCS's own terrain files |
 | `internal/debrief` | `debrief.log` parser (Phase 3) |
 | `internal/stats` | Statistical aggregations (Phase 4) |
+| `cmd/geoexplore` | Research tool: fits DCS's terrain projection from `beacons.lua` (see `docs/terrain-projection.md`) |
+| `cmd/tileprobe` | Research tool: decodes a DCS RasterCharts DDS/DXT5 tile to PNG |
+| `internal/mbtiles` | Imports MBTiles map packs (assembled F10 map) as `tiles/<theatre>/…` |
+| `internal/imgtiles` | Slices a calibrated map image into tiles |
+| `internal/tilefetch` | Downloads a published tile set (a DCS-accurate web map) |
+| `internal/dcsvectors` | Reads ESRI shapefiles, writes GeoJSON (pure Go, no dependency) |
+| `internal/vectors` | Indexes and serves the terrain layers per theatre |
 
 ## Frontend
 
@@ -86,6 +97,17 @@ Svelte + Vite + Leaflet. The build is written to
 `backend/internal/api/dist/` (not versioned), then embedded into the Go binary via
 `//go:embed`. Result: **a single executable** contains the backend and the interface.
 If the frontend has not been built, a fallback page is served automatically.
+
+## Application window
+
+`dcsmm.exe` opens the embedded UI in a native window rather than asking the user to
+open a browser. That window is a WebView2 control (the runtime Microsoft ships with
+Windows 10/11), driven through `github.com/jchv/go-webview2` — a **pure-Go** binding,
+so the build needs no C toolchain and `CGO_ENABLED=0` still holds.
+
+The HTTP server is not removed: the window loads `http://<addr>/`, so the page reaches
+the API exactly as before, and `dcsmm serve` still exposes it to a browser. The window
+is therefore an addition, not a replacement, and closing it shuts the manager down.
 
 ## Real-time choice: SSE rather than WebSocket
 
