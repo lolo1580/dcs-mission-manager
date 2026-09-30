@@ -2,11 +2,11 @@
 
 [🇬🇧 English](README.md) | 🇫🇷 Français
 
-Un gestionnaire tout-en-un pour **DCS World** : live map en temps réel, lecture des
-débriefings, et statistiques avancées. Il tourne **en local, sur la même machine
-Windows que DCS** : un seul `dcsmm.exe`, ni serveur, ni conteneur, rien à configurer.
-Il s'ouvre dans **sa propre fenêtre**, comme un logiciel classique : pas de navigateur
-à lancer, aucune adresse à retenir.
+Un gestionnaire tout-en-un pour **DCS World** : lecture des débriefings,
+statistiques avancées, analyse des sorties et référence des aérodromes. Il tourne
+**en local, sur la même machine Windows que DCS** : un seul `dcsmm.exe`, ni serveur,
+ni conteneur, rien à configurer. Il s'ouvre dans **sa propre fenêtre**, comme un
+logiciel classique : pas de navigateur à lancer, aucune adresse à retenir.
 
 Parce qu'il est local, il peut lire les **données de terrain de DCS lui-même** — les
 aérodromes, fréquences et balises de chaque carte installée — au lieu de dépendre
@@ -33,17 +33,18 @@ d'un jeu de données maintenu à la main.
 
 | Fonction | État | Détail |
 |---|---|---|
-| Live map temps réel | ✅ Phase 1 | Tous les objets, catégories, filtres, traces, recherche |
-| Fonds de carte | ✅ Phase 8 | Satellite, Relief, Routier, **Aéronautique**, Sombre — tous sans clé |
-| Théâtre & étendue | ✅ Phase 8 | 15 cartes DCS : cadrage, contour de l'étendue, aérodromes par théâtre |
-| Tuiles DCS authentiques | 📋 Prévu | Exporteur de tuiles F10 (dossier `tiles/`) |
 | Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
 | Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmaps, traces, analyse de sortie, télémétrie ownship |
-| Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **101 aérodromes listés, 69 plaçables** sur 5 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, affichés sur la carte avec fiche au clic |
-| Fog of war | ✅ Phase 7 | Respect des options de mission F10 (filtrage côté serveur) |
+| Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **101 aérodromes listés, 69 plaçables** sur 5 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes |
+| Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
+
+> La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
+> est toujours reçue et échantillonnée : elle alimente les statistiques, les heatmaps
+> et l'onglet Aérodromes (aérodrome le plus proche). Le gestionnaire s'axe désormais
+> sur la session, les débriefs, les statistiques, l'analyse et les aérodromes.
 
 ### Statistiques avancées (prévues)
 
@@ -99,7 +100,7 @@ côté de la base), puisqu'un exécutable lancé au double-clic n'a pas de conso
    → accès direct à Mods/terrains/ et à Saved Games/
 ```
 
-**Stack :** Go (backend, binaire unique + UI embarquée) · Svelte + Vite + Leaflet (frontend) · SQLite (persistance).
+**Stack :** Go (backend, binaire unique + UI embarquée) · Svelte + Vite (frontend) · SQLite (persistance).
 
 ---
 
@@ -146,7 +147,9 @@ que de `Export.lua` et de `Config/dcsmm.cfg`.
 
 ### 3. Lancer DCS et une mission
 
-Ton appareil apparaît comme un point sur la carte, mis à jour une fois par seconde.
+Le gestionnaire prend la session en compte : joueurs, événements et chat
+apparaissent en direct, et chaque mission est enregistrée pour les débriefs et
+les statistiques.
 
 ---
 
@@ -158,15 +161,12 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | Variable | Défaut | Description |
 |---|---|---|
 | `DCSMM_HTTP_ADDR` | `127.0.0.1:8080` | Adresse d'écoute HTTP (Web UI + SSE). Un port `0` en choisit un libre automatiquement (fenêtre native). Mettre `0.0.0.0:8080` pour atteindre l'UI depuis un autre appareil ; l'API est alors sans authentification |
-| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (télémétrie Live map) |
+| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | Adresse d'écoute UDP (télémétrie des unités) |
 | `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMM_DB_PATH` | `./data/dcsmm.db` | Chemin de la base SQLite |
 | `DCSMM_DB_ENABLED` | `true` | Activer la persistance (sinon tout en mémoire) |
 | `DCSMM_THEATRE` | `Caucasus` | Théâtre par défaut |
 | `DCSMM_UNIT_TTL` | `5` (secondes) | Délai avant qu'une unité silencieuse disparaisse |
-| `DCSMM_TILES_DIR` | `./tiles` | Dossier des tuiles de carte DCS |
-| `DCSMM_BASEMAP` | `satellite` | Fond par défaut : `satellite`, `topo`, `osm`, `dark` |
-| `DCSMM_BASEMAP_URL` | *(vide)* | Fond personnalisé optionnel (template `{z}/{x}/{y}`) |
 | `DCSMM_CATEGORIES` | `./categories.json` | Surcharge de classification des engins |
 | `DCSMM_MAX_UNITS` | `5000` | Nombre maximum d'unités suivies |
 | `DCSMM_TRACK_INTERVAL` | `3` (secondes) | Fréquence d'échantillonnage des positions |
@@ -174,9 +174,6 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMM_TRACK_RETENTION` | `86400` (secondes) | Durée de conservation de l'historique |
 | `DCSMM_SAVED_GAMES` | *(auto)* | Dossier Saved Games de DCS, si la détection échoue |
 | `DCSMM_CHARTS_DIR` | `./maps_dcs` | Scans de cartes aéronautiques (approches, plans de mouvement) |
-| `DCSMM_TILES_ATTRIBUTION` | *(vide)* | Crédit affiché sur la carte pour les jeux de tuiles importés (plusieurs licences de packs l'exigent) |
-| `DCSMM_VECTORS_DIR` | `./vectors` | Couches de terrain GeoJSON (routes, rivières, frontières…) importées des données de terrain DCS |
-| `DCSMM_REVEAL_ALL_UNITS` | `false` | Désactive le fog of war (tout diffuser ; solo/conception) |
 | `DCSMM_SOURCE` | *(auto)* | Force la source de la session : `live` ou `test` (voir plus bas) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
@@ -188,7 +185,7 @@ dcsmm_host = "127.0.0.1"
 dcsmm_udp_port = 7778
 dcsmm_tcp_port = 7779
 
--- Live map
+-- Télémétrie
 dcsmm_send_interval = 1.0    -- position du joueur (secondes)
 dcsmm_world_enabled = true   -- export de tous les objets
 dcsmm_world_interval = 2.0   -- liste des objets (secondes)
@@ -251,30 +248,8 @@ dcsmm install-lua     # installe/fusionne les scripts Lua dans Saved Games
 dcsmm uninstall-lua   # retire le bloc installé (garde la config)
 dcsmm status          # installed / outdated / missing, par fichier
 dcsmm purge           # supprime des sessions enregistrées (destructif)
-dcsmm import-tiles    # importe un pack MBTiles (carte F10 DCS assemblée) en tuiles
 dcsmm version
 ```
-
-### Imagerie de la carte F10
-
-DCS ne livre **aucune image** de sa carte F10 — il la compose à l'exécution — mais
-des cartes conformes au jeu existent et sont libres. Trois façons de les installer :
-
-```powershell
-# 1. Un pack MBTiles (tuiles déjà prêtes)
-dcsmm import-tiles --mbtiles "PersianGulf-F10.mbtiles" --theatre PersianGulf
-
-# 2. Une image calibrée (les packs freeware sont un seul grand JPG)
-dcsmm import-image --image "map.jpg" --theatre Caucasus --bounds 41.0,36.5,45.5,45.0
-
-# 3. Un jeu de tuiles publié (webmap conforme DCS, ex. Caucase de Flappie)
-dcsmm fetch-tiles --url "http://dcsmaps.com/caucasus/{z}/{x}/{y}.png" --theatre Caucasus `
-    --tms --min-zoom 8 --max-zoom 12 --bounds 40.8151520679,36.55,45.8109913793,45.5349433511
-```
-
-Le fond **DCS (official)** apparaît alors sur la carte concernée. Voir
-[docs/f10-maps.md](docs/f10-maps.md) pour les sources, les options, et le crédit
-à donner aux auteurs.
 
 ### Sessions de test et `purge`
 
@@ -319,7 +294,7 @@ DCS mission manager/
 ├─ install-dcs.ps1           # installe les scripts Lua dans Saved Games
 ├─ dcs-lua/                  # scripts à installer côté DCS
 │   ├─ Config/dcsmm.cfg      # modèle de configuration
-│   ├─ Export.lua            # positions → UDP (live map)
+│   ├─ Export.lua            # positions → UDP (télémétrie)
 │   └─ Hooks/dcsmm.lua       # events / joueurs / chat
 ├─ backend/                  # Go
 │   ├─ go.mod
@@ -331,13 +306,13 @@ DCS mission manager/
 │   │   ├─ install/          # injecteur Lua (fusion par marqueurs)
 │   │   ├─ aerodrome/        # aérodromes et fréquences (données embarquées)
 │   │   ├─ category/         # classification des engins (type DCS → famille)
-│   │   ├─ theatre/          # théâtres DCS et leurs emprises
-│   │   ├─ basemap/          # fonds de carte (satellite, relief, osm, sombre)
+│   │   ├─ theatre/          # théâtres DCS
+│   │   ├─ charts/           # scans de cartes aéronautiques (maps_dcs/)
 │   │   ├─ model/            # types échangés DCS ↔ backend
 │   │   ├─ lua/              # parseur de données Lua (debrief.log)
 │   │   ├─ debrief/          # analyse des débriefs
 │   │   ├─ debriefstore/     # réassemblage des transferts de débrief
-│   │   ├─ udp/              # récepteur positions (live map)
+│   │   ├─ udp/              # récepteur télémétrie des unités
 │   │   ├─ tcp/              # récepteur événements / joueurs / chat
 │   │   ├─ live/             # état de session en mémoire
 │   │   ├─ ingest/           # pont live → base de données
@@ -345,13 +320,13 @@ DCS mission manager/
 │   │   ├─ db/               # persistance SQLite (pur Go)
 │   │   ├─ state/            # store unités (en mémoire)
 │   │   ├─ stats/            # agrégations statistiques
-│   │   └─ api/              # REST + SSE + tuiles + UI embarquée (dist/)
-├─ frontend/                 # Svelte + Vite + Leaflet
+│   │   └─ api/              # REST + SSE + UI embarquée (dist/)
+├─ frontend/                 # Svelte + Vite
 │   └─ src/
 │       ├─ App.svelte
-│       └─ lib/              # carte, panneaux, stores
-├─ tiles/                    # tuiles DCS par théâtre
-├─ tools/                    # émetteur de télémétrie de test, extracteur de tuiles
+│       └─ lib/              # panneaux et stores
+├─ maps_dcs/                 # scans de cartes aéronautiques (local, non versionné)
+├─ tools/                    # émetteur de télémétrie de test
 └─ docs/                     # documentation
 ```
 
@@ -359,15 +334,14 @@ DCS mission manager/
 
 ## Roadmap
 
-- [x] **Phase 0 — PoC** : `Export.lua` (position joueur) → Go → carte Leaflet
-- [x] **Phase 1 — Live map** : tous les objets, catégories, filtres, traces, recherche, tuiles DCS
+- [x] **Phase 0 — PoC** : `Export.lua` (position joueur) → Go → UI
 - [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, historique SQLite
 - [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
 - [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
 - [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
 - [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, binaire unique autonome
-- [x] **Phase 6 — Aérodromes** : 21 terrains du Caucase (fréquences, cartes)
-- [x] **Phase 7 — Fog of war** : respect des options F10 de la mission (filtrage serveur)
+- [x] **Phase 6 — Aérodromes** : fréquences et cartes lues depuis les fichiers DCS
+- [ ] **Phase 1 — Live map** : retirée ; la télémétrie est toujours collectée pour l'analyse
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.
 

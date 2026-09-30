@@ -36,12 +36,6 @@ type Config struct {
 	LogLevel string
 	// UnitTTL is how long a unit is kept after its last update.
 	UnitTTL time.Duration
-	// TilesDir is the directory holding DCS map tiles (per theatre).
-	TilesDir string
-	// Basemap is the default basemap id (aero, dark, or a custom one).
-	Basemap string
-	// BasemapURL is an optional custom basemap tile template ({z}/{x}/{y}).
-	BasemapURL string
 	// CategoriesFile is an optional JSON file overriding unit type categories.
 	CategoriesFile string
 	// MaxUnits caps how many units are kept in the store.
@@ -52,9 +46,6 @@ type Config struct {
 	TrackGrace time.Duration
 	// TrackRetention is how long tracking history is kept.
 	TrackRetention time.Duration
-	// RevealAllUnits disables fog-of-war filtering. Off by default: a live map
-	// must not reveal units the mission deliberately hides.
-	RevealAllUnits bool
 	// SavedGames is the DCS Saved Games folder, when it could be located. It is
 	// used to find the installation (through Logs\dcs.log) and to read mission
 	// and debrief data. Empty means "not found".
@@ -63,13 +54,6 @@ type Config struct {
 	// ground plans). They are documents, never shipped: only indexed and
 	// displayed. Empty disables the feature.
 	ChartsDir string
-	// TilesAttribution credits the source of the imported map tiles. It is shown
-	// in the map's corner when a DCS basemap is active. Tile sets are community
-	// work and several licences require attribution.
-	TilesAttribution string
-	// VectorsDir is the folder holding GeoJSON terrain layers (roads, rivers,
-	// borders…) imported from DCS terrain data. Empty disables the feature.
-	VectorsDir string
 }
 
 func env(key, def string) string {
@@ -144,20 +128,12 @@ func Load() Config {
 		Theatre:        env("DCSMM_THEATRE", "Caucasus"),
 		LogLevel:       strings.ToLower(env("DCSMM_LOG_LEVEL", "info")),
 		UnitTTL:        envDuration("DCSMM_UNIT_TTL", 5*time.Second),
-		TilesDir:       env("DCSMM_TILES_DIR", "./tiles"),
-		Basemap:        strings.ToLower(env("DCSMM_BASEMAP", "aero")),
-		BasemapURL:     env("DCSMM_BASEMAP_URL", ""),
 		CategoriesFile: env("DCSMM_CATEGORIES", "./categories.json"),
 		MaxUnits:       envInt("DCSMM_MAX_UNITS", 5000),
 		TrackInterval:  envDuration("DCSMM_TRACK_INTERVAL", 3*time.Second),
 		TrackGrace:     envDuration("DCSMM_TRACK_GRACE", 15*time.Second),
 		TrackRetention: envDuration("DCSMM_TRACK_RETENTION", 24*time.Hour),
-		RevealAllUnits: envBool("DCSMM_REVEAL_ALL_UNITS", false),
 		SavedGames:     savedGamesDir(),
 		ChartsDir:      env("DCSMM_CHARTS_DIR", "./maps_dcs"),
-		// Not defaulted to a specific author: the credit belongs to whoever made
-		// the tile set the user installed.
-		TilesAttribution: env("DCSMM_TILES_ATTRIBUTION", ""),
-		VectorsDir:       env("DCSMM_VECTORS_DIR", "./vectors"),
 	}
 }

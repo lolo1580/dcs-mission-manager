@@ -9,7 +9,7 @@ DCS loads two families of scripts from the *Saved Games* folder:
 ├─ Config\
 │   └─ dcsmm.cfg          ← adresse du backend
 └─ Scripts\
-    ├─ Export.lua         ← positions (live map)
+    ├─ Export.lua         ← positions (telemetry)
     └─ Hooks\
         └─ dcsmm.lua      ← events, players, chat
 ```
@@ -26,7 +26,7 @@ dcsmm_enabled = true
 dcsmm_send_interval = 1.0
 ```
 
-## Step 2 — Export.lua (live map)
+## Step 2 — Export.lua (telemetry)
 
 > ⚠️ **Never overwrite** an existing `Export.lua`. Tacview, SRS and DCS-BIOS all
 > add their own code to it.

@@ -11,18 +11,9 @@ export const trails = writable({});
 export const sortieStats = writable([]);
 export const analyticsError = writable('');
 
-export const HEAT_SOURCES = [
-  { id: 'positions', label: 'Trafic' },
-  { id: 'losses', label: 'Pertes' },
-];
-
 /** Total weight of the current heatmap, for the legend. */
 export const heatTotal = derived(heatPoints, ($p) =>
   $p.reduce((sum, x) => sum + (x.weight ?? 0), 0)
-);
-
-export const maxHeatWeight = derived(heatPoints, ($p) =>
-  $p.reduce((max, x) => Math.max(max, x.weight ?? 0), 1)
 );
 
 export async function loadAnalytics() {

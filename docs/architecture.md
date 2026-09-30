@@ -47,7 +47,7 @@ dcsmm version
 │ DCS World                                                 │
 │                                                           │
 │  Scripts/Export.lua        Hooks/dcsmm.lua                │
-│   (live map)               (events/players)               │
+│   (telemetry)              (events/players)               │
 │        │                          │                       │
 │        │ UDP/JSON                 │ TCP/JSON              │
 └────────┼──────────────────────────┼───────────────────────┘
@@ -56,16 +56,18 @@ dcsmm version
 ┌──────────────────────────────────────────────────────────┐
 │ Manager (dcsmm.exe)                                       │
 │                                                           │
-│  internal/udp  ──► internal/state ──► internal/api        │
-│                                        ├─ REST /api/*      │
-│                                        ├─ SSE  /api/events │
-│                                        └─ Embedded web UI │
+│  internal/udp  ──► internal/state ──► internal/tracker     │
+│  internal/tcp  ──► internal/live  ──► internal/ingest      │
+│                                        ├─ SQLite (data/)   │
+│                                        └─ internal/api     │
+│                                            ├─ REST /api/*  │
+│                                            ├─ SSE /events  │
+│                                            └─ Embedded UI  │
 │                                                           │
 │  Mods/terrains/  ──► internal/aerodrome (airfields)       │
 │  Saved Games/    ──► internal/install, debrief, tracks    │
 │  internal/debrief (Phase 3)                               │
 │  internal/stats   (Phase 4)                               │
-│  internal/theatre (Phase 1, projection)                   │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -79,24 +81,24 @@ dcsmm version
 | `internal/udp` | Reception and decoding of telemetry datagrams |
 | `internal/state` | In-memory store of units, with expiry (TTL) |
 | `internal/api` | REST, Server-Sent Events, serving of the embedded UI |
-| `internal/theatre` | `lat/lng ↔ DCS coordinates` projection (Phase 1) |
 | `internal/aerodrome` | Airfields and frequencies, read from DCS's own terrain files |
+| `internal/charts` | Aeronautical chart scans, indexed from `maps_dcs/` |
 | `internal/debrief` | `debrief.log` parser (Phase 3) |
+| `internal/db` | SQLite persistence (pure Go) |
+| `internal/tracker` | Position history, loss detection and sortie analysis |
 | `internal/stats` | Statistical aggregations (Phase 4) |
-| `cmd/geoexplore` | Research tool: fits DCS's terrain projection from `beacons.lua` (see `docs/terrain-projection.md`) |
-| `cmd/tileprobe` | Research tool: decodes a DCS RasterCharts DDS/DXT5 tile to PNG |
-| `internal/mbtiles` | Imports MBTiles map packs (assembled F10 map) as `tiles/<theatre>/…` |
-| `internal/imgtiles` | Slices a calibrated map image into tiles |
-| `internal/tilefetch` | Downloads a published tile set (a DCS-accurate web map) |
-| `internal/dcsvectors` | Reads ESRI shapefiles, writes GeoJSON (pure Go, no dependency) |
-| `internal/vectors` | Indexes and serves the terrain layers per theatre |
 
 ## Frontend
 
-Svelte + Vite + Leaflet. The build is written to
-`backend/internal/api/dist/` (not versioned), then embedded into the Go binary via
-`//go:embed`. Result: **a single executable** contains the backend and the interface.
-If the frontend has not been built, a fallback page is served automatically.
+Svelte + Vite. The build is written to `backend/internal/api/dist/` (not
+versioned), then embedded into the Go binary via `//go:embed`. Result: **a single
+executable** contains the backend and the interface. If the frontend has not been
+built, a fallback page is served automatically.
+
+The UI is organised in tabs: **Session** (players, events, chat), **Debriefs**,
+**Statistics**, **Analysis** and **Airfields** (reference data, frequencies and
+charts). There is no live map any more; the unit telemetry is still received and
+sampled, and it feeds the statistics, the heatmaps and the airfields tab.
 
 ## Application window
 
@@ -111,11 +113,11 @@ is therefore an addition, not a replacement, and closing it shuts the manager do
 
 ## Real-time choice: SSE rather than WebSocket
 
-For Phase 0/1, updates are **downstream only** (server → client).
+Updates are **downstream only** (server → client).
 **Server-Sent Events** is enough, integrates natively with the browser (`EventSource`),
 and avoids the complexity of a WebSocket. A bidirectional WebSocket could be added
-in Phase 2 for the command channel (kick, mission change…), but that channel
-will go through the dedicated TCP socket on the Lua side, not through the browser.
+for the command channel (kick, mission change…), but that channel will go through the
+dedicated TCP socket on the Lua side, not through the browser.
 
 ## Invariants
 

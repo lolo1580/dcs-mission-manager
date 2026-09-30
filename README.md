@@ -2,7 +2,7 @@
 
 🇬🇧 English | [🇫🇷 Français](README.fr.md)
 
-An all-in-one manager for **DCS World**: real-time live map, debriefing reading, and advanced statistics. It runs **locally, on the same Windows machine as DCS**: one `dcsmm.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
+An all-in-one manager for **DCS World**: debriefing reading, advanced statistics, sortie analysis and airfield reference. It runs **locally, on the same Windows machine as DCS**: one `dcsmm.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
 
 Because it is local, it can read DCS's **own terrain data** — the airfields, frequencies and beacons of every installed map — instead of relying on a hand-maintained dataset.
 
@@ -27,17 +27,18 @@ Because it is local, it can read DCS's **own terrain data** — the airfields, f
 
 | Feature | Status | Details |
 |---|---|---|
-| Real-time live map | ✅ Phase 1 | All objects, categories, filters, trails, search |
-| Basemaps | ✅ Phase 8 | Satellite, Relief, Road, **Aeronautical**, Dark — all key-free |
-| Theatre & extent | ✅ Phase 8 | 15 DCS maps: framing, extent outline, per-theatre airfields |
-| Authentic DCS tiles | 📋 Planned | F10 tile exporter (`tiles/` folder) |
 | Events & players | ✅ Phase 2 | Kills, crashes, chat, players, SQLite history |
 | Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
 | Server control | 🚧 Partial | Chat to DCS (command channel) coming |
 | Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission) |
 | Analytical maps & sortie | ✅ Phase 4 bis | Heatmaps, trails, sortie analysis, ownship telemetry |
-| Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **101 airfields listed, 69 mappable** across 5 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, shown on the map with a click-through data card |
-| Fog of war | ✅ Phase 7 | Respects F10 mission options (server-side filtering) |
+| Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **101 airfields listed, 69 mappable** across 5 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts |
+| Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
+
+> The live map (and its imagery) has been **removed**. Unit telemetry is still
+> received and sampled: it feeds the statistics, the heatmaps and the airfields
+> tab (nearest field). The manager is now session-, debrief-, stats-, analysis-
+> and airfields-oriented.
 
 ### Advanced statistics (planned)
 
@@ -93,7 +94,7 @@ database), since a double-clicked executable has no console.
    → direct read access to Mods/terrains/ and Saved Games/
 ```
 
-**Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite + Leaflet (frontend) · SQLite (persistence).
+**Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite (frontend) · SQLite (persistence).
 
 ---
 
@@ -140,7 +141,8 @@ Copy the files from `dcs-lua/` into your Saved Games folder — see
 
 ### 3. Launch DCS and a mission
 
-Your aircraft appears as a point on the map, updated once per second.
+The manager picks the session up: players, events and chat appear live, and each
+mission is recorded for the debriefs and the statistics.
 
 ---
 
@@ -152,15 +154,12 @@ defaults. None of them is required for a normal install.
 | Variable | Default | Description |
 |---|---|---|
 | `DCSMM_HTTP_ADDR` | `127.0.0.1:8080` | HTTP listening address (Web UI + SSE). A port of `0` picks a free one automatically (native window). Set `0.0.0.0:8080` to reach the UI from another device; the API has no authentication |
-| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | UDP listening address (Live map telemetry) |
+| `DCSMM_UDP_ADDR` | `127.0.0.1:7778` | UDP listening address (unit telemetry) |
 | `DCSMM_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
 | `DCSMM_DB_PATH` | `./data/dcsmm.db` | SQLite database path |
 | `DCSMM_DB_ENABLED` | `true` | Enable persistence (otherwise everything in memory) |
 | `DCSMM_THEATRE` | `Caucasus` | Default theatre |
 | `DCSMM_UNIT_TTL` | `5` (seconds) | Delay before a silent unit disappears |
-| `DCSMM_TILES_DIR` | `./tiles` | DCS map tiles folder |
-| `DCSMM_BASEMAP` | `satellite` | Default basemap: `satellite`, `topo`, `osm`, `dark` |
-| `DCSMM_BASEMAP_URL` | *(empty)* | Optional custom basemap (template `{z}/{x}/{y}`) |
 | `DCSMM_CATEGORIES` | `./categories.json` | Override for engine classification |
 | `DCSMM_MAX_UNITS` | `5000` | Maximum number of tracked units |
 | `DCSMM_TRACK_INTERVAL` | `3` (seconds) | Position sampling frequency |
@@ -168,9 +167,6 @@ defaults. None of them is required for a normal install.
 | `DCSMM_TRACK_RETENTION` | `86400` (seconds) | History retention duration |
 | `DCSMM_SAVED_GAMES` | *(auto)* | DCS Saved Games folder, when auto-detection fails |
 | `DCSMM_CHARTS_DIR` | `./maps_dcs` | Aeronautical chart scans (approach plates, ground plans) |
-| `DCSMM_TILES_ATTRIBUTION` | *(empty)* | Credit shown on the map for imported tile sets (several pack licences require it) |
-| `DCSMM_VECTORS_DIR` | `./vectors` | GeoJSON terrain layers (roads, rivers, borders…) imported from DCS terrain data |
-| `DCSMM_REVEAL_ALL_UNITS` | `false` | Disables fog of war (broadcast everything; solo/design) |
 | `DCSMM_SOURCE` | *(auto)* | Force the session source: `live` or `test` (see below) |
 | `DCSMM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
@@ -182,7 +178,7 @@ dcsmm_host = "127.0.0.1"
 dcsmm_udp_port = 7778
 dcsmm_tcp_port = 7779
 
--- Live map
+-- Telemetry
 dcsmm_send_interval = 1.0    -- player position (seconds)
 dcsmm_world_enabled = true   -- export all objects
 dcsmm_world_interval = 2.0   -- object list (seconds)
@@ -244,30 +240,8 @@ dcsmm install-lua     # installs/merges the Lua scripts into Saved Games
 dcsmm uninstall-lua   # removes the installed block (keeps the config)
 dcsmm status          # installed / outdated / missing, per file
 dcsmm purge           # deletes recorded sessions (destructive)
-dcsmm import-tiles    # imports an MBTiles pack (assembled DCS F10 map) as tiles
 dcsmm version
 ```
-
-### DCS F10 map imagery
-
-DCS ships no image of its F10 map — it renders it at runtime — but DCS-accurate
-maps exist and are free. Three ways to install one:
-
-```powershell
-# 1. An MBTiles pack (tiles, ready to use)
-dcsmm import-tiles --mbtiles "PersianGulf-F10.mbtiles" --theatre PersianGulf
-
-# 2. A calibrated image (the freeware packs are one large JPG)
-dcsmm import-image --image "map.jpg" --theatre Caucasus --bounds 41.0,36.5,45.5,45.0
-
-# 3. A published tile set (a DCS-accurate web map, e.g. Flappie's Caucasus)
-dcsmm fetch-tiles --url "http://dcsmaps.com/caucasus/{z}/{x}/{y}.png" --theatre Caucasus `
-    --tms --min-zoom 8 --max-zoom 12 --bounds 40.8151520679,36.55,45.8109913793,45.5349433511
-```
-
-The **DCS (official)** basemap then appears on that map. See
-[docs/f10-maps.md](docs/f10-maps.md) for the sources, the flags, and the credit
-the authors ask for.
 
 ### Test sessions and `purge`
 
@@ -322,13 +296,13 @@ DCS mission manager/
 │   │   ├─ install/          # Lua injector (merge via markers)
 │   │   ├─ aerodrome/        # aerodromes and frequencies (embedded data)
 │   │   ├─ category/         # engine classification (DCS type → family)
-│   │   ├─ theatre/          # DCS theatres and their extents
-│   │   ├─ basemap/          # basemaps (satellite, relief, osm, dark)
+│   │   ├─ theatre/          # DCS theatres
+│   │   ├─ charts/           # aeronautical chart scans (maps_dcs/)
 │   │   ├─ model/            # types exchanged DCS ↔ backend
 │   │   ├─ lua/              # Lua data parser (debrief.log)
 │   │   ├─ debrief/          # debrief analysis
 │   │   ├─ debriefstore/     # reassembly of debrief transfers
-│   │   ├─ udp/              # position receiver (live map)
+│   │   ├─ udp/              # unit telemetry receiver
 │   │   ├─ tcp/              # event / player / chat receiver
 │   │   ├─ live/             # in-memory session state
 │   │   ├─ ingest/           # live → database bridge
@@ -336,13 +310,13 @@ DCS mission manager/
 │   │   ├─ db/               # SQLite persistence (pure Go)
 │   │   ├─ state/            # unit store (in memory)
 │   │   ├─ stats/            # statistical aggregations
-│   │   └─ api/              # REST + SSE + tiles + embedded UI (dist/)
-├─ frontend/                 # Svelte + Vite + Leaflet
+│   │   └─ api/              # REST + SSE + embedded UI (dist/)
+├─ frontend/                 # Svelte + Vite
 │   └─ src/
 │       ├─ App.svelte
-│       └─ lib/              # map, panels, stores
-├─ tiles/                    # DCS tiles per theatre
-├─ tools/                    # test telemetry emitter, tile extractor
+│       └─ lib/              # panels and stores
+├─ maps_dcs/                 # aeronautical chart scans (local, not versioned)
+├─ tools/                    # test telemetry emitter
 └─ docs/                     # documentation
 ```
 
@@ -350,15 +324,14 @@ DCS mission manager/
 
 ## Roadmap
 
-- [x] **Phase 0 — PoC**: `Export.lua` (player position) → Go → Leaflet map
-- [x] **Phase 1 — Live map**: all objects, categories, filters, trails, search, DCS tiles
+- [x] **Phase 0 — PoC**: `Export.lua` (player position) → Go → UI
 - [x] **Phase 2 — Events & players**: `onGameEvent`, chat, `net.get_stat`, SQLite history
 - [x] **Phase 3 — Debriefings**: network transfer of `debrief.log`, Lua parser, history
 - [x] **Phase 4 — Advanced stats**: overview, pilots, weapons, engines, balance, network
 - [x] **Phase 4 bis — Analytical maps & sortie**: heatmaps, trails, telemetry
 - [x] **Phase 5 — Packaging**: CLI, safe Lua injector, single self-contained binary
 - [x] **Phase 6 — Aerodromes**: read from DCS's own terrain files (frequencies, aids, charts)
-- [x] **Phase 7 — Fog of war**: respects the mission's F10 options (server filtering)
+- [ ] **Phase 1 — Live map**: removed; telemetry is still collected for analysis
 
 The full, detailed plan is available in the project's plan file.
 

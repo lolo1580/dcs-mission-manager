@@ -5,17 +5,12 @@
     aerodromeError,
     aerodromeSource,
     search,
-    showOnMap,
-    towns,
-    showTowns,
-    selectedAerodrome,
     loadAerodromes,
     loadNearest,
     fmtMHz,
     fmtCoords,
   } from './aerodromes.js';
   import { theatres, theatre, setTheatre } from './units.js';
-  import { revealAerodrome } from './ui.js';
   import { t } from './i18n.js';
 
   let selected = null;
@@ -23,21 +18,10 @@
 
   onMount(loadAerodromes);
 
-  // Keep the local selection in sync when the airfield was chosen on the map.
-  // A reactive statement (rather than a manual subscribe) lets Svelte manage the
-  // store subscription lifetime.
-  $: if ($selectedAerodrome) selected = $selectedAerodrome;
-
   async function useNearest() {
     nearestFirst = await loadNearest();
   }
-
-  /** Selects an airfield and reveals it on the map. */
-  function pick(a) {
-    selected = a;
-    showOnMap.set(true);
-    revealAerodrome(a);
-  }</script>
+</script>
 
 <section class="aerodromes">
   <header>
@@ -83,25 +67,13 @@
     <button class="nearest" on:click={useNearest} title={$t('aerodromes.byDistance')}>
       {nearestFirst ? $t('aerodromes.byDistance') : $t('aerodromes.nearest')}
     </button>
-    <label class="onmap">
-      <input type="checkbox" bind:checked={$showOnMap} />
-      {$t('aerodromes.onMap')}
-    </label>
-    {#if $towns.length}
-      <label class="onmap" title={$t('aerodromes.townsHint')}>
-        <input type="checkbox" bind:checked={$showTowns} />
-        {$t('aerodromes.towns')} ({$towns.length})
-      </label>
-    {/if}
   </div>
-
-  <p class="hint">{$t('aerodromes.clickHint')}</p>
 
   <div class="split">
     <ul class="list">
       {#each $filteredAerodromes as a (a.id)}
         <li>
-          <button class:selected={selected?.id === a.id} on:click={() => pick(a)}>
+          <button class:selected={selected?.id === a.id} on:click={() => (selected = a)}>
             <span class="name">{a.name}</span>
             <span class="sub">
               {a.id}
@@ -261,16 +233,6 @@
   .controls input:focus {
     outline: none;
     border-color: var(--blue);
-  }
-
-  .onmap {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.76rem;
-    color: var(--muted);
-    white-space: nowrap;
-    cursor: pointer;
   }
 
   .split {

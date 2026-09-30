@@ -4,7 +4,7 @@
   Sends to the backend, over UDP/JSON:
     - the player position ("ownship" message);
     - the list of world objects ("world" message), filtered to
-      keep only the units useful to the live map.
+      keep only the units useful to the analysis.
 
   Everything is sampled at a regular interval via
   LuaExportActivityNextEvent, without ever blocking a frame.

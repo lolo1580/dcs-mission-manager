@@ -20,8 +20,8 @@ import (
 type Listener struct {
 	live *live.Store
 
-	// OnOptions, when set, receives the mission difficulty/view options so the
-	// server can honour the mission's fog-of-war settings.
+	// OnOptions, when set, receives the mission difficulty/view options, which
+	// are kept with the session.
 	OnOptions func(map[string]any)
 
 	// OnEvent, when set, is called for every received message (for persistence

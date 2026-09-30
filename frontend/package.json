@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "DCS Mission Manager web UI (Svelte + Vite + Leaflet)",
+  "description": "DCS Mission Manager web UI (Svelte + Vite)",
   "scripts": {
     "dev": "vite",
     "build": "node scripts/clean-dist.mjs && vite build",
@@ -13,8 +13,5 @@
     "@sveltejs/vite-plugin-svelte": "^3.1.2",
     "svelte": "^4.2.19",
     "vite": "^5.4.10"
-  },
-  "dependencies": {
-    "leaflet": "^1.9.4"
   }
 }

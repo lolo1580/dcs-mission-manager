@@ -63,25 +63,6 @@ func (s *Server) handleAerodromes(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleTowns returns the settlements of a theatre, read from DCS's
-// map/towns.lua. They are real, geolocated place names, useful as a map layer
-// and available with no mission data at all.
-//
-// Query: ?theatre=Caucasus (required).
-func (s *Server) handleTowns(w http.ResponseWriter, r *http.Request) {
-	if s.aerodromes == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"towns": []any{}})
-		return
-	}
-	theatre := r.URL.Query().Get("theatre")
-	towns := s.aerodromes.Towns(theatre)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"theatre": theatre,
-		"count":   len(towns),
-		"towns":   towns,
-	})
-}
-
 // handleAerodrome returns one airfield by id (case-insensitive).
 func (s *Server) handleAerodrome(w http.ResponseWriter, r *http.Request) {
 	if s.aerodromes == nil {

@@ -5,7 +5,7 @@
 Modules 4.3 (maps) and 4.5 (sortie) rely on the **position history**.
 Rather than using the debriefs' internal `x/y` coordinates
 (which require a projection specific to each theatre), the backend samples the
-**lat/lng positions** already received for the live map. Result: **no geographic
+**lat/lng positions** already received as telemetry. Result: **no geographic
 calibration**, all theatres work the same way.
 
 ## Collection: `internal/tracker`
@@ -49,8 +49,6 @@ are recorded — the speed/G columns stay empty rather than wrong.
 - New **Analysis** tab: heat map source (Traffic / Losses) and
   a **sortie analysis** table per unit (duration, distance, max altitude,
   max speed, max G, number of points).
-- **History** button in the map header: overlays the heat map and the recorded
-  tracks on the live map.
 
 The distance is computed with the **haversine** formula (great circle), on the
 points actually recorded.

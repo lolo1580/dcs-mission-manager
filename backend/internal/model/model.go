@@ -28,8 +28,8 @@ type Message struct {
 	Name    string `json:"name,omitempty"`
 	Theatre string `json:"theatre,omitempty"`
 	Winner  string `json:"winner,omitempty"`
-	// Options maps DCS mission difficulty/view options (e.g. optionsView) so the
-	// backend can honour the mission's fog-of-war settings.
+	// Options maps DCS mission difficulty/view options (e.g. optionsView), kept
+	// with the session.
 	Options map[string]any `json:"options,omitempty"`
 
 	// type = "debrief" — debrief.log is sent in chunks because it can be large.

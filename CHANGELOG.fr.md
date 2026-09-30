@@ -9,59 +9,28 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Retiré
+
+- **La carte temps réel a été retirée.** Le gestionnaire se concentre désormais
+  sur la session (joueurs, événements, chat), les débriefs, les statistiques,
+  l'analyse et les aérodromes. Tout ce qui n'existait que pour servir la carte
+  disparaît : la vue cartographique et ses filtres, les fonds de carte
+  (satellite, relief, routier, aéronautique, sombre), l'imagerie F10 importée
+  (importateurs MBTiles/image/jeu de tuiles et dossier `tiles/`), les vecteurs de
+  terrain DCS (`vectors/`), le contour d'étendue, les routes API de tuiles et de
+  vecteurs, et le filtrage fog of war.
+  - La télémétrie des unités est **toujours reçue et échantillonnée** : elle
+    alimente les traces de vol, les heatmaps et l'analyse de sortie, ainsi que
+    la recherche de l'aérodrome le plus proche. Seul le dessin disparaît.
+  - Les aérodromes, leurs fréquences et leurs **cartes aéronautiques** (lues
+    depuis `maps_dcs/`) sont inchangés.
+  - `dcsmm import-tiles`, `import-image`, `fetch-tiles` et `import-vectors`
+    disparaissent, ainsi que les variables `DCSMM_TILES_DIR`,
+    `DCSMM_TILES_ATTRIBUTION`, `DCSMM_VECTORS_DIR`, `DCSMM_BASEMAP`,
+    `DCSMM_BASEMAP_URL` et `DCSMM_REVEAL_ALL_UNITS`. Leaflet n'est plus une
+    dépendance du frontend.
+
 ### Ajouté
-
-- **La carte peut s'afficher en plein écran, et les calques peuvent être
-  fixés.** Un bouton ⤢ masque l'en-tête et les panneaux latéraux pour que la
-  carte occupe toute la fenêtre (Échap les fait revenir, et Leaflet est prévenu
-  de se remesurer pour ne pas continuer à dessiner à l'ancienne taille). Un
-  bouton **Fixer** transforme les calques aérodromes, terrain et limites en
-  partie intégrante de la vue : leurs boutons disparaissent et ils restent
-  affichés en changeant d'onglet. L'état fixé est mémorisé entre les
-  redémarrages, car il exprime un choix sur la carte et non un coup d'œil.
-- **Les vecteurs de terrain de DCS peuvent être dessinés par-dessus la carte :
-  routes, voies ferrées, rivières, plans d'eau, zones urbaines, frontières,
-  aérodromes.** C'est la géographie qui existe *dans le jeu*, pas une
-  approximation du monde réel — c'est ce qui rend la carte utile pour préparer une
-  mission. `dcsmm import-vectors` convertit les shapefiles publiés avec une carte
-  conforme à DCS (Flappie, dcsmaps.com — réutilisation libre) en GeoJSON, et l'UI
-  les dessine en calque **Terrain** par-dessus n'importe quel fond.
-  - `internal/dcsvectors` implémente les lecteurs ESRI shapefile et dBase en pur
-    Go — aucune dépendance — pour les types de géométrie utilisés, avec
-    simplification des sommets et coordonnées à 5 décimales. Mesuré sur le
-    Caucase : 8 couches, 2 726 routes, 1 650 rivières, 1 723 zones urbaines,
-    1 718 villes, en ~20 Mo.
-  - `internal/vectors` indexe les couches par théâtre et les sert ; seule une
-    couche indexée se résout, donc le handler ne peut jamais servir un fichier
-    arbitraire.
-  - Les couches sont chargées une fois puis gardées côté client : basculer le
-    calque ne les retélécharge pas, et elles sont dessinées dans un ordre
-    cohérent (l'eau sous les routes). Voir `docs/f10-maps.md`.
-
-- **L'imagerie de la carte F10 de DCS peut désormais être importée, et c'est la
-  vraie.** DCS ne livre aucune image de sa carte F10 (il la compose à
-  l'exécution), mais des captures assemblées de cette carte sont en freeware sur
-  les User Files d'Eagle Dynamics. `dcsmm import-tiles` transforme maintenant un
-  pack `MBTiles` téléchargé en l'arborescence
-  `tiles/<theatre>/<z>/<x>/<y>.png` que le manager servait déjà ; le théâtre
-  annonce alors `tiles: true` et l'UI propose un fond **DCS (official)**.
-  - `internal/mbtiles` gère les deux schémas courants (`tiles` à plat, et
-    `map` + `images`), **inverse les lignes TMS vers XYZ** — sans quoi toute
-    carte est mise en miroir verticalement — et ré-encode les tuiles JPEG en PNG
-    pour que le serveur garde un seul chemin de code. L'import est
-    reprenable (`--force` pour écraser).
-  - Le plafond de zoom du fond est lu sur le disque, donc un pack détaillé n'est
-    plus limité au zoom 8.
-  - Voir `docs/f10-maps.md` pour les sources, les options, et pourquoi les
-    fichiers de DCS ne peuvent pas être utilisés à la place.
-  - Les jeux de tuiles publiés (une webmap conforme à DCS) sont rapatriés avec
-    `dcsmm fetch-tiles`, qui **inverse les lignes TMS vers XYZ**, règle le rythme
-    des requêtes pour ne pas marteler un serveur communautaire, réessaie avec
-    temporisation et reprend un téléchargement interrompu. Vérifié sur la carte
-    du Caucase de Flappie : 742 tuiles sur les zooms 8-10, aucun échec, servies
-    ensuite par le manager.
-  - L'auteur du jeu de tuiles est crédité via `DCSMM_TILES_ATTRIBUTION`, affiché
-    sur la carte, car plusieurs licences l'exigent.
 
 - **Le manager s'ouvre désormais dans sa propre fenêtre, et non dans un onglet de
   navigateur.** Lancer `dcsmm.exe` affiche l'UI embarquée dans une fenêtre WebView2
@@ -78,59 +47,8 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   - Le câblage du manager est passé dans `internal/app`, pour que la fenêtre et le
     mode sans interface partagent une seule implémentation.
 
-- **La projection des terrains de DCS a été rétro-conçue et mesurée.** Le
-  `beacons.lua` de DCS donne, pour chaque balise, à la fois la position terrain en
-  mètres et la latitude/longitude réelle : la correspondance a donc pu être
-  **ajustée** plutôt que devinée. C'est une **transverse Mercator**, retrouvée
-  carte par carte à 1-75 m RMS sur des théâtres de 600 à 1300 km (une simple
-  affine en lat/lng se trompe de 7-17 km, et une Lambert conforme conique de
-  200-800 m). Le calcul vit dans `internal/geo` (`Fit`, `Forward`, `Inverse`),
-  avec un test d'intégration qui valide contre une installation DCS réelle quand
-  `DCSMM_TERRAINS` est défini. Voir `docs/terrain-projection.md` et la CLI
-  `cmd/geoexplore`.
-  - Cela tranche la question des « tuiles DCS authentiques » en deux parties. La
-    **projection est résolue** ; les tuiles DDS/DXT5 se décodent en pur Go
-    (`cmd/tileprobe`), mais ce sont des **calques de traits sur fond noir** —
-    routes, rivières, étiquettes — et non l'imagerie colorée que montre la carte
-    F10. DCS ne stocke **aucune** carte colorée : il la compose à l'exécution.
-    Placer une imagerie demande donc encore une image que le projet a le droit
-    d'utiliser.
-  - Les packs qui livrent **une seule grande image** plutôt que des tuiles (toutes
-    les publications freeware d'ED) sont traités par `dcsmm import-image`, qui
-    découpe une image calibrée en tuiles d'après les `--bounds` qu'elle couvre.
-    Vérifié de bout en bout sur une image générée à bornes connues : l'image
-    arrive au bon endroit.
-  - La géométrie vectorielle de DCS (`roads/*.rn4`, `Map/*.sup5`) est réelle et
-    structurée (calques nommés, `LINELIST` avec index de couleur), mais les deux
-    formats sont propriétaires, quantifiés, indexés sur une grille et non
-    documentés : en tirer une carte vectorielle est un vrai chantier de
-    rétro-ingénierie.
-
 ### Corrigé
 
-- **Les marqueurs d'aérodrome étaient illisibles sur la carte.** Ils étaient
-  dessinés en ambre (`#f0b429`), exactement la couleur des couches DCS de routes
-  et de zones urbaines, et proche du beige de la plupart des fonds : les symboles
-  disparaissaient dans le décor. Ils sont désormais cyan avec un halo sombre, une
-  couleur utilisée nulle part ailleurs sur la carte, lisible aussi bien sur fond
-  satellite que relief ou clair. Les étiquettes permanentes d'aérodrome ont reçu
-  un liseré cyan assorti pour que l'ensemble se lise comme un tout, et la couche
-  urbaine a quitté l'ambre pour ne plus entrer en concurrence.
-- **Sélectionner le fond DCS affichait une autre carte.** La couche de tuiles DCS
-  n'existe qu'une fois la liste des théâtres connue, donc après la première
-  application du fond. Un choix enregistré de `dcs` retombait donc sur le fond par
-  défaut, et rien ne le réappliquait : le sélecteur affichait « DCS (official) »
-  alors que la carte dessinait encore l'imagerie satellite. La couche est
-  désormais appliquée dès qu'elle devient disponible.
-- **Un pack dont les tuiles commencent au zoom 8 affichait une carte vide.** La
-  carte était cadrée à un zoom plus large, où le pack n'a aucune tuile — 48 % du
-  pack Caucase est fait de tuiles vides, et sous son plancher chaque requête est
-  un 404. La plage de zoom du pack est maintenant lue sur le disque
-  (`tileMinZoom`/`tileMaxZoom`), la vue y est ramenée, et la carte est bornée à
-  l'emprise du pack pour que le déplacement ne puisse pas en sortir.
-- **L'auteur du jeu de tuiles n'était jamais crédité.** `DCSMM_TILES_ATTRIBUTION`
-  est désormais affiché sur la carte quand un fond DCS est actif, car plusieurs
-  licences de packs l'exigent.
 - **La fenêtre native pouvait faire planter tout le manager au démarrage.** Le
   composant WebView2, ses objets COM et sa boucle de messages doivent vivre sur
   **un seul** thread système, or la fenêtre était créée depuis une goroutine que

@@ -8,13 +8,8 @@ import { units, theatre } from './units.js';
 export const aerodromes = writable([]);
 export const aerodromeError = writable('');
 export const search = writable('');
-/** When true, airfield markers are drawn on the map. */
-export const showOnMap = writable(false);
 /** Where the airfield data comes from: "dcs" or "embedded". */
 export const aerodromeSource = writable('');
-/** Settlements of the active theatre (from DCS data), and whether to draw them. */
-export const towns = writable([]);
-export const showTowns = writable(false);
 /** Aeronautical charts of the selected airfield, and the one being viewed. */
 export const aerodromeCharts = writable([]);
 export const chartsError = writable('');
@@ -44,16 +39,6 @@ export function chartURL(chart) {
   const rel = chart?.path || chart?.name || '';
   return '/api/charts/file/' + rel.split('/').map(encodeURIComponent).join('/');
 }
-/**
- * Airfield selected on the map. Set from MapView, consumed by UnitDetails (which
- * shares the map's bottom-right corner with the unit card).
- */
-export const selectedAerodrome = writable(null);
-
-export function selectAerodrome(a) {
-  selectedAerodrome.set(a ?? null);
-  loadAerodromeCharts(a);
-}
 
 export const filteredAerodromes = derived(
   [aerodromes, search],
@@ -75,33 +60,14 @@ export const filteredAerodromes = derived(
 export async function loadAerodromes() {
   aerodromeError.set('');
   try {
-    let th;
-    theatre.subscribe((v) => (th = v))();
+    const th = get(theatre);
     const res = await fetch(`/api/aerodromes?theatre=${encodeURIComponent(th)}`);
     if (!res.ok) throw new Error(`${res.status}`);
     const body = await res.json();
     aerodromes.set(body.aerodromes ?? []);
     aerodromeSource.set(body.source ?? '');
-    loadTowns(th);
   } catch (e) {
     aerodromeError.set(tNow('error.aerodromes', { detail: e.message }));
-  }
-}
-
-/** Loads the settlements of a theatre. Empty when DCS data is unavailable. */
-export async function loadTowns(theatreId) {
-  if (!theatreId) {
-    towns.set([]);
-    return;
-  }
-  try {
-    const res = await fetch(`/api/towns?theatre=${encodeURIComponent(theatreId)}`);
-    if (!res.ok) throw new Error(`${res.status}`);
-    const body = await res.json();
-    towns.set(body.towns ?? []);
-  } catch {
-    // Towns are a bonus layer: never surface an error for them.
-    towns.set([]);
   }
 }
 

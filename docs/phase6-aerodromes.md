@@ -60,13 +60,11 @@ New **Aerodromes** tab:
 - list filterable by **name, ICAO code or TACAN**;
 - **“Near me”** button: sorts by distance to the player's aircraft;
 - detail sheet: coalition, coordinates, elevation, runway, **Tower**, **TACAN**,
-  **ILS** per runway, and the list of available **charts**;
-- **“On the map”** checkbox: shows the airfields as markers, with the
-  frequencies in a tooltip.
+  **ILS** per runway, and the list of available **charts** (shown in a viewer).
 
 ## Charts
 
-The scans are **not embedded** in the binary (≈1.2 GB). The JSON references
+The scans are **not embedded** in the binary (≈1.2 GB). The index references
 their file name in `maps_dcs/`; this is deliberate, to keep the binary
 light and not redistribute documents potentially under copyright.
 

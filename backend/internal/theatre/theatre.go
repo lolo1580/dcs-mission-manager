@@ -16,17 +16,6 @@ type Theatre struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Bounds Bounds `json:"bounds"`
-	// Tiles is true when map tiles are available for this theatre. It is
-	// filled in at runtime by the API layer, which checks the tiles directory.
-	Tiles bool `json:"tiles"`
-	// TileMaxZoom is the highest zoom level present on disk for this theatre,
-	// filled in at runtime. The UI uses it so a detailed tile pack is shown at
-	// its full resolution instead of being capped at an arbitrary level.
-	TileMaxZoom int `json:"tileMaxZoom,omitempty"`
-	// TileMinZoom is the lowest zoom level present on disk. A pack whose tiles
-	// start at zoom 8 shows nothing below that, so the UI must not frame the map
-	// at a wider zoom or the map appears empty.
-	TileMinZoom int `json:"tileMinZoom,omitempty"`
 }
 
 // builtin lists the DCS maps. The IDs are the ones DCS itself uses (declared in

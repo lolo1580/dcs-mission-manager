@@ -28,35 +28,16 @@ DCS theatres, at different resolutions. They are **not versioned** in git
 - `NN_PAR_*`: procedures.
 
 Each chart indicates the coordinates (CRP), frequencies (Tower, Radar, TACAN, ILS)
-and the runway. Useful for a future **briefings / charts** section — these are not
-basemaps.
+and the runway. They are indexed by `internal/charts` and shown **as documents**
+in the manager's chart viewer — not georeferenced, so they are never overlaid on a
+map.
 
-## Important: these scans are not usable as is
+## How they are used
 
-1. **Not georeferenced** — no calibration metadata (no `.jgw`, no
-   GeoTIFF). The coordinates of the corners are unknown to the software.
-2. **Conic projection** (Lambert type) — the edges are curved, whereas
-   Leaflet expects **Web Mercator (EPSG:3857)**. A direct overlay is
-   impossible without reprojection.
-3. **Real-world charts** — these are not the F10 tiles of DCS. The rendering
-   matches approximately, but not pixel for pixel.
-
-### Aerodrome and procedure charts
-
-The aerodrome charts (`NN_VAD_*`, `NN_GND_*`) are **documents** to consult,
-not georeferenced basemaps. A future “briefings / charts” section
-could display them as is. `tools/inspect-maps.py` can list them.
-
-## Avenues of use
-
-- **A. GeoTIFF** — if you obtain these charts as georeferenced GeoTIFF (EPSG:4326 or
-  3857), they turn into tiles cleanly (gdal2tiles or a dedicated script).
-- **B. Image + calibration** — providing **4 corners (lat/lng)** per image allows a
-  linear mapping via `tools/export-tiles.py`. Enough for an indicative basemap,
-  not enough to correct the conic curvature.
-- **C. Real basemap** — this is what is currently active in the UI
-  (Satellite, Relief, Road, Dark): no pre-processing, accurate enough
-  to overlay the units.
+The scans are **not georeferenced**: no calibration metadata (no `.jgw`, no
+GeoTIFF), and the projection is a conic (Lambert type), not Web Mercator. They are
+therefore displayed whole, as documents, matched to an airfield by name or ICAO
+code. `tools/inspect-maps.py` lists what is present.
 
 ## Rights
 

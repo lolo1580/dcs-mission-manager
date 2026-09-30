@@ -56,7 +56,7 @@ is provided by the Lua hook which resolves the player's slot via
 - **4.3 Analytical maps** (heatmaps, tracks) and **4.5 Sortie analysis**
   (telemetry: altitude/speed/max G) require recording positions
   per unit and the ownship export. They will rely on the lat/lng positions already
-  received by the live map rather than on the debrief's internal coordinates, which
+  received as telemetry rather than on the debrief's internal coordinates, which
   will avoid any per-theatre projection. Coming in a dedicated increment.
 - **Friendly-fire** is only counted from the events; the debrief does not
   always detail it.

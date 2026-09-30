@@ -1,5 +1,5 @@
 // Package api exposes the manager's HTTP interface: a small JSON API, a
-// Server-Sent Events stream for live updates, map tiles, and the embedded web UI.
+// Server-Sent Events stream for live updates, and the embedded web UI.
 package api
 
 import (
@@ -11,16 +11,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"dcsmm/internal/aerodrome"
-	"dcsmm/internal/basemap"
 	"dcsmm/internal/charts"
 	"dcsmm/internal/config"
 	"dcsmm/internal/db"
@@ -28,8 +24,6 @@ import (
 	"dcsmm/internal/state"
 	"dcsmm/internal/stats"
 	"dcsmm/internal/theatre"
-	"dcsmm/internal/vectors"
-	"dcsmm/internal/visibility"
 )
 
 // The frontend build is written here by `npm run build` (see
@@ -70,14 +64,14 @@ const fallbackPage = `<!doctype html>
 npm install
 npm run build</code></pre>
       <p class="status"><span class="dot">●</span> API : <a href="/api/health">/api/health</a> ·
-        <a href="/api/state">/api/state</a> · <a href="/api/events">/api/events</a> ·
+        <a href="/api/events">/api/events</a> ·
         <a href="/api/theatres">/api/theatres</a></p>
     </main>
   </body>
 </html>
 `
 
-// Server wires the unit store to the HTTP handlers.
+// Server wires the session stores to the HTTP handlers.
 type Server struct {
 	cfg        config.Config
 	store      *state.Store
@@ -86,13 +80,9 @@ type Server struct {
 	stats      *stats.Service
 	aerodromes *aerodrome.Catalog
 	charts     *charts.Catalog
-	vectors    *vectors.Catalog
-	visibility *visibility.Policy
 	hub        *hub
 	theatres   []theatre.Theatre
-	tilesDir   string
 	chartsDir  string
-	basemaps   []basemap.Basemap
 	// localOnly is true when the server is bound to the loopback interface, in
 	// which case it also refuses requests whose Host is not local (DNS
 	// rebinding).
@@ -100,17 +90,7 @@ type Server struct {
 }
 
 // New creates a server backed by store. live, database and statsService may be nil.
-func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, vectorCatalog *vectors.Catalog, vis *visibility.Policy) *Server {
-	theatres := theatre.All()
-	for i := range theatres {
-		theatres[i].Tiles = hasTiles(cfg.TilesDir, theatres[i].ID)
-		if theatres[i].Tiles {
-			theatres[i].TileMinZoom, theatres[i].TileMaxZoom = tileZoomRange(cfg.TilesDir, theatres[i].ID)
-		}
-	}
-	if vis == nil {
-		vis = visibility.New(false)
-	}
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog) *Server {
 	return &Server{
 		cfg:        cfg,
 		store:      store,
@@ -119,13 +99,9 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		stats:      statsService,
 		aerodromes: aerodromes,
 		charts:     chartCatalog,
-		vectors:    vectorCatalog,
-		visibility: vis,
 		hub:        newHub(),
-		theatres:   theatres,
-		tilesDir:   cfg.TilesDir,
+		theatres:   theatre.All(),
 		chartsDir:  cfg.ChartsDir,
-		basemaps:   basemap.All(cfg.BasemapURL),
 		localOnly:  isLoopbackAddr(cfg.HTTPAddr),
 	}
 }
@@ -211,9 +187,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/theatres", s.handleTheatres)
-	mux.HandleFunc("/api/visibility", s.handleVisibility)
 	mux.HandleFunc("/api/units/", s.handleUnit)
-	mux.HandleFunc("/api/tiles/", s.handleTiles)
 	mux.HandleFunc("/api/game-events", s.handleGameEvents)
 	mux.HandleFunc("/api/chat", s.handleChat)
 	mux.HandleFunc("/api/players", s.handlePlayers)
@@ -233,11 +207,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/analytics/sorties", s.handleSorties)
 	mux.HandleFunc("/api/aerodromes", s.handleAerodromes)
 	mux.HandleFunc("/api/aerodromes/", s.handleAerodrome)
-	mux.HandleFunc("/api/towns", s.handleTowns)
 	mux.HandleFunc("/api/charts", s.handleCharts)
 	mux.HandleFunc("/api/charts/file/", s.handleChartFile)
-	mux.HandleFunc("/api/vectors", s.handleVectors)
-	mux.HandleFunc("/api/vectors/file/", s.handleVectorFile)
 	mux.HandleFunc("/api/maintenance", s.handleMaintenance)
 	mux.HandleFunc("/api/maintenance/purge", s.handlePurge)
 	mux.Handle("/", s.webHandler())
@@ -296,7 +267,7 @@ func (s *Server) BroadcastMessage(v any) {
 	}
 }
 
-// Summary aggregates unit counts for the UI legend.
+// Summary aggregates unit counts for the session description.
 type Summary struct {
 	ByCategory  map[string]int `json:"byCategory"`
 	ByCoalition map[string]int `json:"byCoalition"`
@@ -323,17 +294,14 @@ func summarise(units []state.Unit) Summary {
 }
 
 func (s *Server) stateJSON() ([]byte, error) {
-	// Fog-of-war filtering happens here, once, so every consumer (SSE, REST)
-	// sees exactly the same, mission-authorised view.
-	units := s.visibility.Filter(s.store.Snapshot())
+	units := s.store.Snapshot()
 	sort.Slice(units, func(i, j int) bool { return units[i].ID < units[j].ID })
 	payload := map[string]any{
-		"type":       "state",
-		"count":      len(units),
-		"units":      units,
-		"summary":    summarise(units),
-		"visibility": s.visibility.Describe(),
-		"ts":         time.Now().UnixMilli(),
+		"type":    "state",
+		"count":   len(units),
+		"units":   units,
+		"summary": summarise(units),
+		"ts":      time.Now().UnixMilli(),
 	}
 	return json.Marshal(payload)
 }
@@ -350,12 +318,11 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 //
 // Query parameters: category, coalition, ownship=true, q (type/label substring).
 func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
-	units := filter(s.visibility.Filter(s.store.Snapshot()), r)
+	units := filter(s.store.Snapshot(), r)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"count":      len(units),
-		"units":      units,
-		"summary":    summarise(units),
-		"visibility": s.visibility.Describe(),
+		"count":   len(units),
+		"units":   units,
+		"summary": summarise(units),
 	})
 }
 
@@ -395,7 +362,7 @@ func (s *Server) handleUnit(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing unit id"})
 		return
 	}
-	for _, u := range s.visibility.Filter(s.store.Snapshot()) {
+	for _, u := range s.store.Snapshot() {
 		if u.ID == id {
 			writeJSON(w, http.StatusOK, u)
 			return
@@ -404,127 +371,11 @@ func (s *Server) handleUnit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNotFound, map[string]string{"error": "unit not found"})
 }
 
-// handleVisibility reports the active fog-of-war policy.
-func (s *Server) handleVisibility(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.visibility.Describe())
-}
-
 func (s *Server) handleTheatres(w http.ResponseWriter, _ *http.Request) {
-	// Prefer the extent derived from DCS's own data; the hardcoded bounds are
-	// only a fallback for a map that is not installed (nothing to measure).
-	if s.aerodromes != nil {
-		for i := range s.theatres {
-			if ext, ok := s.aerodromes.Extent(s.theatres[i].ID); ok {
-				s.theatres[i].Bounds = theatre.Bounds{
-					MinLat: ext.MinLat,
-					MinLng: ext.MinLng,
-					MaxLat: ext.MaxLat,
-					MaxLng: ext.MaxLng,
-				}
-			}
-		}
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"default":  s.cfg.Theatre,
 		"theatres": s.theatres,
-		"basemaps": s.basemaps,
-		"basemap":  s.cfg.Basemap,
-		// Credits the source of the imported map tiles, when the user set one.
-		"tilesAttribution": s.cfg.TilesAttribution,
 	})
-}
-
-// handleTiles serves DCS map tiles laid out as <tilesDir>/<theatre>/<z>/<x>/<y>.png.
-//
-// Leaflet requests tiles through the template /{z}/{x}/{y}.png, so the extension
-// arrives in the URL. It is trimmed rather than assumed: appending ".png"
-// unconditionally produced "11.png.png" and a 404 for every tile ever requested,
-// which went unnoticed because no tiles were shipped.
-func (s *Server) handleTiles(w http.ResponseWriter, r *http.Request) {
-	rest := strings.TrimPrefix(r.URL.Path, "/api/tiles/")
-	parts := strings.Split(rest, "/")
-	if len(parts) != 4 {
-		http.NotFound(w, r)
-		return
-	}
-	th, z, x := parts[0], parts[1], parts[2]
-	// Accept both "11" and "11.png"; anything else is refused.
-	y := strings.TrimSuffix(parts[3], ".png")
-	if !validTilePart(th) || !validTilePart(z) || !validTilePart(x) || !validTilePart(y) {
-		http.NotFound(w, r)
-		return
-	}
-	// Guard against path traversal. The parts are already validated, so escape
-	// is not reachable; this is defence in depth, and the comparison appends a
-	// separator because a plain HasPrefix would accept a sibling directory
-	// ("C:\tiles-other" starts with "C:\tiles").
-	full := filepath.Join(s.tilesDir, th, z, x, y+".png")
-	absBase, err := filepath.Abs(s.tilesDir)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	absFull, err := filepath.Abs(full)
-	if err != nil || !strings.HasPrefix(absFull, absBase+string(os.PathSeparator)) {
-		http.NotFound(w, r)
-		return
-	}
-	if _, err := os.Stat(absFull); err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	http.ServeFile(w, r, absFull)
-}
-
-func validTilePart(s string) bool {
-	if s == "" || len(s) > 64 {
-		return false
-	}
-	for _, r := range s {
-		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' && r != '-' {
-			return false
-		}
-	}
-	return true
-}
-
-func hasTiles(dir, theatreID string) bool {
-	if dir == "" {
-		return false
-	}
-	info, err := os.Stat(filepath.Join(dir, theatreID))
-	return err == nil && info.IsDir()
-}
-
-// tileZoomRange returns the lowest and highest zoom levels present for a
-// theatre. The levels are the numeric directory names directly under the theatre
-// folder (tiles/<theatre>/<z>/...). A zero means "not known".
-func tileZoomRange(dir, theatreID string) (minZ, maxZ int) {
-	entries, err := os.ReadDir(filepath.Join(dir, theatreID))
-	if err != nil {
-		return 0, 0
-	}
-	minZ = -1
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		z, err := strconv.Atoi(e.Name())
-		if err != nil || z < 0 || z > 30 {
-			continue
-		}
-		if minZ < 0 || z < minZ {
-			minZ = z
-		}
-		if z > maxZ {
-			maxZ = z
-		}
-	}
-	if minZ < 0 {
-		minZ = 0
-	}
-	return minZ, maxZ
 }
 
 // handleEvents implements a Server-Sent Events stream.
@@ -544,7 +395,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	s.hub.add(ch)
 	defer s.hub.remove(ch)
 
-	if b, err := s.stateJSON(); err == nil {
+	// Send the current session immediately, so a client that connects between
+	// two broadcasts is not left with an empty view for a whole interval.
+	if b, err := s.sessionJSON(); err == nil && b != nil {
 		fmt.Fprintf(w, "data: %s\n\n", b)
 		flusher.Flush()
 	}

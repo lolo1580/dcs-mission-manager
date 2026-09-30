@@ -42,8 +42,6 @@ import (
 	"dcsmm/internal/tcp"
 	"dcsmm/internal/tracker"
 	"dcsmm/internal/udp"
-	"dcsmm/internal/vectors"
-	"dcsmm/internal/visibility"
 )
 
 // Version is injected at build time (-ldflags "-X main.Version=...").
@@ -205,12 +203,6 @@ func Run(onReady func(addr string)) error {
 			log.Printf("aerodrome: %d airfields loaded from the embedded dataset", airfields.Count())
 		}
 	}
-	visibilityPolicy := visibility.New(cfg.RevealAllUnits)
-	if cfg.RevealAllUnits {
-		log.Printf("visibility: filtering disabled (DCSMM_REVEAL_ALL_UNITS=true)")
-	} else {
-		log.Printf("visibility: fog of war enforced (restrictive)")
-	}
 	// Aeronautical charts live on disk as scans and are never shipped: they are
 	// documents, indexed by name and displayed as-is.
 	chartCatalog, err := charts.Load(cfg.ChartsDir)
@@ -224,21 +216,8 @@ func Run(onReady func(addr string)) error {
 		log.Printf("charts: none found in %s (optional)", cfg.ChartsDir)
 	}
 
-	// Terrain vectors (roads, railroads, rivers, borders, urban areas) come from
-	// DCS terrain data exported as GeoJSON; like the charts, they are optional.
-	vectorCatalog, err := vectors.Load(cfg.VectorsDir)
-	if err != nil {
-		log.Printf("vectors: index unavailable: %v", err)
-		vectorCatalog = nil
-	} else if vectorCatalog.Count() > 0 {
-		log.Printf("vectors: %d layer(s) from %s (%s)",
-			vectorCatalog.Count(), cfg.VectorsDir, strings.Join(vectorCatalog.Theatres(), ", "))
-	} else {
-		log.Printf("vectors: none found in %s (optional)", cfg.VectorsDir)
-	}
-
-	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, vectorCatalog, visibilityPolicy)
-	// The mission's F10 view options drive fog-of-war filtering.
+	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog)
+	// The mission's options are recorded for the session description.
 	tcpListener.OnOptions = srv.ApplyMissionOptions
 
 	// Persist messages as they arrive, and mirror them over SSE.
