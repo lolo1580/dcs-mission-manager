@@ -1,17 +1,23 @@
 <script>
   import { onMount } from 'svelte';
   import {
+    heatPoints,
+    heatGrid,
     heatSource,
     heatTotal,
     sortieStats,
     trails,
     analyticsError,
+    showHeat,
+    showTrails,
+    maxSortieKm,
     loadAnalytics,
     reloadHeat,
     fmtKm,
     fmtSpeed,
     fmtDuration,
   } from './analytics.js';
+  import AnalyticsPlot from './AnalyticsPlot.svelte';
   import { t } from './i18n.js';
 
   onMount(loadAnalytics);
@@ -19,6 +25,11 @@
   async function changeSource(id) {
     heatSource.set(id);
     await reloadHeat();
+  }
+
+  /** Relative width of a sortie's distance bar, in %. */
+  function barWidth(km) {
+    return Math.max(2, Math.round(((km ?? 0) / $maxSortieKm) * 100));
   }
 </script>
 
@@ -40,14 +51,26 @@
     <p class="hint">
       {$t('analytics.hint')}
     </p>
-    <div class="sources">
-      <button class:active={$heatSource === 'losses'} on:click={() => changeSource('losses')}>
-        {$t('analytics.losses')}
-      </button>
-      <button class:active={$heatSource === 'positions'} on:click={() => changeSource('positions')}>
-        {$t('analytics.traffic')}
-      </button>
+    <div class="controls">
+      <div class="sources">
+        <button class:active={$heatSource === 'losses'} on:click={() => changeSource('losses')}>
+          {$t('analytics.losses')}
+        </button>
+        <button class:active={$heatSource === 'positions'} on:click={() => changeSource('positions')}>
+          {$t('analytics.traffic')}
+        </button>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" checked={$showHeat} on:change={(e) => showHeat.set(e.currentTarget.checked)} />
+        {$t('analytics.layerHeat')}
+      </label>
+      <label class="toggle">
+        <input type="checkbox" checked={$showTrails} on:change={(e) => showTrails.set(e.currentTarget.checked)} />
+        {$t('analytics.layerTrails')}
+      </label>
     </div>
+
+    <AnalyticsPlot heat={$heatPoints} grid={$heatGrid} trails={$trails} showHeat={$showHeat} showTrails={$showTrails} />
   </div>
 
   <div class="block">
@@ -69,12 +92,13 @@
         </thead>
         <tbody>
           {#each $sortieStats as s (s.unitId)}
-            {@const trail = $trails[s.unitId] ?? []}
-            {@const label = trail[0] ? s.unitId : s.unitId}
             <tr>
               <td class="name">{s.type || s.unitId}</td>
               <td class="num">{fmtDuration(s.durationSec)}</td>
-              <td class="num">{fmtKm(s.distanceKm)}</td>
+              <td class="num dist">
+                <span class="bar" style="width:{barWidth(s.distanceKm)}%"></span>
+                <span class="val">{fmtKm(s.distanceKm)}</span>
+              </td>
               <td class="num">{Math.round(s.maxAlt)} m</td>
               <td class="num">{fmtSpeed(s.maxSpeed)}</td>
               <td class="num">{s.maxG > 0 ? s.maxG.toFixed(1) : '—'}</td>
@@ -154,6 +178,14 @@
     max-width: 60ch;
   }
 
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.65rem;
+  }
+
   .sources {
     display: flex;
     gap: 0.3rem;
@@ -173,6 +205,15 @@
     color: var(--text);
     border-color: var(--blue);
     background: color-mix(in srgb, var(--blue) 18%, var(--bg));
+  }
+
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.76rem;
+    color: var(--muted);
+    cursor: pointer;
   }
 
   table {
@@ -203,6 +244,29 @@
 
   td.num {
     text-align: right;
+  }
+
+  /* Distance column: a horizontal bar behind the value, scaled to the longest
+     sortie, so the table reads as a ranking at a glance. */
+  td.dist {
+    position: relative;
+    min-width: 8rem;
+  }
+
+  td.dist .bar {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 1.05rem;
+    background: color-mix(in srgb, var(--blue) 30%, transparent);
+    border-radius: 4px;
+    z-index: 0;
+  }
+
+  td.dist .val {
+    position: relative;
+    z-index: 1;
   }
 
   .empty {

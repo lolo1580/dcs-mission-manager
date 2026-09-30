@@ -32,6 +32,26 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **L'onglet Analyse dessine ses données au lieu de seulement lister des
+  chiffres.** La carte disparue, la heatmap s'était réduite à un compteur et les
+  stats de sortie à un tableau. L'analyse dispose maintenant d'un **graphique vu
+  de dessus**, en SVG pur (aucune bibliothèque cartographique) : la heatmap en
+  cellules de grille colorées (du bleu au rouge, à l'échelle racine carrée pour
+  que quelques cellules denses ne masquent pas le reste) et les trajectoires
+  enregistrées en polylignes, sur une même emprise avec les coordonnées des coins.
+  - Le graphique est **sans projection mais non déformé** : un degré de longitude
+    est mis à l'échelle par `cos(latitude)`, donc l'image garde ses vraies
+    proportions — l'écart est important sur Kola ou The Channel, où un rendu carré
+    naïf étire la carte horizontalement.
+  - Deux interrupteurs (densité, trajectoires) activent chaque calque ; leur état
+    est mémorisé entre les redémarrages. Basculer entre « Trafic » et « Pertes »
+    ne recharge que la heatmap, en laissant les trajectoires en place.
+  - Le tableau de sortie gagne une **barre de distance** par ligne, à l'échelle de
+    la plus longue sortie, pour lire le classement d'un coup d'œil.
+  - Les helpers de projection vivent dans `frontend/src/lib/plots.js` et traitent
+    explicitement les cas dégénérés : un point unique, une trajectoire parfaitement
+    rectiligne et un résultat vide se dessinent sans division par zéro.
+
 - **Le manager s'ouvre désormais dans sa propre fenêtre, et non dans un onglet de
   navigateur.** Lancer `dcsmm.exe` affiche l'UI embarquée dans une fenêtre WebView2
   native : plus de navigateur à ouvrir, plus de `localhost:8080` à retenir, et

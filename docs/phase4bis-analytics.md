@@ -49,6 +49,11 @@ are recorded — the speed/G columns stay empty rather than wrong.
 - New **Analysis** tab: heat map source (Traffic / Losses) and
   a **sortie analysis** table per unit (duration, distance, max altitude,
   max speed, max G, number of points).
+- A **top-down plot** (plain SVG, no map library) draws the heat map as coloured
+  grid cells and the recorded flight paths as polylines, over a shared bounding
+  box with corner coordinates. Longitude is scaled by `cos(latitude)` so the shape
+  keeps its true proportions. Each layer can be toggled; the choice is remembered.
+  The sortie table also shows a distance bar per row, scaled to the longest sortie.
 
 The distance is computed with the **haversine** formula (great circle), on the
 points actually recorded.

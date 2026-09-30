@@ -31,6 +31,25 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **The analysis tab draws its data instead of only listing numbers.** With the
+  map gone, the heatmap had become a count and the sortie stats a table. The
+  analysis now has a **top-down plot** built in plain SVG (no map library): the
+  heatmap as coloured grid cells (blue to red, square-root scaled so a few dense
+  cells do not hide the rest) and the recorded flight paths as polylines, over a
+  shared bounding box with corner coordinates.
+  - The plot is **projection-free but not distorted**: one degree of longitude is
+    scaled by `cos(latitude)`, so the picture keeps its true proportions — the
+    difference is large on Kola or The Channel, where a naive square plot
+    stretches the map horizontally.
+  - Two toggles (density, flight paths) turn each layer on and off; they are
+    remembered across restarts. Switching between "Traffic" and "Losses"
+    re-fetches only the heatmap, leaving the paths in place.
+  - The sortie table gained a **distance bar** per row, scaled to the longest
+    sortie, so the ranking reads at a glance.
+  - The projection helpers live in `frontend/src/lib/plots.js` and handle the
+    degenerate cases explicitly: a single point, a perfectly straight track, and
+    an empty result all plot without a division by zero.
+
 - **The manager now opens in its own window instead of a browser tab.** Starting
   `dcsmm.exe` shows the embedded UI in a native WebView2 window: no browser to
   launch, no `localhost:8080` to remember, and closing the window shuts the
