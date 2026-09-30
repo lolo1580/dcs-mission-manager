@@ -31,6 +31,24 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **Chat messages can now be sent into DCS (command channel).** The TCP link was
+  already bidirectional by construction; the backend now writes commands down the
+  same connection the hook uses to report, and the hook executes them.
+  - `POST /api/chat` no longer answers `501`: it hands a
+    `{"type":"command","command":"chat",…}` line to the TCP listener, which fans
+    it out to every connected hook. It answers `503` when no hook is connected
+    (game not running, or scripts not installed) — a normal state, shown as such
+    in the UI, not an error.
+  - `Hooks/dcsmm.lua` reads pending commands from `onSimulationFrame`, with a
+    **zero timeout**, so a frame is never stalled, and injects the message with
+    `net.send_chat`. An unknown command is logged and ignored, so a newer backend
+    cannot break an older hook.
+  - `internal/tcp` tracks its connections and exposes `Connected()` /
+    `SendCommand()`, behind a small `api.Commander` interface so the HTTP layer
+    stays free of the transport.
+  - Covered by tests on both sides: the backend fan-out and the "no hook" case,
+    and the `503`/`200`/`400` answers of `POST /api/chat`.
+
 - **The analysis tab draws its data instead of only listing numbers.** With the
   map gone, the heatmap had become a count and the sortie stats a table. The
   analysis now has a **top-down plot** built in plain SVG (no map library): the

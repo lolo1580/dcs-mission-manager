@@ -80,9 +80,26 @@ Tables: `missions`, `events`, `chat`, `players`, `player_stats`, `meta`.
 Persistence can be disabled with `DCSMM_DB_ENABLED=false` (everything stays in
 memory).
 
-## Command channel (coming soon)
+## Command channel
 
-The TCP channel is **bidirectional by construction**: the backend will be able to
-push commands (kick, mission change, chat message) that the Lua hook will
-execute. The `POST /api/chat` endpoint already exists and returns `501`
-explicitly as long as this channel is not wired up.
+The TCP channel is **bidirectional**: the backend pushes commands down the same
+connection the hook uses to report, as one JSON line per command. The hook reads
+them from `onSimulationFrame` (non-blocking, so a frame is never stalled) and
+executes them.
+
+```
+Backend                                   DCS (Windows)
+POST /api/chat ─► internal/tcp.SendCommand ─► Hooks/dcsmm.lua readCommands()
+                                                 └─► net.send_chat("...")
+```
+
+| Command | Effect |
+|---|---|
+| `{"type":"command","command":"chat","message":"...","from":"Server"}` | Injects a chat message into DCS via `net.send_chat` |
+
+`POST /api/chat` returns `200` once the command is written, `503` when no hook is
+connected (game not running, or scripts not installed) — a normal state, shown as
+such in the UI, not an error.
+
+The hook ignores an unknown command and logs it, so a newer backend cannot break
+an older hook.

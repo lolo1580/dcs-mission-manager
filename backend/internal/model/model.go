@@ -44,6 +44,21 @@ type Message struct {
 	Telemetry *Telemetry `json:"telemetry,omitempty"`
 }
 
+// Command is a message the backend pushes to the DCS hook over the same TCP
+// connection the hook uses to report. The hook executes it on receipt.
+type Command struct {
+	Type string `json:"type"` // always "command"
+	// Command selects the action: "chat" injects a chat message into DCS.
+	Command string `json:"command"`
+	// Message is the chat text (command = "chat").
+	Message string `json:"message,omitempty"`
+	// From is the sender shown in DCS ("Server" by default).
+	From string `json:"from,omitempty"`
+}
+
+// CommandChat is the command id that injects a chat message.
+const CommandChat = "chat"
+
 // Player is a connected client as reported by net.get_player_info / net.get_stat.
 type Player struct {
 	ID   int    `json:"id"`

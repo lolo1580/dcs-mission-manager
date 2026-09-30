@@ -216,7 +216,7 @@ func Run(onReady func(addr string)) error {
 		log.Printf("charts: none found in %s (optional)", cfg.ChartsDir)
 	}
 
-	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog)
+	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, tcpListener)
 	// The mission's options are recorded for the session description.
 	tcpListener.OnOptions = srv.ApplyMissionOptions
 

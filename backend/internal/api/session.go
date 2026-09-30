@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+
+	"dcsmm/internal/model"
 )
 
 // handleGameEvents returns the recent in-memory game events (oldest first).
@@ -19,9 +21,10 @@ func (s *Server) handleGameEvents(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// handleChat returns recent messages on GET, and (Phase 2+) accepts a message
-// to send into DCS on POST. Sending requires the downstream command channel,
-// which is not wired yet, so POST answers 501 with a clear message.
+// handleChat returns recent messages on GET, and accepts a message to send into
+// DCS on POST. Sending goes down the same TCP connection the hook uses to
+// report, as a {"type":"command","command":"chat",...} line the Lua side
+// executes.
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		var body struct {
@@ -31,9 +34,27 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing message"})
 			return
 		}
-		writeJSON(w, http.StatusNotImplemented, map[string]string{
-			"error": "sending to DCS not yet available (command channel coming soon)",
+		if s.commander == nil || s.commander.Connected() == 0 {
+			// Distinguish "DCS is not connected" from a malformed request: the
+			// first is a normal state (game not running), not a bug.
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "DCS is not connected (hooks not installed, or game not running)",
+			})
+			return
+		}
+		sent := s.commander.SendCommand(model.Command{
+			Type:    "command",
+			Command: model.CommandChat,
+			Message: body.Message,
+			From:    "Server",
 		})
+		if sent == 0 {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "DCS did not accept the message (connection lost)",
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"sent": sent})
 		return
 	}
 

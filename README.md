@@ -29,7 +29,7 @@ Because it is local, it can read DCS's **own terrain data** — the airfields, f
 |---|---|---|
 | Events & players | ✅ Phase 2 | Kills, crashes, chat, players, SQLite history |
 | Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
-| Server control | 🚧 Partial | Chat to DCS (command channel) coming |
+| Server control | ✅ Phase 2+ | Send a chat message into DCS (command channel) |
 | Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission) |
 | Analytical maps & sortie | ✅ Phase 4 bis | Heatmap and flight-path plot, sortie analysis, ownship telemetry |
 | Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **101 airfields listed, 69 mappable** across 5 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts |

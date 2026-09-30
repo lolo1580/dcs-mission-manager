@@ -335,6 +335,113 @@ do
     say(string.format("debrief sent (%d bytes, %d chunks)", #data, chunks))
   end
 
+  --[[
+    Command channel (backend → DCS)
+
+    The connection is bidirectional: after sending, we read whatever the backend
+    pushed back and execute it. Reading is strictly non-blocking (a zero timeout
+    returns "timeout" immediately when there is nothing), because this runs from
+    the simulator's frame callback and must never stall a frame.
+
+    The backend sends one JSON object per line:
+      {"type":"command","command":"chat","message":"...","from":"Server"}
+
+    We accept a "chat" command and hand it to DCS's chat API. Anything else is
+    logged and ignored, so a newer backend cannot break an older hook.
+  ]]
+  local readBuf = ""
+
+  local function splitLines(s)
+    local lines = {}
+    local start = 1
+    while true do
+      local nl = s:find("\n", start, true)
+      if not nl then break end
+      lines[#lines + 1] = s:sub(start, nl - 1)
+      start = nl + 1
+    end
+    return lines, s:sub(start)
+  end
+
+  -- A very small JSON field reader: enough for the flat command objects the
+  -- backend sends, without pulling in a parser DCS does not ship.
+  local function jsonStringField(s, key)
+    local pattern = '"' .. key .. '%s*:%s*"'
+    local _, e = s:find(pattern)
+    if not e then return nil end
+    local i = e + 1
+    local out = {}
+    while i <= #s do
+      local c = s:sub(i, i)
+      if c == '"' then break end
+      if c == "\\" then
+        local n = s:sub(i + 1, i + 1)
+        if n == "n" then out[#out + 1] = "\n"
+        elseif n == "r" then out[#out + 1] = "\r"
+        elseif n == "t" then out[#out + 1] = "\t"
+        elseif n == '"' then out[#out + 1] = '"'
+        elseif n == "\\" then out[#out + 1] = "\\"
+        elseif n == "u" then
+          local hex = s:sub(i + 2, i + 5)
+          local code = tonumber(hex, 16)
+          if code then out[#out + 1] = string.char(code % 256) end
+          i = i + 4
+        else out[#out + 1] = n end
+        i = i + 2
+      else
+        out[#out + 1] = c
+        i = i + 1
+      end
+    end
+    return table.concat(out)
+  end
+
+  -- Injects a chat message into DCS. net.send_chat sends to everyone;
+  -- net.send_chat_to targets one player. We keep it simple and broadcast.
+  local function injectChat(message, from)
+    if not message or message == "" then return end
+    local text = message
+    if from and from ~= "" then text = "[" .. from .. "] " .. message end
+    if net and net.send_chat then
+      local ok, err = pcall(net.send_chat, text)
+      if not ok then say("chat send failed: " .. tostring(err)) end
+    end
+  end
+
+  local function handleCommand(line)
+    if not line:find('"command"', 1, true) then return end
+    local cmd = jsonStringField(line, "command")
+    if cmd == "chat" then
+      injectChat(jsonStringField(line, "message"), jsonStringField(line, "from"))
+    else
+      say("unknown command from backend: " .. tostring(cmd))
+    end
+  end
+
+  -- Drains everything the backend has sent since the last call, without ever
+  -- blocking.
+  local function readCommands()
+    if not conn then return end
+    if conn.settimeout then conn:settimeout(0) end
+    while true do
+      local data, err, partial = conn:receive(4096)
+      local chunk = data or partial
+      if chunk and #chunk > 0 then
+        readBuf = readBuf .. chunk
+        local lines, rest = splitLines(readBuf)
+        readBuf = rest
+        for _, line in ipairs(lines) do
+          if line ~= "" then handleCommand(line) end
+        end
+      end
+      if not chunk or #chunk == 0 then break end
+      -- "timeout" (err set, no partial) means nothing more to read right now.
+      if err and err ~= "timeout" then break end
+      if data == nil and partial == nil then break end
+    end
+    if conn.settimeout then conn:settimeout(0.5) end
+  end
+
   ---------------------------------------------------------------------------
   -- Callback table expected by Sim.setUserCallbacks
   ---------------------------------------------------------------------------
@@ -422,7 +529,12 @@ do
   function dcsmm.onPlayerChangeSlot(id) sendPlayers() end
 
   -- Periodic refresh of statistics, via the simulator timer.
-  local nextPlayersAt, nextSlotsAt
+  local nextPlayersAt, nextSlotsAt, nextCommandAt
+  -- How often we look for a command from the backend. Short enough to feel
+  -- responsive, long enough that the socket read (which never blocks anyway)
+  -- stays negligible against the frame budget.
+  local commandInterval = 0.25
+
   function dcsmm.onSimulationFrame()
     local t = (LoGetModelTime and LoGetModelTime()) or 0
     if not nextSlotsAt then nextSlotsAt = t + 30.0 end
@@ -434,6 +546,11 @@ do
     if t >= nextPlayersAt then
       sendPlayers()
       nextPlayersAt = t + playersInterval
+    end
+    if not nextCommandAt then nextCommandAt = t + commandInterval end
+    if t >= nextCommandAt then
+      pcall(readCommands)
+      nextCommandAt = t + commandInterval
     end
   end
 

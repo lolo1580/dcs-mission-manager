@@ -35,7 +35,7 @@ d'un jeu de données maintenu à la main.
 |---|---|---|
 | Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
-| Contrôle serveur | 🚧 Partiel | Chat vers DCS (canal de commandes) à venir |
+| Contrôle serveur | ✅ Phase 2+ | Envoi d'un message de chat dans DCS (canal de commandes) |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmap et tracés de vol, analyse de sortie, télémétrie ownship |
 | Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **101 aérodromes listés, 69 plaçables** sur 5 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes |

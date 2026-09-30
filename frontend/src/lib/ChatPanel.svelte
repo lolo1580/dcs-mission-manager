@@ -18,7 +18,11 @@
         body: JSON.stringify({ message }),
       });
       if (!res.ok) {
-        // The backend explains why (downstream channel not wired yet).
+        // 503 means DCS is not connected: a normal state, not a failure.
+        if (res.status === 503) {
+          error = tNow('chat.notConnected');
+          return;
+        }
         const body = await res.json().catch(() => ({}));
         error = body.error ?? tNow('chat.refused', { status: res.status });
         return;

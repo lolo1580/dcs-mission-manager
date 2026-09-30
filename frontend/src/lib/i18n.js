@@ -112,7 +112,7 @@ const en = {
   'chat.placeholder': 'Message…',
   'chat.send': 'Send',
   'chat.system': 'system',
-  'chat.unavailable': 'Sending to DCS is not available yet (command channel pending)',
+  'chat.notConnected': 'DCS is not connected (hooks not installed, or game not running)',
   'chat.unreachable': 'Backend unreachable',
   'chat.refused': 'Send refused ({status})',
 
@@ -305,7 +305,7 @@ const fr = {
   'chat.placeholder': 'Message…',
   'chat.send': 'Envoyer',
   'chat.system': 'système',
-  'chat.unavailable': "Envoi vers DCS pas encore disponible (canal de commandes à venir)",
+  'chat.notConnected': "DCS n'est pas connecté (hooks non installés, ou jeu non lancé)",
   'chat.unreachable': 'Backend injoignable',
   'chat.refused': 'Envoi refusé ({status})',
 

@@ -71,6 +71,17 @@ npm run build</code></pre>
 </html>
 `
 
+// Commander pushes commands back to DCS over the hook connection, and reports
+// whether a hook is connected. It is implemented by internal/tcp.Listener; the
+// interface keeps package api free of a dependency on the transport.
+type Commander interface {
+	// SendCommand serializes v as one JSON line to every connected hook and
+	// returns how many received it. Zero means no hook is connected.
+	SendCommand(v any) int
+	// Connected reports how many hook connections are open.
+	Connected() int
+}
+
 // Server wires the session stores to the HTTP handlers.
 type Server struct {
 	cfg        config.Config
@@ -80,6 +91,7 @@ type Server struct {
 	stats      *stats.Service
 	aerodromes *aerodrome.Catalog
 	charts     *charts.Catalog
+	commander  Commander
 	hub        *hub
 	theatres   []theatre.Theatre
 	chartsDir  string
@@ -89,8 +101,9 @@ type Server struct {
 	localOnly bool
 }
 
-// New creates a server backed by store. live, database and statsService may be nil.
-func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog) *Server {
+// New creates a server backed by store. live, database, statsService and
+// commander may be nil.
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, commander Commander) *Server {
 	return &Server{
 		cfg:        cfg,
 		store:      store,
@@ -99,6 +112,7 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		stats:      statsService,
 		aerodromes: aerodromes,
 		charts:     chartCatalog,
+		commander:  commander,
 		hub:        newHub(),
 		theatres:   theatre.All(),
 		chartsDir:  cfg.ChartsDir,

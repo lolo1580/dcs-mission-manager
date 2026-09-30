@@ -1,8 +1,10 @@
-// Package tcp receives newline-delimited JSON messages from the DCS Hooks script.
+// Package tcp receives newline-delimited JSON messages from the DCS Hooks script,
+// and pushes commands back to it.
 //
 // The Lua side opens a TCP connection to the backend and streams one JSON object
-// per line: game events, player rosters, chat and mission transitions. This is
-// also the channel the backend uses to push commands back to DCS (Phase 2+).
+// per line: game events, player rosters, chat and mission transitions. The same
+// connection is the command channel: the backend writes one JSON line back, and
+// the hook executes it (for example a chat message injected into DCS).
 package tcp
 
 import (
@@ -10,13 +12,15 @@ import (
 	"encoding/json"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"dcsmm/internal/live"
 	"dcsmm/internal/model"
 )
 
-// Listener accepts DCS hook connections and feeds the live store.
+// Listener accepts DCS hook connections, feeds the live store, and can push
+// commands back down the same connections.
 type Listener struct {
 	live *live.Store
 
@@ -24,14 +28,35 @@ type Listener struct {
 	// are kept with the session.
 	OnOptions func(map[string]any)
 
-	// OnEvent, when set, is called for every received message (for persistence
+	// OnMessage, when set, is called for every received message (for persistence
 	// and broadcasting). It must not block.
 	OnMessage func(model.Message)
+
+	mu    sync.Mutex
+	conns map[*client]struct{}
+	// undelivered counts commands that found no connected hook, so an operator
+	// can tell "DCS is not running" from "the command was refused".
+	undelivered int
+}
+
+// client is one hook connection, with a mutex so the read loop and a command
+// writer never interleave their writes.
+type client struct {
+	mu   sync.Mutex
+	conn net.Conn
+}
+
+// write sends one already-serialized line (including its trailing newline).
+func (c *client) write(b []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, err := c.conn.Write(b)
+	return err
 }
 
 // NewListener creates a listener writing into store.
 func NewListener(store *live.Store) *Listener {
-	return &Listener{live: store}
+	return &Listener{live: store, conns: make(map[*client]struct{})}
 }
 
 // Listen opens a TCP socket bound to addr.
@@ -57,7 +82,12 @@ func (l *Listener) Serve(ln *net.TCPListener) {
 }
 
 func (l *Listener) handle(conn net.Conn) {
-	defer conn.Close()
+	c := &client{conn: conn}
+	l.addClient(c)
+	defer func() {
+		l.removeClient(c)
+		conn.Close()
+	}()
 	log.Printf("tcp: dcs connected from %s", conn.RemoteAddr())
 
 	scanner := bufio.NewScanner(conn)
@@ -78,6 +108,61 @@ func (l *Listener) handle(conn net.Conn) {
 		log.Printf("tcp: read: %v", err)
 	}
 	log.Printf("tcp: dcs disconnected from %s", conn.RemoteAddr())
+}
+
+func (l *Listener) addClient(c *client) {
+	l.mu.Lock()
+	l.conns[c] = struct{}{}
+	l.mu.Unlock()
+}
+
+func (l *Listener) removeClient(c *client) {
+	l.mu.Lock()
+	delete(l.conns, c)
+	l.mu.Unlock()
+}
+
+// Connected reports how many hook connections are currently open. The UI uses it
+// to tell whether DCS can receive a command.
+func (l *Listener) Connected() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.conns)
+}
+
+// SendCommand serializes v as one JSON line and writes it to every connected
+// hook. It returns the number of connections the command reached; zero means no
+// hook is connected (DCS not running, or the scripts not installed).
+//
+// A failed write drops that client: the read loop will notice the closed socket
+// and clean it up.
+func (l *Listener) SendCommand(v any) int {
+	b, err := json.Marshal(v)
+	if err != nil {
+		log.Printf("tcp: marshal command: %v", err)
+		return 0
+	}
+	b = append(b, '\n')
+
+	l.mu.Lock()
+	clients := make([]*client, 0, len(l.conns))
+	for c := range l.conns {
+		clients = append(clients, c)
+	}
+	if len(clients) == 0 {
+		l.undelivered++
+	}
+	l.mu.Unlock()
+
+	sent := 0
+	for _, c := range clients {
+		if err := c.write(b); err != nil {
+			log.Printf("tcp: command write: %v", err)
+			continue
+		}
+		sent++
+	}
+	return sent
 }
 
 func (l *Listener) dispatch(m *model.Message) {

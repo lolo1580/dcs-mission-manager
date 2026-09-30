@@ -32,6 +32,25 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Le chat peut désormais être envoyé dans DCS (canal de commandes).** La liaison
+  TCP était déjà bidirectionnelle par construction ; le backend écrit maintenant des
+  commandes sur la même connexion que celle utilisée par le hook pour remonter, et
+  le hook les exécute.
+  - `POST /api/chat` ne répond plus `501` : il remet une ligne
+    `{"type":"command","command":"chat",…}` au listener TCP, qui la diffuse à tous
+    les hooks connectés. Il répond `503` quand aucun hook n'est connecté (jeu non
+    lancé, ou scripts non installés) — un état normal, affiché comme tel dans
+    l'interface, pas une erreur.
+  - `Hooks/dcsmm.lua` lit les commandes en attente depuis `onSimulationFrame`, avec
+    un **délai nul**, pour ne jamais bloquer une image, et injecte le message via
+    `net.send_chat`. Une commande inconnue est journalisée et ignorée, donc un
+    backend plus récent ne peut pas casser un hook plus ancien.
+  - `internal/tcp` suit ses connexions et expose `Connected()` / `SendCommand()`,
+    derrière une petite interface `api.Commander` pour que la couche HTTP reste
+    indépendante du transport.
+  - Couvert par des tests des deux côtés : la diffusion backend et le cas « aucun
+    hook », et les réponses `503`/`200`/`400` de `POST /api/chat`.
+
 - **L'onglet Analyse dessine ses données au lieu de seulement lister des
   chiffres.** La carte disparue, la heatmap s'était réduite à un compteur et les
   stats de sortie à un tableau. L'analyse dispose maintenant d'un **graphique vu
