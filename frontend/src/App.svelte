@@ -12,15 +12,35 @@
   import MissionsPanel from './lib/MissionsPanel.svelte';
   import InstallPanel from './lib/InstallPanel.svelte';
   import ConfigPanel from './lib/ConfigPanel.svelte';
-  import { connected, paused, fetchTheatres } from './lib/units.js';
+  import PanelsPanel from './lib/PanelsPanel.svelte';
+  import { connected, paused, fetchTheatres, connect } from './lib/units.js';
   import { events, players, mission } from './lib/session.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
+  import { onMount } from 'svelte';
 
   let tab = 'session';
 
   function goTo(id) {
     tab = id;
   }
+
+  // Open the live stream once, for the whole application. It used to be the map
+  // component that opened it; with the map gone, nothing did, and the session,
+  // events, chat and cockpit-hardware updates silently stopped arriving.
+  onMount(() => {
+    const stopStream = connect();
+    window.addEventListener('keydown', onKey);
+    return () => {
+      stopStream();
+      window.removeEventListener('keydown', onKey);
+    };
+  });
+
+  function onKey(e) {
+    if (e.key === 'Escape' && mapFullscreen) mapFullscreen = false;
+  }
+
+  let mapFullscreen = false;
 
   // Theatres drive the airfields tab: load them once at startup.
   fetchTheatres().catch(() => {});
@@ -48,6 +68,7 @@
       <button class:active={tab === 'modules'} on:click={() => goTo('modules')}>{$t('tab.modules')}</button>
       <button class:active={tab === 'install'} on:click={() => goTo('install')}>{$t('tab.install')}</button>
       <button class:active={tab === 'config'} on:click={() => goTo('config')}>{$t('tab.config')}</button>
+      <button class:active={tab === 'panels'} on:click={() => goTo('panels')}>{$t('tab.panels')}</button>
     </nav>
 
     {#if $mission}
@@ -121,6 +142,10 @@
     {:else if tab === 'config'}
       <div class="session wide">
         <ConfigPanel />
+      </div>
+    {:else if tab === 'panels'}
+      <div class="session wide">
+        <PanelsPanel />
       </div>
     {:else}
       <div class="session wide">

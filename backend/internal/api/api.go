@@ -20,8 +20,10 @@ import (
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
+	"dcsmanager/internal/dcsbios"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/live"
+	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
 	"dcsmanager/internal/theatre"
@@ -98,6 +100,8 @@ type Server struct {
 	mods       []dcsdata.InstalledMod
 	scripts    dcsdata.ScriptStatus
 	dcsConfig  dcsdata.DCSConfig
+	panels     *panelservice.Service
+	bios       *dcsbios.Client
 	commander  Commander
 	hub        *hub
 	theatres   []theatre.Theatre
@@ -270,6 +274,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/mods", s.handleMods)
 	mux.HandleFunc("/api/scripts", s.handleScripts)
 	mux.HandleFunc("/api/config", s.handleDCSConfig)
+	mux.HandleFunc("/api/panels", s.handlePanels)
+	mux.HandleFunc("/api/dcsbios", s.handleDCSBIOS)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

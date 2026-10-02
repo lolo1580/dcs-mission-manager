@@ -31,6 +31,7 @@ import (
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
+	"dcsmanager/internal/dcsbios"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/dcsdir"
 	"dcsmanager/internal/debriefstore"
@@ -38,6 +39,7 @@ import (
 	"dcsmanager/internal/install"
 	"dcsmanager/internal/live"
 	"dcsmanager/internal/model"
+	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/source"
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
@@ -312,6 +314,34 @@ func Run(onReady func(addr string)) error {
 
 	// Every callback is in place: the listener may now accept connections.
 	go tcpListener.Serve(tcpLn)
+
+	// ---- Panels and DCS-BIOS: cockpit hardware ----------------------------
+	// The manager drives Logitech panels directly and speaks DCS-BIOS' protocol,
+	// so a cockpit with either can be watched. Both are best-effort: a machine
+	// without panels or without DCS-BIOS simply sees nothing here.
+	panelSvc := panelservice.New(panelservice.DefaultOptions(), func(e panelservice.Event) {
+		srv.BroadcastMessage(map[string]any{"type": "panel", "panel": api.PanelEventJSON(e)})
+	})
+	panelSvc.Start()
+	defer panelSvc.Stop()
+
+	bios := dcsbios.New(dcsbios.DefaultOptions(), func(st dcsbios.State) {
+		srv.BroadcastMessage(map[string]any{
+			"type": "dcsbios",
+			"state": map[string]any{
+				"connected": st.Connected,
+				"aircraft":  st.Aircraft,
+				"frames":    st.Frames,
+			},
+		})
+	})
+	if err := bios.Start(); err != nil {
+		log.Printf("dcsbios: listener unavailable: %v", err)
+	} else {
+		defer bios.Stop()
+		log.Printf("dcsbios: listening on %s:%d", dcsbios.DefaultMulticast, dcsbios.DefaultReceivePort)
+	}
+	srv.SetPanels(panelSvc, bios)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

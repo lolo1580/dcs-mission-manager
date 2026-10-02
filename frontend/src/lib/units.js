@@ -4,6 +4,7 @@
  */
 import { writable, get } from 'svelte/store';
 import { events, players, chat, mission, sessionRev } from './session.js';
+import { pushPanelEvent, biosState } from './panels.js';
 
 /** All units as received from the backend. */
 export const units = writable([]);
@@ -33,6 +34,16 @@ export function connect() {
         units.set(msg.units ?? []);
         summary.set(msg.summary ?? { byCategory: {}, byCoalition: {} });
         lastUpdate.set(new Date());
+        return;
+      }
+
+      // Cockpit hardware arrives on its own frames, pushed as it happens.
+      if (msg.type === 'panel') {
+        pushPanelEvent(msg.panel);
+        return;
+      }
+      if (msg.type === 'dcsbios' && msg.state) {
+        biosState.set(msg.state);
         return;
       }
 
