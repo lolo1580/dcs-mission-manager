@@ -7,23 +7,23 @@ DCS loads two families of scripts from the *Saved Games* folder:
 ```
 %USERPROFILE%\Saved Games\DCS\          (ou DCS.openbeta)
 ├─ Config\
-│   └─ dcsmm.cfg          ← adresse du backend
+│   └─ dcsmanager.cfg          ← adresse du backend
 └─ Scripts\
     ├─ Export.lua         ← positions (telemetry)
     └─ Hooks\
-        └─ dcsmm.lua      ← events, players, chat
+        └─ dcsmanager.lua      ← events, players, chat
 ```
 
 ## Step 1 — Configuration
 
-Copy `dcs-lua/Config/dcsmm.cfg` to `Saved Games\DCS\Config\dcsmm.cfg`, then adapt:
+Copy `dcs-lua/Config/dcsmanager.cfg` to `Saved Games\DCS\Config\dcsmanager.cfg`, then adapt:
 
 ```lua
-dcsmm_host = "127.0.0.1"   -- the manager runs locally, nothing to change
-dcsmm_udp_port = 7778
-dcsmm_tcp_port = 7779
-dcsmm_enabled = true
-dcsmm_send_interval = 1.0
+dcsmanager_host = "127.0.0.1"   -- the manager runs locally, nothing to change
+dcsmanager_udp_port = 7778
+dcsmanager_tcp_port = 7779
+dcsmanager_enabled = true
+dcsmanager_send_interval = 1.0
 ```
 
 ## Step 2 — Export.lua (telemetry)
@@ -51,7 +51,7 @@ Simply copy `dcs-lua/Export.lua` to that location.
 
 ## Step 3 — Hooks (Phase 2, optional for now)
 
-Copy `dcs-lua/Hooks/dcsmm.lua` to `Saved Games\DCS\Scripts\Hooks\dcsmm.lua`.
+Copy `dcs-lua/Hooks/dcsmanager.lua` to `Saved Games\DCS\Scripts\Hooks\dcsmanager.lua`.
 DCS automatically loads all the `.lua` files in this folder, sorted by name.
 
 ## Step 4 — Restart DCS
@@ -59,17 +59,17 @@ DCS automatically loads all the `.lua` files in this folder, sorted by name.
 Start a mission. In the DCS logs, you should see:
 
 ```
-DCSMM: position export enabled (127.0.0.1:7778)
+DCSMANAGER: position export enabled (127.0.0.1:7778)
 ```
 
 ## Troubleshooting
 
 | Symptom | Clue |
 |---|---|
-| Nothing in the logs | `dcsmm.cfg` missing or misplaced (it must be in `Config\`) |
+| Nothing in the logs | `dcsmanager.cfg` missing or misplaced (it must be in `Config\`) |
 | `LuaSocket introuvable` | Incomplete DCS installation; LuaSocket ships with DCS |
 | The dot does not appear | Backend not started, or a firewall is blocking 127.0.0.1 |
-| The dot is jerky in game | Increase `dcsmm_send_interval` |
+| The dot is jerky in game | Increase `dcsmanager_send_interval` |
 
 ## Test without DCS
 

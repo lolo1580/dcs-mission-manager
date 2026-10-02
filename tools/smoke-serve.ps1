@@ -1,12 +1,12 @@
-# Smoke test for dcsmm serve — the headless mode.
+# Smoke test for dcsmanager serve — the headless mode.
 #
 # It starts the manager headless, waits for the health endpoint, checks that the
 # embedded UI is served (not the fallback page), then stops it. It needs no
 # window, so it runs unattended.
 #
-# Usage: pwsh -File tools/smoke-serve.ps1 [-Exe .\dcsmm.exe] [-Port 8080]
+# Usage: pwsh -File tools/smoke-serve.ps1 [-Exe .\dcsmanager.exe] [-Port 8080]
 param(
-    [string]$Exe = (Join-Path $PSScriptRoot '..\dcsmm.exe'),
+    [string]$Exe = (Join-Path $PSScriptRoot '..\dcsmanager.exe'),
     [int]$Port = 8080
 )
 
@@ -16,10 +16,10 @@ if (-not (Test-Path $Exe)) { throw "not found: $Exe" }
 
 # A port of 0 would work too, but the log line is harder to read back from a
 # script; an explicit, unlikely-to-be-taken port keeps this simple.
-$env:DCSMM_HTTP_ADDR = "127.0.0.1:$Port"
-$env:DCSMM_UDP_ADDR = "127.0.0.1:0"
-$env:DCSMM_TCP_ADDR = "127.0.0.1:0"
-$env:DCSMM_DB_ENABLED = 'false'
+$env:DCSMANAGER_HTTP_ADDR = "127.0.0.1:$Port"
+$env:DCSMANAGER_UDP_ADDR = "127.0.0.1:0"
+$env:DCSMANAGER_TCP_ADDR = "127.0.0.1:0"
+$env:DCSMANAGER_DB_ENABLED = 'false'
 
 & $Exe version
 
@@ -41,7 +41,7 @@ try {
     $html = (Invoke-WebRequest "http://127.0.0.1:$Port/" -UseBasicParsing).Content
     if ($html -notmatch '<div id="app">') { throw 'the embedded UI is not served (fallback page returned)' }
 
-    Write-Host 'OK: dcsmm serve is up and serves the embedded UI'
+    Write-Host 'OK: dcsmanager serve is up and serves the embedded UI'
 } finally {
     if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
 }

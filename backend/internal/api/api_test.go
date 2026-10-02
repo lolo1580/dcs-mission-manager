@@ -4,7 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"dcsmm/internal/state"
+	"dcsmanager/internal/state"
 )
 
 func sample() []state.Unit {

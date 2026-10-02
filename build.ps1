@@ -1,4 +1,4 @@
-# DCS Mission Manager — build script (Windows / PowerShell)
+# DCS Manager — build script (Windows / PowerShell)
 #
 # Usage:
 #   .\build.ps1              # frontend + backend
@@ -25,15 +25,15 @@ function Build-Backend {
     Push-Location (Join-Path $root 'backend')
     $version = (Select-String -Path (Join-Path $root 'VERSION') -Pattern '^\s*(.+)$').Matches.Groups[1].Value.Trim()
     if (-not $version) { $version = 'dev' }
-    go build -trimpath -ldflags="-s -w -X main.Version=$version" -o (Join-Path $root 'dcsmm.exe') ./cmd/dcsmm
+    go build -trimpath -ldflags="-s -w -X main.Version=$version" -o (Join-Path $root 'dcsmanager.exe') ./cmd/dcsmanager
     Pop-Location
-    Write-Host "==> Built dcsmm.exe ($version)" -ForegroundColor Green
+    Write-Host "==> Built dcsmanager.exe ($version)" -ForegroundColor Green
 }
 
 switch ($Target) {
     'frontend' { Build-Frontend }
     'backend'  { Build-Backend }
     'all'      { Build-Frontend; Build-Backend }
-    'run'      { Push-Location (Join-Path $root 'backend'); go run ./cmd/dcsmm; Pop-Location }
+    'run'      { Push-Location (Join-Path $root 'backend'); go run ./cmd/dcsmanager; Pop-Location }
     'test'     { Push-Location (Join-Path $root 'backend'); go test ./...; Pop-Location }
 }

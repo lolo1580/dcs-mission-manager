@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"dcsmm/internal/theatre"
+	"dcsmanager/internal/theatre"
 )
 
 // writeLibrary builds a small chart library mirroring the real folder layout:

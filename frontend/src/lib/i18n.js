@@ -17,7 +17,7 @@ export const LANGUAGES = [
 ];
 
 const DEFAULT_LANG = 'en';
-const STORAGE_KEY = 'dcsmm.lang';
+const STORAGE_KEY = 'dcsmanager.lang';
 
 function initialLang() {
   if (typeof localStorage === 'undefined') return DEFAULT_LANG;
@@ -38,7 +38,7 @@ lang.subscribe((value) => {
 // ---------------------------------------------------------------------------
 
 const en = {
-  'app.title': 'DCS Mission Manager',
+  'app.title': 'DCS Manager',
   'app.connected': 'connected',
   'app.offline': 'offline',
   'app.theatre': 'Theatre',
@@ -118,7 +118,7 @@ const en = {
 
   'debriefs.title': 'Debriefs',
   'debriefs.refresh': 'Refresh',
-  'debriefs.none': 'No debrief recorded. At the end of a mission, Hooks/dcsmm.lua sends debrief.log to the backend.',
+  'debriefs.none': 'No debrief recorded. At the end of a mission, Hooks/dcsmanager.lua sends debrief.log to the backend.',
   'debriefs.timeline': 'Timeline',
   'debriefs.pilots': 'Pilots',
   'debriefs.takeoffs': 'Takeoffs',
@@ -231,7 +231,7 @@ const en = {
 };
 
 const fr = {
-  'app.title': 'DCS Mission Manager',
+  'app.title': 'DCS Manager',
   'app.connected': 'connecté',
   'app.offline': 'hors ligne',
   'app.theatre': 'Théâtre',
@@ -311,7 +311,7 @@ const fr = {
 
   'debriefs.title': 'Débriefs',
   'debriefs.refresh': 'Rafraîchir',
-  'debriefs.none': "Aucun débrief enregistré. À la fin d'une mission, Hooks/dcsmm.lua envoie debrief.log au backend.",
+  'debriefs.none': "Aucun débrief enregistré. À la fin d'une mission, Hooks/dcsmanager.lua envoie debrief.log au backend.",
   'debriefs.timeline': 'Chronologie',
   'debriefs.pilots': 'Pilotes',
   'debriefs.takeoffs': 'Décollages',

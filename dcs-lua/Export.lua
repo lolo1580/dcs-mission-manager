@@ -1,5 +1,5 @@
 --[[
-  DCS Mission Manager — Export.lua
+  DCS Manager — Export.lua
   ------------------------------------------------------------------
   Sends to the backend, over UDP/JSON:
     - the player position ("ownship" message);
@@ -9,30 +9,30 @@
   Everything is sampled at a regular interval via
   LuaExportActivityNextEvent, without ever blocking a frame.
 
-  Installation: `dcsmm install-lua` merges this block into your existing
-  Export.lua (Tacview, SRS, DCS-BIOS...) by placing it between the DCSMM
+  Installation: `dcsmanager install-lua` merges this block into your existing
+  Export.lua (Tacview, SRS, DCS-BIOS...) by placing it between the DCSMANAGER
   markers. Do not remove the markers: they are used for updating and
-  uninstalling (`dcsmm uninstall-lua`).
+  uninstalling (`dcsmanager uninstall-lua`).
 
-  Prerequisite: Config/dcsmm.cfg present in Saved Games\DCS\Config\
+  Prerequisite: Config/dcsmanager.cfg present in Saved Games\DCS\Config\
 
-  Options (dcsmm.cfg):
-    dcsmm_send_interval   player send interval, in seconds (default 1.0)
-    dcsmm_world_interval  world send interval, in seconds (default 2.0)
-    dcsmm_world_enabled   enable/disable the world export (default true)
-    dcsmm_world_radius    max radius in km around the player (0 = no limit)
-    dcsmm_max_objects     max number of objects per message (default 800)
-    dcsmm_coalitions      list of coalitions to include (default {"blue","red"})
+  Options (dcsmanager.cfg):
+    dcsmanager_send_interval   player send interval, in seconds (default 1.0)
+    dcsmanager_world_interval  world send interval, in seconds (default 2.0)
+    dcsmanager_world_enabled   enable/disable the world export (default true)
+    dcsmanager_world_radius    max radius in km around the player (0 = no limit)
+    dcsmanager_max_objects     max number of objects per message (default 800)
+    dcsmanager_coalitions      list of coalitions to include (default {"blue","red"})
 ]]
 
--- >>> DCSMM-BEGIN (managed block — do not edit by hand) >>>
+-- >>> DCSMANAGER-BEGIN (managed block — do not edit by hand) >>>
 do
   ---------------------------------------------------------------------------
   -- Defensive logging
   ---------------------------------------------------------------------------
   local function say(msg)
     if log and log.write then
-      pcall(log.write, "DCSMM", log.INFO or 0, msg)
+      pcall(log.write, "DCSMANAGER", log.INFO or 0, msg)
     end
   end
 
@@ -47,7 +47,7 @@ do
   local ownshipLat, ownshipLng = nil, nil
 
   if lfs and lfs.writedir then
-    local cfgPath = lfs.writedir() .. "Config/dcsmm.cfg"
+    local cfgPath = lfs.writedir() .. "Config/dcsmanager.cfg"
     local ok, chunk = pcall(loadfile, cfgPath)
     if ok and chunk then
       local env = {}
@@ -55,17 +55,17 @@ do
       setfenv(chunk, env)
       pcall(chunk)
 
-      host = env.dcsmm_host or host
-      udpPort = env.dcsmm_udp_port or udpPort
-      interval = env.dcsmm_send_interval or interval
-      worldInterval = env.dcsmm_world_interval or worldInterval
-      worldRadiusKm = env.dcsmm_world_radius or worldRadiusKm
-      maxObjects = env.dcsmm_max_objects or maxObjects
-      if env.dcsmm_enabled ~= nil then enabled = env.dcsmm_enabled end
-      if env.dcsmm_world_enabled ~= nil then worldEnabled = env.dcsmm_world_enabled end
-      if type(env.dcsmm_coalitions) == "table" then
+      host = env.dcsmanager_host or host
+      udpPort = env.dcsmanager_udp_port or udpPort
+      interval = env.dcsmanager_send_interval or interval
+      worldInterval = env.dcsmanager_world_interval or worldInterval
+      worldRadiusKm = env.dcsmanager_world_radius or worldRadiusKm
+      maxObjects = env.dcsmanager_max_objects or maxObjects
+      if env.dcsmanager_enabled ~= nil then enabled = env.dcsmanager_enabled end
+      if env.dcsmanager_world_enabled ~= nil then worldEnabled = env.dcsmanager_world_enabled end
+      if type(env.dcsmanager_coalitions) == "table" then
         coalitions = {}
-        for _, c in ipairs(env.dcsmm_coalitions) do coalitions[c] = true end
+        for _, c in ipairs(env.dcsmanager_coalitions) do coalitions[c] = true end
       end
     end
   end
@@ -329,4 +329,4 @@ do
     return t + interval
   end
 end
--- <<< DCSMM-END <<<
+-- <<< DCSMANAGER-END <<<

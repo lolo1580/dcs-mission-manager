@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"dcsmm/internal/live"
-	"dcsmm/internal/model"
+	"dcsmanager/internal/live"
+	"dcsmanager/internal/model"
 )
 
 // Listener accepts DCS hook connections, feeds the live store, and can push

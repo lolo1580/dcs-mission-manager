@@ -5,7 +5,7 @@ metadata (georeferencing is usually absent) and saves readable corner crops so
 the graticule labels can be read for manual calibration.
 
 Usage:
-    python tools/inspect-maps.py --dir maps_dcs --out %TEMP%/dcsmm-corners
+    python tools/inspect-maps.py --dir maps_dcs --out %TEMP%/dcsmanager-corners
 """
 
 from __future__ import annotations

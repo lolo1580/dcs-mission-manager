@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"dcsmm/internal/category"
-	"dcsmm/internal/state"
+	"dcsmanager/internal/category"
+	"dcsmanager/internal/state"
 )
 
 func TestOwnshipMessageRoundTrip(t *testing.T) {

@@ -15,8 +15,8 @@ package stats
 import (
 	"encoding/json"
 
-	"dcsmm/internal/category"
-	"dcsmm/internal/db"
+	"dcsmanager/internal/category"
+	"dcsmanager/internal/db"
 )
 
 // Scope selects how statistics are aggregated.

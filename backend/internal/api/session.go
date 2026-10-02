@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 // handleGameEvents returns the recent in-memory game events (oldest first).

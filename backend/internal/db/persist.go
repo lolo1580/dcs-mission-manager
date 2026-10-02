@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 // EnsureMission returns the id of the open (not ended) mission, creating one

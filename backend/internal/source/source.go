@@ -36,9 +36,9 @@ var TestToolNames = [][]byte{
 // tools. The check is a substring search, so it does not depend on JSON key
 // order or formatting.
 //
-// A user can force the verdict for every session with DCSMM_SOURCE=test (useful
+// A user can force the verdict for every session with DCSMANAGER_SOURCE=test (useful
 // when writing scripts that do not reuse the fixtures' names) or suppress it
-// with DCSMM_SOURCE=live.
+// with DCSMANAGER_SOURCE=live.
 func IsTestPayload(payload []byte) bool {
 	for _, name := range TestToolNames {
 		if bytes.Contains(payload, name) {
@@ -56,7 +56,7 @@ type Detector struct {
 	fired bool
 }
 
-// NewDetector creates a detector honouring the DCSMM_SOURCE override.
+// NewDetector creates a detector honouring the DCSMANAGER_SOURCE override.
 func NewDetector() *Detector {
 	return &Detector{}
 }
@@ -84,12 +84,12 @@ func (d *Detector) Observed() bool {
 	return d.fired
 }
 
-// Forced returns the source requested by the DCSMM_SOURCE environment variable,
+// Forced returns the source requested by the DCSMANAGER_SOURCE environment variable,
 // or "" when the variable is unset or invalid. An explicit override always wins
 // over detection, so it can be used to tag a session that uses different
 // fixtures, or to correct a false positive.
 func Forced() string {
-	switch os.Getenv("DCSMM_SOURCE") {
+	switch os.Getenv("DCSMANAGER_SOURCE") {
 	case "test":
 		return "test"
 	case "live":

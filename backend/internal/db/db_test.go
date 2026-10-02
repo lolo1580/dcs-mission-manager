@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 func openTemp(t *testing.T) *DB {

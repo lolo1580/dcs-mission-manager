@@ -3,7 +3,7 @@ package db
 import (
 	"time"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 // SaveSamples stores a batch of position/telemetry samples in one transaction.

@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/model"
-	"dcsmm/internal/state"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/model"
+	"dcsmanager/internal/state"
 )
 
 // Tracker periodically samples the unit store and detects losses.

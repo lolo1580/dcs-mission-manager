@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"dcsmm/internal/db"
+	"dcsmanager/internal/db"
 )
 
 // handlePurge removes recorded data. It is deliberately explicit about the

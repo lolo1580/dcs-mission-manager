@@ -1,6 +1,6 @@
 // tools/send-events.mjs
 //
-// Test event sender: simulates what DCS would send via Hooks/dcsmm.lua
+// Test event sender: simulates what DCS would send via Hooks/dcsmanager.lua
 // on the TCP channel. Lets you validate Phase 2 (players, events, chat)
 // without launching DCS.
 //

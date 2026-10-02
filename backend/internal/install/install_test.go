@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"dcsmm/internal/luafiles"
+	"dcsmanager/internal/luafiles"
 )
 
 const distExport = `--[[
-  DCS Mission Manager — Export.lua
+  DCS Manager — Export.lua
 ]]
 ` + BeginMarker + `
 do
@@ -21,7 +21,7 @@ end
 
 const distHooks = "-- hooks\n" + BeginMarker + "\ndo end\n" + EndMarker + "\n"
 
-const distConfig = "dcsmm_host = \"127.0.0.1\"\n"
+const distConfig = "dcsmanager_host = \"127.0.0.1\"\n"
 
 // setup creates a fake distribution and a fake Saved Games folder.
 func setup(t *testing.T) (*Installer, string) {
@@ -30,8 +30,8 @@ func setup(t *testing.T) (*Installer, string) {
 
 	luaDir := filepath.Join(root, "dcs-lua")
 	mustWrite(t, filepath.Join(luaDir, "Export.lua"), distExport)
-	mustWrite(t, filepath.Join(luaDir, "Hooks", "dcsmm.lua"), distHooks)
-	mustWrite(t, filepath.Join(luaDir, "Config", "dcsmm.cfg"), distConfig)
+	mustWrite(t, filepath.Join(luaDir, "Hooks", "dcsmanager.lua"), distHooks)
+	mustWrite(t, filepath.Join(luaDir, "Config", "dcsmanager.cfg"), distConfig)
 
 	sg := filepath.Join(root, "Saved Games", "DCS")
 	if err := os.MkdirAll(sg, 0o755); err != nil {
@@ -69,11 +69,11 @@ func TestInstallFreshCreatesAllFiles(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(sg, "Scripts", "Export.lua")); err != nil {
 		t.Error("Export.lua should exist")
 	}
-	if _, err := os.Stat(filepath.Join(sg, "Scripts", "Hooks", "dcsmm.lua")); err != nil {
-		t.Error("Hooks/dcsmm.lua should exist")
+	if _, err := os.Stat(filepath.Join(sg, "Scripts", "Hooks", "dcsmanager.lua")); err != nil {
+		t.Error("Hooks/dcsmanager.lua should exist")
 	}
-	if _, err := os.Stat(filepath.Join(sg, "Config", "dcsmm.cfg")); err != nil {
-		t.Error("Config/dcsmm.cfg should exist")
+	if _, err := os.Stat(filepath.Join(sg, "Config", "dcsmanager.cfg")); err != nil {
+		t.Error("Config/dcsmanager.cfg should exist")
 	}
 }
 
@@ -103,7 +103,7 @@ end
 		t.Fatal("the existing Export.lua content must be preserved")
 	}
 	if !strings.Contains(content, BeginMarker) || !strings.Contains(content, EndMarker) {
-		t.Fatal("the DCSMM block must be present")
+		t.Fatal("the DCSMANAGER block must be present")
 	}
 	if !strings.Contains(content, "local x = 1") {
 		t.Fatal("the block content must be present")
@@ -215,14 +215,14 @@ func TestUninstallRemovesBlockAndKeepsRest(t *testing.T) {
 	got, _ := os.ReadFile(filepath.Join(sg, "Scripts", "Export.lua"))
 	content := string(got)
 	if strings.Contains(content, BeginMarker) {
-		t.Fatal("the DCSMM block should be removed")
+		t.Fatal("the DCSMANAGER block should be removed")
 	}
 	if !strings.Contains(content, "Tacview start") {
 		t.Fatal("the original content must remain")
 	}
 
-	if _, err := os.Stat(filepath.Join(sg, "Scripts", "Hooks", "dcsmm.lua")); !os.IsNotExist(err) {
-		t.Fatal("Hooks/dcsmm.lua should be removed")
+	if _, err := os.Stat(filepath.Join(sg, "Scripts", "Hooks", "dcsmanager.lua")); !os.IsNotExist(err) {
+		t.Fatal("Hooks/dcsmanager.lua should be removed")
 	}
 
 	found := false
@@ -258,11 +258,11 @@ func TestStatusReportsMissingThenInstalledThenOutdated(t *testing.T) {
 	}
 
 	// Outdated (the distribution changes).
-	mustWrite(t, filepath.Join(in.LuaDir, "Config", "dcsmm.cfg"), "dcsmm_host = \"10.0.0.5\"\n")
+	mustWrite(t, filepath.Join(in.LuaDir, "Config", "dcsmanager.cfg"), "dcsmanager_host = \"10.0.0.5\"\n")
 	status := in.Status(targets)
 	var outdated int
 	for _, r := range status {
-		if r.Action == "outdated" && strings.HasSuffix(r.DestRel, "dcsmm.cfg") {
+		if r.Action == "outdated" && strings.HasSuffix(r.DestRel, "dcsmanager.cfg") {
 			outdated++
 		}
 	}
@@ -346,7 +346,7 @@ func TestSpliceBlockRepairsDuplicateBlocks(t *testing.T) {
 // through an encoding round-trip: the em dash became "â€"". The keyword is still
 // recognisable, so the block is repaired rather than duplicated again.
 func TestSpliceBlockToleratesDamagedMarkerPunctuation(t *testing.T) {
-	damagedBegin := "-- >>> DCSMM-BEGIN (managed block \xc3\xa2\xc2\x80\xc2\x94 do not edit by hand) >>>"
+	damagedBegin := "-- >>> DCSMANAGER-BEGIN (managed block \xc3\xa2\xc2\x80\xc2\x94 do not edit by hand) >>>"
 	if damagedBegin == BeginMarker {
 		t.Fatal("the damaged marker must differ from the current one")
 	}
@@ -372,7 +372,7 @@ func TestSpliceBlockToleratesDamagedMarkerPunctuation(t *testing.T) {
 // TestSpliceBlockIgnoresKeywordInCode guards the safety rule: a mere mention of
 // the keyword in real Lua code must never be treated as a block boundary.
 func TestSpliceBlockIgnoresKeywordInCode(t *testing.T) {
-	existing := "local s = \"DCSMM-BEGIN is just a string\"\nlocal t = \"DCSMM-END\"\n"
+	existing := "local s = \"DCSMANAGER-BEGIN is just a string\"\nlocal t = \"DCSMANAGER-END\"\n"
 	block := BeginMarker + "\nnew\n" + EndMarker
 
 	out, changed := spliceBlock(existing, block)
@@ -416,7 +416,7 @@ func TestUninstallRemovesEveryBlock(t *testing.T) {
 
 // TestEmbeddedFallback covers the released-binary case: no dcs-lua folder next
 // to the executable, so the scripts must come from the embedded copies. This
-// guards the regression where a lone dcsmm.exe could not install anything.
+// guards the regression where a lone dcsmanager.exe could not install anything.
 func TestEmbeddedFallback(t *testing.T) {
 	root := t.TempDir()
 	sg := filepath.Join(root, "Saved Games", "DCS")

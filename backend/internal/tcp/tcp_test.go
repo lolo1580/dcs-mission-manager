@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"dcsmm/internal/live"
+	"dcsmanager/internal/live"
 )
 
 // TestSendCommandReachesHook checks the whole command path: a hook connects, the

@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"dcsmm/internal/category"
-	"dcsmm/internal/db"
-	"dcsmm/internal/model"
+	"dcsmanager/internal/category"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/model"
 )
 
 func setup(t *testing.T) (*Service, *db.DB) {

@@ -4,7 +4,7 @@
 // The guiding rule is safety: an existing Export.lua is almost always already
 // used by other tools (Tacview, SRS, DCS-BIOS, …). This package therefore never
 // overwrites such a file. It merges a marked block between
-// `>>> DCSMM-BEGIN >>>` and `<<< DCSMM-END <<<` markers, and always keeps a
+// `>>> DCSMANAGER-BEGIN >>>` and `<<< DCSMANAGER-END <<<` markers, and always keeps a
 // timestamped backup before touching anything.
 package install
 
@@ -17,15 +17,15 @@ import (
 	"strings"
 	"time"
 
-	"dcsmm/internal/luafiles"
+	"dcsmanager/internal/luafiles"
 )
 
 // Markers delimiting the managed block. These strings are load-bearing: they
 // are written into the user's Export.lua and must match byte-for-byte between
 // this constant and the `dcs-lua/` scripts.
 const (
-	BeginMarker = "-- >>> DCSMM-BEGIN (managed block — do not edit by hand) >>>"
-	EndMarker   = "-- <<< DCSMM-END <<<"
+	BeginMarker = "-- >>> DCSMANAGER-BEGIN (managed block — do not edit by hand) >>>"
+	EndMarker   = "-- <<< DCSMANAGER-END <<<"
 )
 
 // Target describes where a script must be installed inside Saved Games.
@@ -43,8 +43,8 @@ type Target struct {
 func DefaultTargets() []Target {
 	return []Target{
 		{Source: "Export.lua", DestRel: filepath.Join("Scripts", "Export.lua"), NeedsBlock: true},
-		{Source: filepath.Join("Hooks", "dcsmm.lua"), DestRel: filepath.Join("Scripts", "Hooks", "dcsmm.lua"), NeedsBlock: false},
-		{Source: filepath.Join("Config", "dcsmm.cfg"), DestRel: filepath.Join("Config", "dcsmm.cfg"), NeedsBlock: false},
+		{Source: filepath.Join("Hooks", "dcsmanager.lua"), DestRel: filepath.Join("Scripts", "Hooks", "dcsmanager.lua"), NeedsBlock: false},
+		{Source: filepath.Join("Config", "dcsmanager.cfg"), DestRel: filepath.Join("Config", "dcsmanager.cfg"), NeedsBlock: false},
 	}
 }
 
@@ -60,7 +60,7 @@ type Result struct {
 type Installer struct {
 	// LuaDir is the directory containing the distribution scripts (dcs-lua).
 	// When empty, or when it does not contain a target, the embedded copies
-	// (package luafiles) are used instead, so a lone dcsmm.exe can still install.
+	// (package luafiles) are used instead, so a lone dcsmanager.exe can still install.
 	LuaDir string
 	// SavedGames is the DCS Saved Games folder.
 	SavedGames string
@@ -190,7 +190,7 @@ func (in *Installer) copyFile(destRel, dest string, content []byte) (Result, err
 func (in *Installer) mergeBlock(destRel, dest string, content []byte) (Result, error) {
 	block := extractBlock(string(content))
 	if block == "" {
-		return Result{DestRel: destRel}, errors.New("bloc DCSMM introuvable dans la source")
+		return Result{DestRel: destRel}, errors.New("bloc DCSMANAGER introuvable dans la source")
 	}
 
 	existing, err := os.ReadFile(dest)
@@ -231,8 +231,8 @@ func (in *Installer) mergeBlock(destRel, dest string, content []byte) (Result, e
 // encoding round-trip (a tool that read the file as Latin-1 and wrote it back as
 // UTF-8 turns the em dash into "â€"") is still recognised for what it is.
 const (
-	beginKeyword = "DCSMM-BEGIN"
-	endKeyword   = "DCSMM-END"
+	beginKeyword = "DCSMANAGER-BEGIN"
+	endKeyword   = "DCSMANAGER-END"
 )
 
 // lineContaining returns the whole line holding kw, at or after from, with its
@@ -261,7 +261,7 @@ func lineContaining(s string, from int, kw string) (start, end int, ok bool) {
 	}
 }
 
-// findBlocks returns the byte ranges of every DCSMM managed block in s, in order.
+// findBlocks returns the byte ranges of every DCSMANAGER managed block in s, in order.
 //
 // Every block is found, not just the first, on purpose: an Export.lua that, for
 // whatever reason, ended up with two blocks must be repaired rather than left
@@ -381,8 +381,8 @@ func (in *Installer) backup(dest string, content []byte) (string, error) {
 // Uninstall removes the managed artifacts:
 //
 //   - the marked block is stripped from Export.lua (the rest is preserved);
-//   - Hooks/dcsmm.lua is deleted;
-//   - Config/dcsmm.cfg is left alone (it holds the user's address/ports).
+//   - Hooks/dcsmanager.lua is deleted;
+//   - Config/dcsmanager.cfg is left alone (it holds the user's address/ports).
 func (in *Installer) Uninstall() ([]Result, error) {
 	var results []Result
 
@@ -422,13 +422,13 @@ func (in *Installer) Uninstall() ([]Result, error) {
 		} else {
 			results = append(results, Result{
 				DestRel: filepath.Join("Scripts", "Export.lua"),
-				Action:  "skipped", Note: "aucun bloc DCSMM",
+				Action:  "skipped", Note: "aucun bloc DCSMANAGER",
 			})
 		}
 	}
 
-	// Hooks/dcsmm.lua: our own file, safe to delete.
-	hooksPath := filepath.Join(in.SavedGames, "Scripts", "Hooks", "dcsmm.lua")
+	// Hooks/dcsmanager.lua: our own file, safe to delete.
+	hooksPath := filepath.Join(in.SavedGames, "Scripts", "Hooks", "dcsmanager.lua")
 	if _, err := os.Stat(hooksPath); err == nil {
 		if !in.DryRun {
 			if err := os.Remove(hooksPath); err != nil {
@@ -436,7 +436,7 @@ func (in *Installer) Uninstall() ([]Result, error) {
 			}
 		}
 		results = append(results, Result{
-			DestRel: filepath.Join("Scripts", "Hooks", "dcsmm.lua"),
+			DestRel: filepath.Join("Scripts", "Hooks", "dcsmanager.lua"),
 			Action:  "removed",
 		})
 	}

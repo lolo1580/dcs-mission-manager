@@ -300,9 +300,9 @@ func TestParseEmptyTable(t *testing.T) {
 // TestParseRealDebrief runs against a real DCS debrief.log when one is present.
 // It is skipped otherwise, so the suite stays portable.
 func TestParseRealDebrief(t *testing.T) {
-	path := os.Getenv("DCSMM_TEST_DEBRIEF")
+	path := os.Getenv("DCSMANAGER_TEST_DEBRIEF")
 	if path == "" {
-		t.Skip("set DCSMM_TEST_DEBRIEF to a debrief.log to run this test")
+		t.Skip("set DCSMANAGER_TEST_DEBRIEF to a debrief.log to run this test")
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {

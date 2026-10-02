@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/model"
-	"dcsmm/internal/state"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/model"
+	"dcsmanager/internal/state"
 )
 
 func setup(t *testing.T) (*Tracker, *db.DB, *state.Store) {

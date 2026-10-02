@@ -1,4 +1,4 @@
-// Command dcsmm is the DCS Mission Manager.
+// Command dcsmanager is the DCS Manager.
 //
 // It listens for telemetry from the DCS Lua scripts (UDP for positions, TCP for
 // events and players), keeps an in-memory state, persists history to SQLite, and
@@ -11,12 +11,12 @@
 //
 // Usage:
 //
-//	dcsmm                    run the manager in a native window (default)
-//	dcsmm serve              run headless (browser UI), as before
-//	dcsmm install-lua        install the DCS-side Lua scripts
-//	dcsmm uninstall-lua      remove the managed Lua artifacts
-//	dcsmm status             report whether the Lua scripts are installed
-//	dcsmm version            print the version
+//	dcsmanager                    run the manager in a native window (default)
+//	dcsmanager serve              run headless (browser UI), as before
+//	dcsmanager install-lua        install the DCS-side Lua scripts
+//	dcsmanager uninstall-lua      remove the managed Lua artifacts
+//	dcsmanager status             report whether the Lua scripts are installed
+//	dcsmanager version            print the version
 package main
 
 import (
@@ -25,11 +25,11 @@ import (
 	"fmt"
 	"os"
 
-	"dcsmm/internal/app"
-	"dcsmm/internal/config"
-	"dcsmm/internal/db"
-	"dcsmm/internal/desktop"
-	"dcsmm/internal/install"
+	"dcsmanager/internal/app"
+	"dcsmanager/internal/config"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/desktop"
+	"dcsmanager/internal/install"
 )
 
 // Version is set at build time with -ldflags "-X main.Version=...".
@@ -47,10 +47,10 @@ func main() {
 		case "serve":
 			if err := app.Run(nil); err != nil {
 				if errors.Is(err, app.ErrAlreadyRunning) {
-					fmt.Fprintln(os.Stderr, "dcsmm: another instance is already running (see DCSMM_HTTP_ADDR)")
+					fmt.Fprintln(os.Stderr, "dcsmanager: another instance is already running (see DCSMANAGER_HTTP_ADDR)")
 					os.Exit(3)
 				}
-				fmt.Fprintf(os.Stderr, "dcsmm: %v\n", err)
+				fmt.Fprintf(os.Stderr, "dcsmanager: %v\n", err)
 				os.Exit(1)
 			}
 			return
@@ -63,7 +63,7 @@ func main() {
 		case "purge":
 			os.Exit(runPurgeCommand(os.Args[2:]))
 		case "version", "--version", "-v":
-			fmt.Printf("dcsmm %s\n", Version)
+			fmt.Printf("dcsmanager %s\n", Version)
 			return
 		case "help", "--help", "-h":
 			usage()
@@ -74,16 +74,16 @@ func main() {
 }
 
 func usage() {
-	fmt.Print(`DCS Mission Manager
+	fmt.Print(`DCS Manager
 
 Usage:
-  dcsmm                 Open the manager in a native window (web UI + DCS ingestion)
-  dcsmm serve           Run headless; open http://localhost:8080 in a browser
-  dcsmm install-lua     Install the Lua scripts into Saved Games
-  dcsmm uninstall-lua   Remove the installed scripts
-  dcsmm status          Report whether the scripts are installed / up to date
-  dcsmm purge           Delete recorded sessions (destructive; see options)
-  dcsmm version         Print the version
+  dcsmanager                 Open the manager in a native window (web UI + DCS ingestion)
+  dcsmanager serve           Run headless; open http://localhost:8080 in a browser
+  dcsmanager install-lua     Install the Lua scripts into Saved Games
+  dcsmanager uninstall-lua   Remove the installed scripts
+  dcsmanager status          Report whether the scripts are installed / up to date
+  dcsmanager purge           Delete recorded sessions (destructive; see options)
+  dcsmanager version         Print the version
 
 Options for install-lua / uninstall-lua / status:
   --saved-games <dir>   DCS Saved Games directory (auto-detected)
@@ -96,7 +96,7 @@ Options for purge (exactly one is required):
   --mission-id <n>      Delete one mission and everything linked to it
   --all                 Delete every recorded session (keeps schema and players)
 
-Server configuration: DCSMM_* environment variables (see README).
+Server configuration: DCSMANAGER_* environment variables (see README).
 `)
 }
 
@@ -110,7 +110,7 @@ func runLuaCommand(args []string, mode string) int {
 
 	// Resolve the Lua source directory. It is optional: when none is found, the
 	// installer falls back to the scripts embedded in the binary, so a lone
-	// dcsmm.exe works. An explicit --lua-dir still wins.
+	// dcsmanager.exe works. An explicit --lua-dir still wins.
 	resolvedLua := *luaDir
 	if resolvedLua == "" {
 		resolvedLua = app.FindLuaDir()
@@ -162,7 +162,7 @@ func runLuaCommand(args []string, mode string) int {
 	if mode == "install" && !*dryRun {
 		fmt.Println()
 		fmt.Println("Remember to restart DCS so the scripts are reloaded.")
-		fmt.Println("Backend address: see Saved Games\\DCS\\Config\\dcsmm.cfg")
+		fmt.Println("Backend address: see Saved Games\\DCS\\Config\\dcsmanager.cfg")
 	}
 	return 0
 }
@@ -174,7 +174,7 @@ func runPurgeCommand(args []string) int {
 	source := fs.String("source", "", "delete missions of this source: live|test")
 	missionID := fs.Int64("mission-id", 0, "delete this mission and its data")
 	all := fs.Bool("all", false, "delete every recorded session")
-	dbPath := fs.String("db", "", "database path (defaults to DCSMM_DB_PATH)")
+	dbPath := fs.String("db", "", "database path (defaults to DCSMANAGER_DB_PATH)")
 	dryRun := fs.Bool("dry-run", false, "report what would be deleted, delete nothing")
 	_ = fs.Parse(args)
 
@@ -190,7 +190,7 @@ func runPurgeCommand(args []string) int {
 	}
 	if chosen != 1 {
 		fmt.Fprintln(os.Stderr, "purge: pass exactly one of --source <live|test>, --mission-id <n> or --all")
-		fmt.Fprintln(os.Stderr, "       run `dcsmm help` for the full usage")
+		fmt.Fprintln(os.Stderr, "       run `dcsmanager help` for the full usage")
 		return 2
 	}
 	if *source != "" && !db.ValidSource(*source) {
@@ -203,7 +203,7 @@ func runPurgeCommand(args []string) int {
 		path = config.Load().DBPath
 	}
 	if path == "" {
-		path = "./data/dcsmm.db"
+		path = "./data/dcsmanager.db"
 	}
 
 	database, err := db.Open(path)

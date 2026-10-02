@@ -3,8 +3,8 @@ package stats
 import (
 	"testing"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/model"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/model"
 )
 
 // seedMission records a mission with one player, a kill and a sample, tagged

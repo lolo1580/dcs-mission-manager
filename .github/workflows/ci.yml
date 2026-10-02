@@ -109,14 +109,14 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
 
-      - name: Build dcsmm.exe (frontend embedded)
+      - name: Build dcsmanager.exe (frontend embedded)
         working-directory: backend
         env:
           CGO_ENABLED: '0'
         run: |
           $sha = $env:GITHUB_SHA.Substring(0, 7)
-          go build -trimpath -ldflags="-s -w -X main.Version=ci-$sha" -o ../dcsmm.exe ./cmd/dcsmm
-          if (-not (Test-Path ../dcsmm.exe)) { throw 'dcsmm.exe was not produced' }
+          go build -trimpath -ldflags="-s -w -X main.Version=ci-$sha" -o ../dcsmanager.exe ./cmd/dcsmanager
+          if (-not (Test-Path ../dcsmanager.exe)) { throw 'dcsmanager.exe was not produced' }
 
       - name: Smoke test (runs and serves the UI)
         run: pwsh -File tools/smoke-serve.ps1

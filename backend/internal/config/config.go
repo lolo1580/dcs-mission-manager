@@ -1,4 +1,4 @@
-// Package config loads backend configuration from DCSMM_* environment variables.
+// Package config loads backend configuration from DCSMANAGER_* environment variables.
 //
 // The manager is local-only: it runs on the same Windows machine as DCS. That is
 // a deliberate constraint, not a limitation to work around — it is what lets the
@@ -19,7 +19,7 @@ type Config struct {
 	// HTTPAddr is the listen address of the web UI (HTTP + SSE). It defaults to
 	// the loopback interface: the manager is local, and the API includes a
 	// destructive purge endpoint with no authentication. Set
-	// DCSMM_HTTP_ADDR=0.0.0.0:8080 deliberately to reach the UI from another
+	// DCSMANAGER_HTTP_ADDR=0.0.0.0:8080 deliberately to reach the UI from another
 	// device (a tablet in the cockpit, for instance).
 	HTTPAddr string
 	// UDPAddr is the listen address for telemetry coming from DCS.
@@ -64,10 +64,10 @@ func env(key, def string) string {
 }
 
 // savedGamesDir locates the DCS Saved Games folder, honouring an explicit
-// DCSMM_SAVED_GAMES override. It is best-effort: an empty result is normal when
+// DCSMANAGER_SAVED_GAMES override. It is best-effort: an empty result is normal when
 // DCS is not installed, and callers must cope with it rather than fail.
 func savedGamesDir() string {
-	if v := os.Getenv("DCSMM_SAVED_GAMES"); v != "" {
+	if v := os.Getenv("DCSMANAGER_SAVED_GAMES"); v != "" {
 		return v
 	}
 	home, err := os.UserHomeDir()
@@ -120,20 +120,20 @@ func envBool(key string, def bool) bool {
 // Load reads the configuration from the environment, applying defaults.
 func Load() Config {
 	return Config{
-		HTTPAddr:       env("DCSMM_HTTP_ADDR", "127.0.0.1:8080"),
-		UDPAddr:        env("DCSMM_UDP_ADDR", "127.0.0.1:7778"),
-		TCPAddr:        env("DCSMM_TCP_ADDR", "127.0.0.1:7779"),
-		DBPath:         env("DCSMM_DB_PATH", "./data/dcsmm.db"),
-		DBEnabled:      envBool("DCSMM_DB_ENABLED", true),
-		Theatre:        env("DCSMM_THEATRE", "Caucasus"),
-		LogLevel:       strings.ToLower(env("DCSMM_LOG_LEVEL", "info")),
-		UnitTTL:        envDuration("DCSMM_UNIT_TTL", 5*time.Second),
-		CategoriesFile: env("DCSMM_CATEGORIES", "./categories.json"),
-		MaxUnits:       envInt("DCSMM_MAX_UNITS", 5000),
-		TrackInterval:  envDuration("DCSMM_TRACK_INTERVAL", 3*time.Second),
-		TrackGrace:     envDuration("DCSMM_TRACK_GRACE", 15*time.Second),
-		TrackRetention: envDuration("DCSMM_TRACK_RETENTION", 24*time.Hour),
+		HTTPAddr:       env("DCSMANAGER_HTTP_ADDR", "127.0.0.1:8080"),
+		UDPAddr:        env("DCSMANAGER_UDP_ADDR", "127.0.0.1:7778"),
+		TCPAddr:        env("DCSMANAGER_TCP_ADDR", "127.0.0.1:7779"),
+		DBPath:         env("DCSMANAGER_DB_PATH", "./data/dcsmanager.db"),
+		DBEnabled:      envBool("DCSMANAGER_DB_ENABLED", true),
+		Theatre:        env("DCSMANAGER_THEATRE", "Caucasus"),
+		LogLevel:       strings.ToLower(env("DCSMANAGER_LOG_LEVEL", "info")),
+		UnitTTL:        envDuration("DCSMANAGER_UNIT_TTL", 5*time.Second),
+		CategoriesFile: env("DCSMANAGER_CATEGORIES", "./categories.json"),
+		MaxUnits:       envInt("DCSMANAGER_MAX_UNITS", 5000),
+		TrackInterval:  envDuration("DCSMANAGER_TRACK_INTERVAL", 3*time.Second),
+		TrackGrace:     envDuration("DCSMANAGER_TRACK_GRACE", 15*time.Second),
+		TrackRetention: envDuration("DCSMANAGER_TRACK_RETENTION", 24*time.Hour),
 		SavedGames:     savedGamesDir(),
-		ChartsDir:      env("DCSMM_CHARTS_DIR", "./maps_dcs"),
+		ChartsDir:      env("DCSMANAGER_CHARTS_DIR", "./maps_dcs"),
 	}
 }

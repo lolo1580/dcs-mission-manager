@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/live"
-	"dcsmm/internal/model"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/live"
+	"dcsmanager/internal/model"
 )
 
 // Writer persists DCS messages, ensuring a mission is open and resolving player

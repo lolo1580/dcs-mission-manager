@@ -1,7 +1,7 @@
 // tools/send-debrief.mjs
 //
 // Sends a debrief.log to the backend over the TCP channel, just like
-// Hooks/dcsmm.lua would at the end of a mission (chunking + base64).
+// Hooks/dcsmanager.lua would at the end of a mission (chunking + base64).
 //
 // Usage:
 //   node tools/send-debrief.mjs [path] [host] [port]

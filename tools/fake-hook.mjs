@@ -1,5 +1,5 @@
 // Fake DCS hook: connects to the backend's TCP port, and behaves like
-// Hooks/dcsmm.lua — it stays connected and prints any command the backend
+// Hooks/dcsmanager.lua — it stays connected and prints any command the backend
 // pushes. Used to test the command channel without launching DCS.
 //
 // Usage: node tools/fake-hook.mjs [host] [port] [seconds]

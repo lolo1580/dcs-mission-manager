@@ -3,7 +3,7 @@
 // web UI, and blocks until the process is asked to stop.
 //
 // Run is the single source of truth for that wiring, shared by the two entry
-// points of the binary: the headless/CLI mode (cmd/dcsmm) and the desktop
+// points of the binary: the headless/CLI mode (cmd/dcsmanager) and the desktop
 // window (internal/desktop). Keeping it in one place means the two modes can
 // never drift apart, which matters because the desktop mode is meant to be the
 // same manager with a native window instead of a browser tab.
@@ -25,23 +25,23 @@ import (
 	"syscall"
 	"time"
 
-	"dcsmm/internal/aerodrome"
-	"dcsmm/internal/api"
-	"dcsmm/internal/category"
-	"dcsmm/internal/charts"
-	"dcsmm/internal/config"
-	"dcsmm/internal/db"
-	"dcsmm/internal/dcsdir"
-	"dcsmm/internal/debriefstore"
-	"dcsmm/internal/ingest"
-	"dcsmm/internal/live"
-	"dcsmm/internal/model"
-	"dcsmm/internal/source"
-	"dcsmm/internal/state"
-	"dcsmm/internal/stats"
-	"dcsmm/internal/tcp"
-	"dcsmm/internal/tracker"
-	"dcsmm/internal/udp"
+	"dcsmanager/internal/aerodrome"
+	"dcsmanager/internal/api"
+	"dcsmanager/internal/category"
+	"dcsmanager/internal/charts"
+	"dcsmanager/internal/config"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/dcsdir"
+	"dcsmanager/internal/debriefstore"
+	"dcsmanager/internal/ingest"
+	"dcsmanager/internal/live"
+	"dcsmanager/internal/model"
+	"dcsmanager/internal/source"
+	"dcsmanager/internal/state"
+	"dcsmanager/internal/stats"
+	"dcsmanager/internal/tcp"
+	"dcsmanager/internal/tracker"
+	"dcsmanager/internal/udp"
 )
 
 // Version is injected at build time (-ldflags "-X main.Version=...").
@@ -65,7 +65,7 @@ func Stop() {
 // answers on the configured HTTP address. It is a distinct, expected outcome:
 // the caller can surface it (rather than appear to do nothing) and, in window
 // mode, focus the instance already running instead of starting a second one.
-var ErrAlreadyRunning = errors.New("another dcsmm instance is already running")
+var ErrAlreadyRunning = errors.New("another dcsmanager instance is already running")
 
 // Run starts the manager and blocks until it is told to shut down. It returns
 // ErrAlreadyRunning without starting anything when another instance already
@@ -86,8 +86,8 @@ func Run(onReady func(addr string)) error {
 		return ErrAlreadyRunning
 	}
 
-	log.Printf("dcsmm %s", Version)
-	log.Printf("dcsmm %s", Version)
+	log.Printf("dcsmanager %s", Version)
+	log.Printf("dcsmanager %s", Version)
 
 	store := state.New(cfg.UnitTTL, cfg.MaxUnits)
 	classifier := category.New(cfg.CategoriesFile)
@@ -123,7 +123,7 @@ func Run(onReady func(addr string)) error {
 		return db.SourceLive
 	}
 	if forcedSource != "" {
-		log.Printf("source: forced to %q by DCSMM_SOURCE", forcedSource)
+		log.Printf("source: forced to %q by DCSMANAGER_SOURCE", forcedSource)
 	}
 
 	// ---- UDP: unit positions ---------------------------------------------
@@ -334,7 +334,7 @@ func probeExistingServer(addr string) bool {
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<10)).Decode(&health); err != nil {
 		return false
 	}
-	return health.Service == "dcsmm"
+	return health.Service == "dcsmanager"
 }
 
 // LogFilePath is where a window-mode launch writes its log, since a
@@ -349,7 +349,7 @@ func LogFilePath() (string, error) {
 	if dir == "" {
 		dir = "."
 	}
-	return filepath.Join(dir, "dcsmm.log"), nil
+	return filepath.Join(dir, "dcsmanager.log"), nil
 }
 
 func isDir(path string) bool {

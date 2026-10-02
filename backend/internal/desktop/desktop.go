@@ -14,8 +14,8 @@ import (
 	"log"
 	"os"
 
-	"dcsmm/internal/app"
-	"dcsmm/internal/config"
+	"dcsmanager/internal/app"
+	"dcsmanager/internal/config"
 )
 
 // Run starts the manager and shows it in a native window. It blocks until the

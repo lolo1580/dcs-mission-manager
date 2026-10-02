@@ -1,4 +1,4 @@
-# DCS Mission Manager — build helpers
+# DCS Manager — build helpers
 
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 
@@ -18,18 +18,18 @@ frontend: ## Build the web UI
 	cd frontend && npm install && npm run build
 
 backend: ## Build the Go binary
-	cd backend && go build -trimpath -ldflags="-s -w -X main.Version=$(VERSION)" -o ../dcsmm ./cmd/dcsmm
+	cd backend && go build -trimpath -ldflags="-s -w -X main.Version=$(VERSION)" -o ../dcsmanager ./cmd/dcsmanager
 
 build: frontend backend ## Build everything
 
 run: ## Run the backend from source
-	cd backend && go run ./cmd/dcsmm
+	cd backend && go run ./cmd/dcsmanager
 
 install: build ## Build then install the Lua scripts into DCS
-	./dcsmm install-lua
+	./dcsmanager install-lua
 
 test: ## Run Go tests
 	cd backend && go test ./...
 
 clean: ## Remove build artifacts
-	rm -rf dcsmm dcsmm.exe frontend/dist backend/internal/api/dist/assets backend/internal/api/dist/index.html
+	rm -rf dcsmanager dcsmanager.exe frontend/dist backend/internal/api/dist/assets backend/internal/api/dist/index.html

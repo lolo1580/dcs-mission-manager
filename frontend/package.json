@@ -1,9 +1,9 @@
 {
-  "name": "dcsmm-frontend",
+  "name": "dcsmanager-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "DCS Mission Manager web UI (Svelte + Vite)",
+  "description": "DCS Manager web UI (Svelte + Vite)",
   "scripts": {
     "dev": "vite",
     "build": "node scripts/clean-dist.mjs && vite build",

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"dcsmm/internal/stats"
+	"dcsmanager/internal/stats"
 )
 
 // scopeFromRequest builds a stats scope from query parameters.

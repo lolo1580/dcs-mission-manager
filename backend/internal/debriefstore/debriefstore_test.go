@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/model"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/model"
 )
 
 const debriefSample = `mission_file_path	=	".\\Missions\\test.miz"

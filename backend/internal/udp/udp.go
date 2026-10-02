@@ -16,8 +16,8 @@ import (
 	"log"
 	"net"
 
-	"dcsmm/internal/category"
-	"dcsmm/internal/state"
+	"dcsmanager/internal/category"
+	"dcsmanager/internal/state"
 )
 
 // Message is a telemetry datagram sent by the DCS side.

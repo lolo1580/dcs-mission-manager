@@ -1,4 +1,4 @@
-# Architecture — DCS Mission Manager
+# Architecture — DCS Manager
 
 ## Principle
 
@@ -21,22 +21,22 @@ Lua installer, the debrief and the track files need no transfer or setup.
 .\install-dcs.ps1            # add -DryRun to simulate
 
 # 3. Run
-.\dcsmm.exe
+.\dcsmanager.exe
 ```
 
-The manager opens in its own window. `dcsmm serve` runs it headless instead, with the
+The manager opens in its own window. `dcsmanager serve` runs it headless instead, with the
 web UI at <http://localhost:8080>.
 
 ### CLI
 
 ```powershell
-dcsmm                 # opens the manager in a native window
-dcsmm serve           # starts the server only; UI at http://localhost:8080
-dcsmm install-lua     # installs/merges the Lua scripts into Saved Games
-dcsmm uninstall-lua   # removes the installed block (keeps the config)
-dcsmm status          # installed / outdated / missing, per file
-dcsmm purge           # deletes recorded sessions (destructive; see README)
-dcsmm version
+dcsmanager                 # opens the manager in a native window
+dcsmanager serve           # starts the server only; UI at http://localhost:8080
+dcsmanager install-lua     # installs/merges the Lua scripts into Saved Games
+dcsmanager uninstall-lua   # removes the installed block (keeps the config)
+dcsmanager status          # installed / outdated / missing, per file
+dcsmanager purge           # deletes recorded sessions (destructive; see README)
+dcsmanager version
 ```
 
 ## Data flow
@@ -46,7 +46,7 @@ dcsmm version
 ┌──────────────────────────────────────────────────────────┐
 │ DCS World                                                 │
 │                                                           │
-│  Scripts/Export.lua        Hooks/dcsmm.lua                │
+│  Scripts/Export.lua        Hooks/dcsmanager.lua                │
 │   (telemetry)              (events/players)               │
 │        │                          │                       │
 │        │ UDP/JSON                 │ TCP/JSON              │
@@ -54,7 +54,7 @@ dcsmm version
          │     127.0.0.1            │
          ▼                          ▼
 ┌──────────────────────────────────────────────────────────┐
-│ Manager (dcsmm.exe)                                       │
+│ Manager (dcsmanager.exe)                                       │
 │                                                           │
 │  internal/udp  ──► internal/state ──► internal/tracker     │
 │  internal/tcp  ──► internal/live  ──► internal/ingest      │
@@ -75,7 +75,7 @@ dcsmm version
 
 | Package | Role |
 |---|---|
-| `internal/config` | Configuration via `DCSMM_*` variables |
+| `internal/config` | Configuration via `DCSMANAGER_*` variables |
 | `internal/app` | Manager wiring (listeners, state, DB, tracking, HTTP), shared by both entry points |
 | `internal/desktop` | Native window (WebView2, pure Go); falls back to headless if unavailable |
 | `internal/udp` | Reception and decoding of telemetry datagrams |
@@ -102,13 +102,13 @@ sampled, and it feeds the statistics, the heatmaps and the airfields tab.
 
 ## Application window
 
-`dcsmm.exe` opens the embedded UI in a native window rather than asking the user to
+`dcsmanager.exe` opens the embedded UI in a native window rather than asking the user to
 open a browser. That window is a WebView2 control (the runtime Microsoft ships with
 Windows 10/11), driven through `github.com/jchv/go-webview2` — a **pure-Go** binding,
 so the build needs no C toolchain and `CGO_ENABLED=0` still holds.
 
 The HTTP server is not removed: the window loads `http://<addr>/`, so the page reaches
-the API exactly as before, and `dcsmm serve` still exposes it to a browser. The window
+the API exactly as before, and `dcsmanager serve` still exposes it to a browser. The window
 is therefore an addition, not a replacement, and closing it shuts the manager down.
 
 ## Real-time choice: SSE rather than WebSocket

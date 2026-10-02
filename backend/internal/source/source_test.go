@@ -75,9 +75,9 @@ func TestForced(t *testing.T) {
 		{"", ""},
 		{"nonsense", ""},
 	} {
-		t.Setenv("DCSMM_SOURCE", tc.value)
+		t.Setenv("DCSMANAGER_SOURCE", tc.value)
 		if got := Forced(); got != tc.want {
-			t.Errorf("DCSMM_SOURCE=%q: want %q, got %q", tc.value, tc.want, got)
+			t.Errorf("DCSMANAGER_SOURCE=%q: want %q, got %q", tc.value, tc.want, got)
 		}
 	}
 }

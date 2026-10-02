@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 // Mission sources. Every mission row is tagged with one of these so recorded

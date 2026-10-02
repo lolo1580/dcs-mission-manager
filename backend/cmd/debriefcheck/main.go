@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"os"
 
-	"dcsmm/internal/debrief"
+	"dcsmanager/internal/debrief"
 )
 
 func main() {

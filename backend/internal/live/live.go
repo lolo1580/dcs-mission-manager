@@ -6,7 +6,7 @@ package live
 import (
 	"sync"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 // Store holds recent events, players and chat in a concurrency-safe way.

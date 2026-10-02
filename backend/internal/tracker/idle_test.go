@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/state"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/state"
 )
 
 // TestIdleTickCreatesNoMission guards against phantom sessions: an idle backend

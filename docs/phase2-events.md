@@ -8,7 +8,7 @@ message**.
 
 ```
 DCS (Windows)                                    Backend
-Scripts/Hooks/dcsmm.lua
+Scripts/Hooks/dcsmanager.lua
   onGameEvent ─┐
   onChatMessage ┼─► TCP 7779, JSON one line per message ─► internal/tcp
   net.get_*   ─┘                                           │
@@ -43,7 +43,7 @@ statistics that survive callsign changes.
 ## Refresh
 
 - **Events** and **chat**: sent as soon as they occur.
-- **Players**: refreshed every `dcsmm_players_interval` seconds (default 5), and
+- **Players**: refreshed every `dcsmanager_players_interval` seconds (default 5), and
   immediately on a `change_slot`, `connect`, `disconnect` or `mission_end`.
 - The periodic refresh goes through `onSimulationFrame`, so it never blocks a
   frame: no blocking network call is made in a callback.
@@ -77,7 +77,7 @@ SQLite via **modernc.org/sqlite** (pure Go, no CGO): the binary stays single and
 needs no C toolchain.
 
 Tables: `missions`, `events`, `chat`, `players`, `player_stats`, `meta`.
-Persistence can be disabled with `DCSMM_DB_ENABLED=false` (everything stays in
+Persistence can be disabled with `DCSMANAGER_DB_ENABLED=false` (everything stays in
 memory).
 
 ## Command channel
@@ -89,7 +89,7 @@ executes them.
 
 ```
 Backend                                   DCS (Windows)
-POST /api/chat ─► internal/tcp.SendCommand ─► Hooks/dcsmm.lua readCommands()
+POST /api/chat ─► internal/tcp.SendCommand ─► Hooks/dcsmanager.lua readCommands()
                                                  └─► net.send_chat("...")
 ```
 

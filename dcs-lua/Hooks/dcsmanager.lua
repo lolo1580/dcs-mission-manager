@@ -1,5 +1,5 @@
 --[[
-  DCS Mission Manager — Hooks/dcsmm.lua
+  DCS Manager — Hooks/dcsmanager.lua
   ------------------------------------------------------------------
   Sends to the backend, over TCP/JSON (one JSON line per message):
     - game events (kill, crash, eject, takeoff, landing...);
@@ -7,24 +7,24 @@
     - the chat;
     - the mission start and end.
 
-  Place this in: Saved Games\DCS\Scripts\Hooks\dcsmm.lua
+  Place this in: Saved Games\DCS\Scripts\Hooks\dcsmanager.lua
 
   ⚠️  DCS loads ALL .lua files from Hooks/ and sorts them by name.
       This file is additive: it does not overwrite any other hook.
 
-  Prerequisite: Config/dcsmm.cfg present in Saved Games\DCS\Config\
+  Prerequisite: Config/dcsmanager.cfg present in Saved Games\DCS\Config\
 
-  Options (dcsmm.cfg):
-    dcsmm_host            backend address (default 127.0.0.1)
-    dcsmm_tcp_port        backend TCP port (default 7779)
-    dcsmm_enabled         enable/disable (default true)
-    dcsmm_players_interval players send interval in seconds (default 5.0)
+  Options (dcsmanager.cfg):
+    dcsmanager_host            backend address (default 127.0.0.1)
+    dcsmanager_tcp_port        backend TCP port (default 7779)
+    dcsmanager_enabled         enable/disable (default true)
+    dcsmanager_players_interval players send interval in seconds (default 5.0)
 ]]
 
--- >>> DCSMM-BEGIN (managed block — do not edit by hand) >>>
+-- >>> DCSMANAGER-BEGIN (managed block — do not edit by hand) >>>
 do
   local function say(msg)
-    if net and net.log then net.log("DCSMM: " .. tostring(msg)) end
+    if net and net.log then net.log("DCSMANAGER: " .. tostring(msg)) end
   end
   ---------------------------------------------------------------------------
   -- Configuration
@@ -34,17 +34,17 @@ do
   local playersInterval = 5.0
 
   if lfs and lfs.writedir then
-    local cfgPath = lfs.writedir() .. "Config/dcsmm.cfg"
+    local cfgPath = lfs.writedir() .. "Config/dcsmanager.cfg"
     local ok, chunk = pcall(loadfile, cfgPath)
     if ok and chunk then
       local env = {}
       setmetatable(env, { __index = _G })
       setfenv(chunk, env)
       pcall(chunk)
-      host = env.dcsmm_host or host
-      tcpPort = env.dcsmm_tcp_port or tcpPort
-      playersInterval = env.dcsmm_players_interval or playersInterval
-      if env.dcsmm_enabled ~= nil then enabled = env.dcsmm_enabled end
+      host = env.dcsmanager_host or host
+      tcpPort = env.dcsmanager_tcp_port or tcpPort
+      playersInterval = env.dcsmanager_players_interval or playersInterval
+      if env.dcsmanager_enabled ~= nil then enabled = env.dcsmanager_enabled end
     end
   end
 
@@ -445,9 +445,9 @@ do
   ---------------------------------------------------------------------------
   -- Callback table expected by Sim.setUserCallbacks
   ---------------------------------------------------------------------------
-  local dcsmm = {}
+  local dcsmanager = {}
 
-  function dcsmm.onSimulationStart()
+  function dcsmanager.onSimulationStart()
     local name = (Sim and Sim.getMissionName and Sim.getMissionName()) or "?"
     refreshSlotTypes()
     -- We forward the mission options: the backend needs them to respect the
@@ -489,7 +489,7 @@ do
     end
   end
 
-  function dcsmm.onSimulationStop()
+  function dcsmanager.onSimulationStop()
     -- We send the debrief BEFORE closing the connection: the backend waits
     -- for the file to archive it.
     pcall(sendDebrief)
@@ -499,7 +499,7 @@ do
     say("mission ended")
   end
 
-  function dcsmm.onGameEvent(eventName, arg1, arg2, arg3, arg4)
+  function dcsmanager.onGameEvent(eventName, arg1, arg2, arg3, arg4)
     -- We forward all non-nil arguments; the backend stores them as-is.
     local args = {}
     for _, a in ipairs({ arg1, arg2, arg3, arg4 }) do
@@ -520,13 +520,13 @@ do
     end
   end
 
-  function dcsmm.onChatMessage(message, from)
+  function dcsmanager.onChatMessage(message, from)
     sendLine(toJson({ type = "chat", from = from or "", message = message or "" }))
   end
 
-  function dcsmm.onPlayerConnect(id) sendPlayers() end
-  function dcsmm.onPlayerDisconnect(id, code) sendPlayers() end
-  function dcsmm.onPlayerChangeSlot(id) sendPlayers() end
+  function dcsmanager.onPlayerConnect(id) sendPlayers() end
+  function dcsmanager.onPlayerDisconnect(id, code) sendPlayers() end
+  function dcsmanager.onPlayerChangeSlot(id) sendPlayers() end
 
   -- Periodic refresh of statistics, via the simulator timer.
   local nextPlayersAt, nextSlotsAt, nextCommandAt
@@ -535,7 +535,7 @@ do
   -- stays negligible against the frame budget.
   local commandInterval = 0.25
 
-  function dcsmm.onSimulationFrame()
+  function dcsmanager.onSimulationFrame()
     local t = (LoGetModelTime and LoGetModelTime()) or 0
     if not nextSlotsAt then nextSlotsAt = t + 30.0 end
     if t >= nextSlotsAt then
@@ -554,7 +554,7 @@ do
     end
   end
 
-  Sim.setUserCallbacks(dcsmm)
+  Sim.setUserCallbacks(dcsmanager)
   say("hooks loaded")
 end
--- <<< DCSMM-END <<<
+-- <<< DCSMANAGER-END <<<

@@ -2,7 +2,7 @@
 //
 // A syntax error in Export.lua is silent in DCS: the script simply never runs and
 // the map stays empty, which costs a full game restart to notice. This checks the
-// syntax, the required config keys, and that the DCSMM markers still match the
+// syntax, the required config keys, and that the DCSMANAGER markers still match the
 // constants in install.go byte for byte (they are load-bearing for merge and
 // uninstall).
 //
@@ -48,7 +48,7 @@ if (!luaparse) {
   process.exit(0);
 }
 
-const files = ['dcs-lua/Export.lua', 'dcs-lua/Hooks/dcsmm.lua'];
+const files = ['dcs-lua/Export.lua', 'dcs-lua/Hooks/dcsmanager.lua'];
 let failed = false;
 
 for (const rel of files) {
@@ -70,10 +70,10 @@ for (const rel of files) {
 }
 
 // The config is data, not code: at least check the keys are declared.
-const cfgPath = path.join(root, 'dcs-lua/Config/dcsmm.cfg');
+const cfgPath = path.join(root, 'dcs-lua/Config/dcsmanager.cfg');
 if (fs.existsSync(cfgPath)) {
   const cfg = fs.readFileSync(cfgPath, 'utf8');
-  for (const key of ['dcsmm_host', 'dcsmm_udp_port', 'dcsmm_tcp_port', 'dcsmm_enabled']) {
+  for (const key of ['dcsmanager_host', 'dcsmanager_udp_port', 'dcsmanager_tcp_port', 'dcsmanager_enabled']) {
     if (!cfg.includes(key)) {
       console.log(`  cfg sans ${key}`);
       failed = true;
@@ -88,8 +88,8 @@ const goPath = path.join(root, 'backend/internal/install/install.go');
 if (fs.existsSync(expPath) && fs.existsSync(goPath)) {
   const exp = fs.readFileSync(expPath, 'utf8');
   const go = fs.readFileSync(goPath, 'utf8');
-  const begin = go.match(/"(-- >>> DCSMM-BEGIN[^"]*)"/);
-  const end = go.match(/"(-- <<< DCSMM-END <<<)"/);
+  const begin = go.match(/"(-- >>> DCSMANAGER-BEGIN[^"]*)"/);
+  const end = go.match(/"(-- <<< DCSMANAGER-END <<<)"/);
   if (!begin || !end) {
     console.log('  marqueurs introuvables dans install.go');
     failed = true;

@@ -10,12 +10,12 @@ calibration**, all theatres work the same way.
 
 ## Collection: `internal/tracker`
 
-A periodic sampler (`DCSMM_TRACK_INTERVAL`, default 3 s) records
+A periodic sampler (`DCSMANAGER_TRACK_INTERVAL`, default 3 s) records
 for each unit: position, altitude, heading, speed, load factor.
 
 - **Tracks**: the movements, to reconstruct the trajectories.
 - **Losses**: when a unit **disappears** from the world for longer than
-  `DCSMM_TRACK_GRACE` (default 15 s), it is recorded as a loss with its
+  `DCSMANAGER_TRACK_GRACE` (default 15 s), it is recorded as a loss with its
   last known position. This is an honest approximation of “destroyed or
   deactivated” — DCS does not always send an explicit event.
 - **Reappearance**: if the unit returns, it is no longer counted as a loss.
@@ -25,7 +25,7 @@ automatically creates a session mission so nothing is lost.
 
 ## Retention
 
-`DCSMM_TRACK_RETENTION` (default 24 h): an hourly pass deletes data
+`DCSMANAGER_TRACK_RETENTION` (default 24 h): an hourly pass deletes data
 older than that, so the database does not grow indefinitely on a server that
 runs continuously.
 

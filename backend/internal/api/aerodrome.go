@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"dcsmm/internal/aerodrome"
-	"dcsmm/internal/theatre"
+	"dcsmanager/internal/aerodrome"
+	"dcsmanager/internal/theatre"
 )
 
 // handleAerodromes returns the airfield reference data.

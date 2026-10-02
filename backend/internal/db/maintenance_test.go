@@ -3,7 +3,7 @@ package db
 import (
 	"testing"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 // TestEnsureMissionTagged verifies that sessions are tagged at creation and that

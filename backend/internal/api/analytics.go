@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/tracker"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/tracker"
 )
 
 // analyticsMissionID returns the mission to analyse: ?missionId=N, otherwise the

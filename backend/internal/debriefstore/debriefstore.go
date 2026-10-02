@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"dcsmm/internal/db"
-	"dcsmm/internal/debrief"
-	"dcsmm/internal/model"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/debrief"
+	"dcsmanager/internal/model"
 )
 
 // Assembler collects chunks of a debrief transfer and, once complete, parses

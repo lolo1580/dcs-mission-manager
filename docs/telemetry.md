@@ -30,7 +30,7 @@ The family (`category`) is inferred from the **DCS type** by heuristic rules
 **overridden** precisely, via a JSON file:
 
 ```jsonc
-// categories.json (path via DCSMM_CATEGORIES, default ./categories.json)
+// categories.json (path via DCSMANAGER_CATEGORIES, default ./categories.json)
 {
   "F-16C_50": "plane",
   "SA-10": "ground",

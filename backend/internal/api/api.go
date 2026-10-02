@@ -16,14 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"dcsmm/internal/aerodrome"
-	"dcsmm/internal/charts"
-	"dcsmm/internal/config"
-	"dcsmm/internal/db"
-	"dcsmm/internal/live"
-	"dcsmm/internal/state"
-	"dcsmm/internal/stats"
-	"dcsmm/internal/theatre"
+	"dcsmanager/internal/aerodrome"
+	"dcsmanager/internal/charts"
+	"dcsmanager/internal/config"
+	"dcsmanager/internal/db"
+	"dcsmanager/internal/live"
+	"dcsmanager/internal/state"
+	"dcsmanager/internal/stats"
+	"dcsmanager/internal/theatre"
 )
 
 // The frontend build is written here by `npm run build` (see
@@ -41,7 +41,7 @@ const fallbackPage = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DCS Mission Manager</title>
+    <title>DCS Manager</title>
     <style>
       :root { color-scheme: dark; }
       body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -57,7 +57,7 @@ const fallbackPage = `<!doctype html>
   </head>
   <body>
     <main>
-      <h1>DCS Mission Manager — backend is up</h1>
+      <h1>DCS Manager — backend is up</h1>
       <p>The backend is running, but the frontend has not been built yet. This is the embedded fallback page.</p>
       <p>To build the UI:</p>
       <pre><code>cd frontend
@@ -323,7 +323,7 @@ func (s *Server) stateJSON() ([]byte, error) {
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
-		"service": "dcsmm",
+		"service": "dcsmanager",
 		"units":   s.store.Count(),
 	})
 }

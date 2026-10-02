@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"dcsmm/internal/lua"
+	"dcsmanager/internal/lua"
 )
 
 // Beacon type constants, as written in DCS's beacons.lua. Only the ones we

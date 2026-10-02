@@ -19,11 +19,11 @@ function storedFlag(key, def) {
   const v = localStorage.getItem(key);
   return v === null ? def : v === '1';
 }
-export const showHeat = writable(storedFlag('dcsmm.an.showHeat', true));
-export const showTrails = writable(storedFlag('dcsmm.an.showTrails', true));
+export const showHeat = writable(storedFlag('dcsmanager.an.showHeat', true));
+export const showTrails = writable(storedFlag('dcsmanager.an.showTrails', true));
 for (const [store, key] of [
-  [showHeat, 'dcsmm.an.showHeat'],
-  [showTrails, 'dcsmm.an.showTrails'],
+  [showHeat, 'dcsmanager.an.showHeat'],
+  [showTrails, 'dcsmanager.an.showTrails'],
 ]) {
   store.subscribe((on) => {
     if (typeof localStorage !== 'undefined') localStorage.setItem(key, on ? '1' : '0');

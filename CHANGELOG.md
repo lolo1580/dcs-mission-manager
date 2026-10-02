@@ -9,6 +9,22 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The project is renamed to DCS Manager.** It outgrew the mission-only scope,
+  so the name, the binary and every identifier that carried the old one changed:
+  `dcsmm.exe` → `dcsmanager.exe`, the Go module `dcsmm` → `dcsmanager`, the CLI
+  name, the environment variables `DCSMM_*` → `DCSMANAGER_*`, the Lua config
+  `dcsmm.cfg` → `dcsmanager.cfg` and the hook `Hooks/dcsmm.lua` →
+  `Hooks/dcsmanager.lua`.
+  - This is a **breaking change**: the embedded Lua scripts and the config file
+    both changed name, so an existing install must run `dcsmanager install-lua`
+    again and move `Config\dcsmm.cfg` to `Config\dcsmanager.cfg`. Environment
+    variables set as `DCSMM_*` are no longer read.
+  - The install markers in `Export.lua` are now `DCSMANAGER-BEGIN` / `-END`, so the
+    old block is not recognised and must be removed (or the file restored from
+    its backup) before reinstalling.
+
 ### Removed
 
 - **The live map has been removed.** The manager now focuses on the session
@@ -23,10 +39,10 @@ to [semantic versioning](https://semver.org/).
     "nearest field" lookup. Only the drawing is gone.
   - Airfields, their frequencies and their **aeronautical charts** (read from
     `maps_dcs/`) are unchanged.
-  - `dcsmm import-tiles`, `import-image`, `fetch-tiles` and `import-vectors` are
-    gone, along with the `DCSMM_TILES_DIR`, `DCSMM_TILES_ATTRIBUTION`,
-    `DCSMM_VECTORS_DIR`, `DCSMM_BASEMAP`, `DCSMM_BASEMAP_URL` and
-    `DCSMM_REVEAL_ALL_UNITS` variables. Leaflet is no longer a frontend
+  - `dcsmanager import-tiles`, `import-image`, `fetch-tiles` and `import-vectors` are
+    gone, along with the `DCSMANAGER_TILES_DIR`, `DCSMANAGER_TILES_ATTRIBUTION`,
+    `DCSMANAGER_VECTORS_DIR`, `DCSMANAGER_BASEMAP`, `DCSMANAGER_BASEMAP_URL` and
+    `DCSMANAGER_REVEAL_ALL_UNITS` variables. Leaflet is no longer a frontend
     dependency.
 
 ### Added
@@ -39,7 +55,7 @@ to [semantic versioning](https://semver.org/).
     it out to every connected hook. It answers `503` when no hook is connected
     (game not running, or scripts not installed) — a normal state, shown as such
     in the UI, not an error.
-  - `Hooks/dcsmm.lua` reads pending commands from `onSimulationFrame`, with a
+  - `Hooks/dcsmanager.lua` reads pending commands from `onSimulationFrame`, with a
     **zero timeout**, so a frame is never stalled, and injects the message with
     `net.send_chat`. An unknown command is logged and ignored, so a newer backend
     cannot break an older hook.
@@ -69,15 +85,15 @@ to [semantic versioning](https://semver.org/).
     an empty result all plot without a division by zero.
 
 - **The manager now opens in its own window instead of a browser tab.** Starting
-  `dcsmm.exe` shows the embedded UI in a native WebView2 window: no browser to
+  `dcsmanager.exe` shows the embedded UI in a native WebView2 window: no browser to
   launch, no `localhost:8080` to remember, and closing the window shuts the
   manager down. The window is driven by `github.com/jchv/go-webview2`, a pure-Go
   binding, so the build still needs no C toolchain (`CGO_ENABLED=0` unchanged).
   - The HTTP server is kept, not replaced: the window loads `http://<addr>/`, so
-    the page reaches the API exactly as before, and `dcsmm serve` still exposes
+    the page reaches the API exactly as before, and `dcsmanager serve` still exposes
     the UI to a browser (second monitor, tablet). The manager falls back to that
     headless mode on its own when the WebView2 runtime is unavailable.
-  - `DCSMM_HTTP_ADDR` now accepts a port of `0`, in which case the OS picks a
+  - `DCSMANAGER_HTTP_ADDR` now accepts a port of `0`, in which case the OS picks a
     free one and the window is pointed at the resolved address.
   - The manager's wiring moved to `internal/app` so the window and the headless
     mode share one implementation and cannot drift apart.
@@ -109,15 +125,15 @@ to [semantic versioning](https://semver.org/).
     Kola 0 → **1**, Marianas 0 → **1**.
   - VORs: Persian Gulf 1 → **16**, Kola 4 → **9**.
   - TACANs: Persian Gulf 8 → **10** (the VORTACs).
-- **Starting the manager twice died silently.** A second `dcsmm.exe` failed on
+- **Starting the manager twice died silently.** A second `dcsmanager.exe` failed on
   the UDP bind and exited, printing to a console the user never sees when
   double-clicking — it looked like nothing happened at all. The manager now asks
   `GET /api/health` for its own service name before starting: in window mode it
-  shows a message box and stops, and `dcsmm serve` exits with code 3 and a
+  shows a message box and stops, and `dcsmanager serve` exits with code 3 and a
   one-line reason. A duplicate launch now says so instead of vanishing.
 - **Window mode wrote no log.** A double-clicked executable has no console, so a
   startup failure left no trace to investigate. Window mode now appends to
-  `data/dcsmm.log` (next to `DCSMM_DB_PATH`), which is where "it does not start"
+  `data/dcsmanager.log` (next to `DCSMANAGER_DB_PATH`), which is where "it does not start"
   finally gets an answer.
 
 ### Fixed
@@ -261,7 +277,7 @@ to [semantic versioning](https://semver.org/).
   local machine while the server is bound to loopback, and **the default listen
   address is `127.0.0.1:8080`** instead of `0.0.0.0:8080`. Reaching the UI from
   another device is still possible, deliberately, with
-  `DCSMM_HTTP_ADDR=0.0.0.0:8080` — in which case the README says the API is
+  `DCSMANAGER_HTTP_ADDR=0.0.0.0:8080` — in which case the README says the API is
   unauthenticated. Covered by `TestOriginGuard` and `TestIsLoopbackAddr`.
 - **Player names were injected into Leaflet tooltips unescaped.** Leaflet renders
   tooltip content as HTML, so a player called `<img src=x onerror=...>` in a
@@ -311,7 +327,7 @@ The manager becomes a **local companion**: it now reads DCS's own files. That
 single change is what turned the airfields from a hand-transcribed dataset for one
 map into the simulator's own truth for every installed map.
 
-It is also the first release that **exercises `dcsmm.exe` on Windows in CI** and
+It is also the first release that **exercises `dcsmanager.exe` on Windows in CI** and
 the first in which the aeronautical charts you already have on disk are readable
 from the app.
 
@@ -329,7 +345,7 @@ session. See "Beta scope" in the previous entry for the standing caveat.
   container-port caveat in the documentation. This is what makes the airfield
   reading possible: a local backend can read DCS's own files, and it removes the
   whole class of "wrong IP / firewall / port publishing" support questions.
-- CI and the release workflow now build and smoke-test **`dcsmm.exe` on Windows**
+- CI and the release workflow now build and smoke-test **`dcsmanager.exe` on Windows**
   rather than a Linux stand-in, so the artifact that is verified is the artifact
   users download.
 
@@ -347,7 +363,7 @@ session. See "Beta scope" in the previous entry for the standing caveat.
     georeferenced and are in a conic projection, so warping them onto the map
     would be wrong. A note in the viewer says so.
   - They are never shipped and never redistributed; the folder is local and each
-    scan keeps its own licence. `DCSMM_CHARTS_DIR` changes the folder.
+    scan keeps its own licence. `DCSMANAGER_CHARTS_DIR` changes the folder.
   - The file endpoint serves only files present in the index, so a crafted URL
     cannot read anything else.
 - **Aeronautical basemap style.** A fifth basemap, "Aeronautical", draws on the
@@ -384,7 +400,7 @@ session. See "Beta scope" in the previous entry for the standing caveat.
   geolocated settlements (1691 for the Caucasus, 385 for the Persian Gulf). They
   are exposed as `/api/towns` and can be drawn on the map, giving it context
   with no mission data at all.
-- **`DCSMM_SAVED_GAMES`** overrides the Saved Games folder. The DCS installation
+- **`DCSMANAGER_SAVED_GAMES`** overrides the Saved Games folder. The DCS installation
   is located through the registry, with a fallback to the `Command line:` line of
   `Logs/dcs.log`.
 - The Lua parser now understands the constructs DCS data files use: the gettext
@@ -401,13 +417,13 @@ session. See "Beta scope" in the previous entry for the standing caveat.
   coalition, coordinates, elevation, runway, Tower, TACAN, ILS). The card also
   has a "Show on the map" button, and clicking an airfield in the Airfields tab
   now switches to the map and focuses it.
-- **Session source tracking (`live` / `test`) and `dcsmm purge`.** A session
+- **Session source tracking (`live` / `test`) and `dcsmanager purge`.** A session
   recorded while the test tools are running is indistinguishable from a real
   flight, because those tools speak exactly the same protocol as DCS. Every
   mission now carries a `source`, detected automatically from the fixture
-  callsigns (`DCSMM_SOURCE` forces the verdict), and statistics exclude `test`
+  callsigns (`DCSMANAGER_SOURCE` forces the verdict), and statistics exclude `test`
   sessions unless `?includeTest=1` is passed. New CLI and HTTP endpoints
-  (`dcsmm purge`, `DELETE /api/maintenance/purge`) remove sessions, which
+  (`dcsmanager purge`, `DELETE /api/maintenance/purge`) remove sessions, which
   previously had no option short of deleting the database file.
 
 ### Fixed
@@ -428,19 +444,19 @@ session. See "Beta scope" in the previous entry for the standing caveat.
 
 ## [1.0.0-beta.2] — 2026-09-26
 
-Fixes a broken first run in beta.1: the downloaded `dcsmm.exe` could not run
+Fixes a broken first run in beta.1: the downloaded `dcsmanager.exe` could not run
 `install-lua`.
 
 ### Fixed
 
 - **`install-lua` did not work from a downloaded binary.** The scripts had to sit
   in a `dcs-lua/` folder next to the executable, which a release archive never
-  contains, so the documented `.\dcsmm.exe install-lua` failed with
+  contains, so the documented `.\dcsmanager.exe install-lua` failed with
   "dcs-lua directory not found". The scripts are now **embedded in the binary**
   (generated by `tools/gen-lua-embed.mjs`), with the on-disk folder still taking
   precedence for development. Covered by `TestEmbeddedFallback`, and CI fails if
   `dcs-lua/` changes without regenerating the embedded copy.
-- Path separator bug: `Hooks/dcsmm.lua` resolved on Linux but `Hooks\dcsmm.lua`
+- Path separator bug: `Hooks/dcsmanager.lua` resolved on Linux but `Hooks\dcsmanager.lua`
   failed on Windows. Relative paths are now normalised before lookup.
 
 ### Notes
@@ -483,10 +499,10 @@ first-class option.
 - Every French string, comment, log line, CLI message, docstring and documentation
   page has been translated to English: backend (all packages), Lua scripts, tools,
   CI workflow, Docker files, PowerShell scripts, examples.
-- **Protocol values were deliberately left untouched** (`dcsmm_*` config keys,
+- **Protocol values were deliberately left untouched** (`dcsmanager_*` config keys,
   JSON keys, DCS event names, coalition values, `optview_*`, theatre ids, basemap
   ids), so existing installations keep working.
-- The `DCSMM-BEGIN`/`DCSMM-END` markers were translated **on both sides**
+- The `DCSMANAGER-BEGIN`/`DCSMANAGER-END` markers were translated **on both sides**
   (`install.go` and the Lua scripts) so they still match byte-for-byte.
 - The fog-of-war banner is now translated client-side from the machine-readable
   `mode`, instead of displaying the backend's label.
@@ -513,7 +529,7 @@ Verified:
 
 Not yet verified against a live DCS session:
 
-- `Scripts/Export.lua` and `Scripts/Hooks/dcsmm.lua` running inside DCS.
+- `Scripts/Export.lua` and `Scripts/Hooks/dcsmanager.lua` running inside DCS.
 - `Sim.getMissionOptions()` on a real mission (values taken from DCS's own
   `optionsDb.lua`).
 - Fog-of-war behaviour with real units and coalitions.
@@ -543,7 +559,7 @@ options: it no longer reveals what DCS hides.
   - `internal/tcp` reports the options back; the server deduces the policy.
   - `GET /api/visibility` and `visibility` key in every state frame;
     `visibility` SSE event on every change.
-  - `internal/config`: `DCSMM_REVEAL_ALL_UNITS` (default `false`).
+  - `internal/config`: `DCSMANAGER_REVEAL_ALL_UNITS` (default `false`).
 
 - **Frontend**
   - Banner under the header indicating the active mode and its limit.
@@ -596,9 +612,9 @@ radio frequencies and approach charts.
 
 ### Added
 
-- **CLI (`dcsmm`)**
+- **CLI (`dcsmanager`)**
   - `install-lua`: installs/merges the scripts into Saved Games;
-  - `uninstall-lua`: removes the block and `Hooks/dcsmm.lua`;
+  - `uninstall-lua`: removes the block and `Hooks/dcsmanager.lua`;
   - `status`: `installed` / `outdated` / `missing` per file;
   - `version` / `help`.
   - Automatic detection of `Saved Games` (`DCS.openbeta` takes priority) and of the
@@ -606,10 +622,10 @@ radio frequencies and approach charts.
 
 - **Lua injector (`internal/install`)**
   - **Never replaces** an existing `Export.lua` (Tacview, SRS, DCS-BIOS…):
-    merges a block delimited by `>>> DCSMM-BEGIN >>>` / `<<< DCSMM-END <<<`.
+    merges a block delimited by `>>> DCSMANAGER-BEGIN >>>` / `<<< DCSMANAGER-END <<<`.
   - **Timestamped backup** before any modification.
   - **Idempotent**: a second run updates the block in place.
-  - Markers added in `Export.lua` and `Hooks/dcsmm.lua`.
+  - Markers added in `Export.lua` and `Hooks/dcsmanager.lua`.
 
 - **Deployment**
   - `Dockerfile`: `go.sum` copied (reproducible build), version injected via
@@ -649,8 +665,8 @@ heatmaps, flight trails and telemetry.
     a degree grid, **without projection**), `Trails`, `PruneTracking`.
   - `internal/tracker.Analyse`: duration, distance (haversine), altitude/speed/G max.
   - Routes `GET /api/analytics/{heatmap,tracks,sorties}`.
-  - Configuration: `DCSMM_TRACK_INTERVAL`, `DCSMM_TRACK_GRACE`,
-    `DCSMM_TRACK_RETENTION`.
+  - Configuration: `DCSMANAGER_TRACK_INTERVAL`, `DCSMANAGER_TRACK_GRACE`,
+    `DCSMANAGER_TRACK_RETENTION`.
   - Telemetry fields (`speed`, `g`, `aoa`) on tracked units.
 
 - **DCS scripts**
@@ -687,7 +703,7 @@ heatmaps, flight trails and telemetry.
     `?scope=career|mission` and `?missionId=N`.
 
 - **DCS scripts**
-  - `Hooks/dcsmm.lua`: resolution of the **aircraft type** per player via
+  - `Hooks/dcsmanager.lua`: resolution of the **aircraft type** per player via
     `Sim.getAvailableSlots` (cached, refreshed every 30 s); the field
     `unitType` replaces the use of the opaque `slotID`.
 
@@ -729,7 +745,7 @@ backend, parsed and archived.
 - **Transport and storage**
   - `internal/debriefstore`: reassembly of **multi-chunk** transfers
     (base64 chunks, out-of-order arrival tolerated, concurrent transfers isolated).
-  - `Hooks/dcsmm.lua`: reads `debrief.log` at the end of the mission and sends it in 32 KB
+  - `Hooks/dcsmanager.lua`: reads `debrief.log` at the end of the mission and sends it in 32 KB
     chunks encoded in base64.
   - `debriefs` table (metadata, parsed `parsed` JSON, original `raw`).
 
@@ -766,14 +782,14 @@ events, connected players and chat.
     records stats only for active players.
   - `internal/api`: `GET /api/game-events`, `/api/players`, `/api/chat`,
     `/api/mission`, `/api/history/{events,chat,missions}`; SSE `session` frame.
-  - `internal/config`: `DCSMM_DB_ENABLED`.
+  - `internal/config`: `DCSMANAGER_DB_ENABLED`.
 
 - **DCS scripts**
-  - `Hooks/dcsmm.lua`: TCP sending of events (`onGameEvent`), chat
+  - `Hooks/dcsmanager.lua`: TCP sending of events (`onGameEvent`), chat
     (`onChatMessage`), players and their statistics (`net.get_player_list`,
     `net.get_player_info`, `net.get_stat`), and mission transitions. Persistent
     connection, automatic reconnection, calls protected by `pcall`, never blocking.
-  - `Config/dcsmm.cfg`: `dcsmm_players_interval`.
+  - `Config/dcsmanager.cfg`: `dcsmanager_players_interval`.
 
 - **Frontend**
   - **Map** / **Session** tabs; name of the current mission in the header.
@@ -808,14 +824,14 @@ and displayed on an interactive map.
     by category/coalition, `GET /api/units/{id}`, `GET /api/theatres`, and serving of
     **DCS map tiles** (`/api/tiles/<theatre>/<z>/<x>/<y>.png`) with protection
     against path traversal.
-  - `internal/config`: new options (`DCSMM_UNIT_TTL`, `DCSMM_TILES_DIR`,
-    `DCSMM_BASEMAP_URL`, `DCSMM_CATEGORIES`, `DCSMM_MAX_UNITS`).
+  - `internal/config`: new options (`DCSMANAGER_UNIT_TTL`, `DCSMANAGER_TILES_DIR`,
+    `DCSMANAGER_BASEMAP_URL`, `DCSMANAGER_CATEGORIES`, `DCSMANAGER_MAX_UNITS`).
 
 - **DCS scripts**
   - `Export.lua`: export of **all world objects** in addition to the player, filterable
-    by radius (`dcsmm_world_radius`), capped (`dcsmm_max_objects`), selectable
+    by radius (`dcsmanager_world_radius`), capped (`dcsmanager_max_objects`), selectable
     coalitions; defensive access to the `LoGet*`/`Export.*` functions.
-  - `Config/dcsmm.cfg`: new documented options.
+  - `Config/dcsmanager.cfg`: new documented options.
 
 - **Frontend**
   - Map: SVG icons per category, colors per coalition, **flight trails** for
@@ -855,18 +871,18 @@ First version: **PoC Phase 0** — validation of the DCS → Go → browser chai
   - `Makefile` and `build.ps1`: build commands (frontend, backend, Docker).
 
 - **DCS scripts (`dcs-lua/`)**
-  - `Config/dcsmm.cfg`: configuration template (backend IP, ports, send interval).
+  - `Config/dcsmanager.cfg`: configuration template (backend IP, ports, send interval).
   - `Export.lua`: export of the player's position to the backend over UDP/JSON,
     sampled once per second via `LuaExportActivityNextEvent` (no impact
     on simulator performance).
 
 - **Go backend (`backend/`)**
-  - `internal/config`: configuration via environment variables (`DCSMM_*`) with defaults.
+  - `internal/config`: configuration via environment variables (`DCSMANAGER_*`) with defaults.
   - `internal/udp`: UDP receiver decoding the JSON positions.
   - `internal/state`: in-memory store of units (with expiry).
   - `internal/api`: HTTP server (REST `GET /api/state`, **Server-Sent Events**
     stream `/api/events`) + serving of the embedded web interface.
-  - `cmd/dcsmm/main.go`: entry point assembling the building blocks.
+  - `cmd/dcsmanager/main.go`: entry point assembling the building blocks.
 
 - **Frontend (`frontend/`)**
   - Minimal Leaflet interface displaying unit positions in real time via

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"dcsmm/internal/lua"
-	"dcsmm/internal/model"
+	"dcsmanager/internal/lua"
+	"dcsmanager/internal/model"
 )
 
 // Debrief is the parsed summary of one mission's debrief file.

@@ -20,7 +20,7 @@ import (
 	webview2 "github.com/jchv/go-webview2"
 	"golang.org/x/sys/windows"
 
-	"dcsmm/internal/app"
+	"dcsmanager/internal/app"
 )
 
 // show opens url in a WebView2 window and blocks until it is closed.
@@ -49,7 +49,7 @@ func show(url string) error {
 		Debug:     false,
 		AutoFocus: true,
 		WindowOptions: webview2.WindowOptions{
-			Title:  "DCS Mission Manager",
+			Title:  "DCS Manager",
 			Width:  1280,
 			Height: 800,
 			Center: true,
@@ -76,9 +76,9 @@ func notifyAlreadyRunning(url string) {
 	if focusRunningInstance() {
 		return
 	}
-	msg := "DCS Mission Manager is already running.\n\nOpen " + url +
+	msg := "DCS Manager is already running.\n\nOpen " + url +
 		" in your browser to reach it."
-	messageBox("DCS Mission Manager", msg)
+	messageBox("DCS Manager", msg)
 }
 
 // focusRunningInstance raises the window of an already-running instance and
@@ -86,7 +86,7 @@ func notifyAlreadyRunning(url string) {
 // the caller falls back to a message box.
 func focusRunningInstance() bool {
 	class := windows.StringToUTF16Ptr("webview")
-	title := windows.StringToUTF16Ptr("DCS Mission Manager")
+	title := windows.StringToUTF16Ptr("DCS Manager")
 	hwnd, _, _ := findWindowW.Call(
 		uintptr(unsafe.Pointer(class)),
 		uintptr(unsafe.Pointer(title)),
@@ -105,7 +105,7 @@ func focusRunningInstance() bool {
 func notifyWindowUnavailable(url string) {
 	msg := "The native window could not be created (the WebView2 runtime may be missing).\n\n" +
 		"The manager is still running: open " + url + " in your browser."
-	messageBox("DCS Mission Manager", msg)
+	messageBox("DCS Manager", msg)
 }
 
 // messageBox shows a modal message box, so the desktop mode never fails

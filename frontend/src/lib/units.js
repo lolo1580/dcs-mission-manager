@@ -70,7 +70,7 @@ export async function fetchTheatres() {
 
 /** The theatre id saved in localStorage, or null. */
 function storedTheatre() {
-  return typeof localStorage !== 'undefined' ? localStorage.getItem('dcsmm.theatre') : null;
+  return typeof localStorage !== 'undefined' ? localStorage.getItem('dcsmanager.theatre') : null;
 }
 
 /**
@@ -93,11 +93,11 @@ export const theatres = writable([]);
 
 /** Active theatre id. Persisted, because a player flies the same map for weeks. */
 export const theatre = writable(
-  (typeof localStorage !== 'undefined' && localStorage.getItem('dcsmm.theatre')) || 'Caucasus'
+  (typeof localStorage !== 'undefined' && localStorage.getItem('dcsmanager.theatre')) || 'Caucasus'
 );
 
 theatre.subscribe((id) => {
-  if (typeof localStorage !== 'undefined') localStorage.setItem('dcsmm.theatre', id);
+  if (typeof localStorage !== 'undefined') localStorage.setItem('dcsmanager.theatre', id);
 });
 
 export function setTheatre(id) {

@@ -51,7 +51,7 @@ structure (events, world state, aggregates) via `ToModel()`.
 The file can exceed 1 MB. It is sent in **chunks**:
 
 ```
-Hooks/dcsmm.lua                      Backend
+Hooks/dcsmanager.lua                      Backend
   lit debrief.log
   → splits into 32 KB chunks
   → base64 par morceau

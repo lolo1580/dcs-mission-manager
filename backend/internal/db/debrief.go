@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 // SaveDebrief stores a parsed debrief and returns it with its assigned id.

@@ -1,4 +1,4 @@
-module dcsmm
+module dcsmanager
 
 go 1.25.0
 

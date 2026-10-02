@@ -3,7 +3,7 @@ package live
 import (
 	"testing"
 
-	"dcsmm/internal/model"
+	"dcsmanager/internal/model"
 )
 
 func TestAddEventAssignsIDsAndCaps(t *testing.T) {
