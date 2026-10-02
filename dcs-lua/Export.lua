@@ -39,7 +39,7 @@ do
   ---------------------------------------------------------------------------
   -- Configuration
   ---------------------------------------------------------------------------
-  local host, udpPort = "127.0.0.1", 7778
+  local host, udpPort = "127.0.0.1", 7776
   local interval, worldInterval = 1.0, 2.0
   local enabled, worldEnabled = true, true
   local worldRadiusKm, maxObjects = 0, 800

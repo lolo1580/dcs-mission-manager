@@ -5,7 +5,7 @@
 //
 // Usage:
 //   node tools/send-telemetry.mjs [host] [port]
-//   node tools/send-telemetry.mjs 127.0.0.1 7778
+//   node tools/send-telemetry.mjs 127.0.0.1 7776
 //
 // Sends:
 //   - an "ownship" message every second (the player);
@@ -14,7 +14,7 @@
 import dgram from 'node:dgram';
 
 const host = process.argv[2] ?? '127.0.0.1';
-const port = Number(process.argv[3] ?? 7778);
+const port = Number(process.argv[3] ?? 7776);
 
 const socket = dgram.createSocket('udp4');
 

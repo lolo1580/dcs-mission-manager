@@ -11,7 +11,7 @@
 import dgram from 'node:dgram';
 
 const host = process.argv[2] ?? '127.0.0.1';
-const port = Number(process.argv[3] ?? 7778);
+const port = Number(process.argv[3] ?? 7776);
 const name = process.argv[4] ?? 'Cellar';
 const seconds = Number(process.argv[5] ?? 5);
 

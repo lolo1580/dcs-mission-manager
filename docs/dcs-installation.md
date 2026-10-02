@@ -20,11 +20,16 @@ Copy `dcs-lua/Config/dcsmanager.cfg` to `Saved Games\DCS\Config\dcsmanager.cfg`,
 
 ```lua
 dcsmanager_host = "127.0.0.1"   -- the manager runs locally, nothing to change
-dcsmanager_udp_port = 7778
+dcsmanager_udp_port = 7776      -- DCS-BIOS owns 7778; keep them apart
 dcsmanager_tcp_port = 7779
 dcsmanager_enabled = true
 dcsmanager_send_interval = 1.0
 ```
+
+> **Running alongside DCS-BIOS.** DCS-BIOS listens for commands on UDP 7778, so
+> the manager uses 7776 for its own telemetry. That is what lets the two run at
+> the same time; changing this port back to 7778 would make one of them fail to
+> start.
 
 ## Step 2 — Export.lua (telemetry)
 
@@ -59,7 +64,7 @@ DCS automatically loads all the `.lua` files in this folder, sorted by name.
 Start a mission. In the DCS logs, you should see:
 
 ```
-DCSMANAGER: position export enabled (127.0.0.1:7778)
+DCSMANAGER: position export enabled (127.0.0.1:7776)
 ```
 
 ## Troubleshooting
@@ -76,7 +81,7 @@ DCSMANAGER: position export enabled (127.0.0.1:7778)
 A test emitter is provided:
 
 ```bash
-node tools/send-telemetry.mjs 127.0.0.1 7778
+node tools/send-telemetry.mjs 127.0.0.1 7776
 ```
 
 It simulates four aircraft flying around the Caucasus.

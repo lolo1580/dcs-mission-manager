@@ -132,7 +132,7 @@ go run ./backend/cmd/dcsmanager
 
 By default, the backend listens on:
 
-- `127.0.0.1:7778` over **UDP** (positions)
+- `127.0.0.1:7776` over **UDP** (positions)
 - `0.0.0.0:8080` over **HTTP** (Web UI + real-time stream `GET /api/events` via SSE)
 
 The manager then opens in a **native window**. In `serve` mode it opens no window and
@@ -159,7 +159,7 @@ defaults. None of them is required for a normal install.
 | Variable | Default | Description |
 |---|---|---|
 | `DCSMANAGER_HTTP_ADDR` | `127.0.0.1:8080` | HTTP listening address (Web UI + SSE). A port of `0` picks a free one automatically (native window). Set `0.0.0.0:8080` to reach the UI from another device; the API has no authentication |
-| `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7778` | UDP listening address (unit telemetry) |
+| `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7776` | UDP listening address (unit telemetry). Not 7778: **DCS-BIOS owns that port**, and the two are meant to run together |
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | SQLite database path |
 | `DCSMANAGER_DB_ENABLED` | `true` | Enable persistence (otherwise everything in memory) |
@@ -180,7 +180,7 @@ defaults. None of them is required for a normal install.
 ```lua
 -- Backend address (the manager runs locally)
 dcsmanager_host = "127.0.0.1"
-dcsmanager_udp_port = 7778
+dcsmanager_udp_port = 7776
 dcsmanager_tcp_port = 7779
 
 -- Telemetry

@@ -23,6 +23,10 @@ type Config struct {
 	// device (a tablet in the cockpit, for instance).
 	HTTPAddr string
 	// UDPAddr is the listen address for telemetry coming from DCS.
+	//
+	// 7776, not 7778: DCS-BIOS — which many cockpits run alongside this manager —
+	// owns 7778 for its command channel. Binding it too would make one of the two
+	// fail to start, and DCS-BIOS' port is the established one.
 	UDPAddr string
 	// TCPAddr is the listen address for events and downstream commands (Phase 2+).
 	TCPAddr string
@@ -121,7 +125,7 @@ func envBool(key string, def bool) bool {
 func Load() Config {
 	return Config{
 		HTTPAddr:       env("DCSMANAGER_HTTP_ADDR", "127.0.0.1:8080"),
-		UDPAddr:        env("DCSMANAGER_UDP_ADDR", "127.0.0.1:7778"),
+		UDPAddr:        env("DCSMANAGER_UDP_ADDR", "127.0.0.1:7776"),
 		TCPAddr:        env("DCSMANAGER_TCP_ADDR", "127.0.0.1:7779"),
 		DBPath:         env("DCSMANAGER_DB_PATH", "./data/dcsmanager.db"),
 		DBEnabled:      envBool("DCSMANAGER_DB_ENABLED", true),
