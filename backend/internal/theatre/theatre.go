@@ -49,24 +49,6 @@ var builtin = []Theatre{
 	{ID: "GermanyCW", Name: "Cold War Germany", Bounds: Bounds{47.0, 5.5, 55.5, 15.5}},
 }
 
-// aliases maps the spellings that are not DCS's own onto the real theatre id.
-// They exist because the wrong ids ("Marianas", "Sinai") were published in
-// earlier releases and may still be in a browser's saved preference.
-var aliases = map[string]string{
-	"Marianas": "MarianaIslands",
-	"Sinai":    "SinaiMap",
-}
-
-// Resolve returns the real theatre id for a query value, following the published
-// aliases so an older saved preference keeps working. An unknown value is
-// returned unchanged, letting the caller decide what to do with it.
-func Resolve(id string) string {
-	if real, ok := aliases[id]; ok {
-		return real
-	}
-	return id
-}
-
 // All returns a copy of the built-in theatres.
 func All() []Theatre {
 	out := make([]Theatre, len(builtin))
@@ -74,11 +56,8 @@ func All() []Theatre {
 	return out
 }
 
-// Get returns the theatre with the given id, following the published aliases.
+// Get returns the theatre with the given id.
 func Get(id string) (Theatre, bool) {
-	if real, ok := aliases[id]; ok {
-		id = real
-	}
 	for _, t := range builtin {
 		if t.ID == id {
 			return t, true

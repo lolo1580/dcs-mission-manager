@@ -74,10 +74,9 @@ function storedTheatre() {
 }
 
 /**
- * Corrects a stored theatre that no longer exists. An earlier release used
- * "Marianas" and "Sinai" where DCS says "MarianaIslands" and "SinaiMap"; anyone
- * who saved one of those would be stuck on an empty theatre, with a selector
- * showing no matching option.
+ * Corrects a stored theatre that is no longer in the list — a map the player
+ * uninstalled, say. Without this the selector would sit on an id with no option
+ * and the tab would look empty.
  */
 function validateTheatrePreference(list) {
   if (!list.length) return;

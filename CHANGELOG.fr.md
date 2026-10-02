@@ -23,6 +23,21 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Retiré
 
+- **Les couches de compatibilité avec nos propres anciennes versions sont parties.**
+  Maintenant que le projet démarre à neuf, le code qui n'existait que pour lire des
+  artefacts produits par une ancienne version de chez nous est du poids mort :
+  - **Les alias de théâtre** (`Marianas` → `MarianaIslands`, `Sinai` → `SinaiMap`)
+    corrigeaient des identifiants que nous avions publiés faux. `theatre.Resolve`
+    disparaît et seuls les identifiants de DCS sont acceptés.
+  - **La section « restes de l'ancien nom »** de l'onglet Installation DCS, et la
+    liste `legacy` derrière elle, disparaissent : il n'y a pas d'ancienne
+    installation à nettoyer.
+  - Le paragraphe du README sur la migration depuis une version antérieure à la
+    colonne `source` disparaît aussi.
+  - Ce qui est conservé, c'est la **robustesse face à l'entrée externe**, pas face à
+    notre passé : un fichier DCS malformé, une archive illisible ou un
+    `options.lua` édité à la main dégradent toujours en silence, et les migrations
+    additives de la base tournent toujours.
 - **La carte temps réel a été retirée.** Le gestionnaire se concentre désormais
   sur la session (joueurs, événements, chat), les débriefs, les statistiques,
   l'analyse et les aérodromes. Tout ce qui n'existait que pour servir la carte

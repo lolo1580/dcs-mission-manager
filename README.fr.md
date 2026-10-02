@@ -282,11 +282,6 @@ dcsmanager purge --source test --dry-run  # affiche ce qui serait supprimé, san
 Les statistiques acceptent `?includeTest=1` pour inclure volontairement les
 sessions simulées.
 
-> En migrant depuis une version antérieure, les missions **existantes** sont
-> étiquetées `live` (la migration ne peut pas savoir qu'elles étaient simulées).
-> Pour effacer des données enregistrées avant cette fonction, utilisez
-> `dcsmanager purge --mission-id <n>` ou `--all`.
-
 ---
 
 ## Structure du projet

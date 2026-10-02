@@ -45,27 +45,13 @@ func TestDCSIdentifiers(t *testing.T) {
 		}
 	}
 
-	// The wrong spellings must no longer be theatre ids of their own.
+	// The wrong spellings are not theatre ids of their own.
 	for _, wrong := range []string{"Marianas", "Sinai"} {
 		for _, th := range All() {
 			if th.ID == wrong {
 				t.Errorf("%q must not be a theatre id; DCS uses the other spelling", wrong)
 			}
 		}
-	}
-
-	// They still resolve, so a preference saved by an earlier release works.
-	if _, ok := Get("Marianas"); !ok {
-		t.Error("Get(\"Marianas\") should follow the alias")
-	}
-	if got := Resolve("Sinai"); got != "SinaiMap" {
-		t.Errorf("Resolve(\"Sinai\") = %q, want SinaiMap", got)
-	}
-	if got := Resolve("Caucasus"); got != "Caucasus" {
-		t.Errorf("Resolve should leave a real id alone, got %q", got)
-	}
-	if got := Resolve("Nowhere"); got != "Nowhere" {
-		t.Errorf("Resolve should leave an unknown id alone, got %q", got)
 	}
 }
 

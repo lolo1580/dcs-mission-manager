@@ -271,10 +271,6 @@ dcsmanager purge --source test --dry-run  # show what would be deleted, delete n
 
 Statistics accept `?includeTest=1` to include simulated sessions deliberately.
 
-> Upgrading from an older version tags **existing** missions as `live` (the
-> migration cannot know they were simulated). To clear data recorded before this
-> feature, use `dcsmanager purge --mission-id <n>` or `--all`.
-
 ---
 
 ## Project structure

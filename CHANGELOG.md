@@ -23,6 +23,19 @@ to [semantic versioning](https://semver.org/).
 
 ### Removed
 
+- **The compatibility shims for our own former versions are gone.** Now that the
+  project starts fresh, code that only existed to read artefacts an older build of
+  ours had produced is dead weight:
+  - **The theatre aliases** (`Marianas` → `MarianaIslands`, `Sinai` → `SinaiMap`)
+    were a fix for ids we once published wrong. `theatre.Resolve` is removed and
+    only DCS's own ids are accepted.
+  - **The "leftovers from the previous name" report** in the DCS install tab, and
+    the `legacy` list behind it, are gone: there is no old install to clean up.
+  - The README paragraph about upgrading from a release predating the session
+    `source` column is gone too.
+  - What is kept is **robustness against external input**, not against our past: a
+    malformed DCS file, an unreadable archive or a hand-edited `options.lua` still
+    degrade quietly, and the additive DB migrations still run.
 - **The live map has been removed.** The manager now focuses on the session
   (players, events, chat), the debriefs, the statistics, the analysis and the
   airfields. Everything that only existed to serve the map went with it: the map
