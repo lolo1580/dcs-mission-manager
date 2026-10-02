@@ -20,6 +20,7 @@ import (
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
+	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/live"
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
@@ -91,6 +92,7 @@ type Server struct {
 	stats      *stats.Service
 	aerodromes *aerodrome.Catalog
 	charts     *charts.Catalog
+	modules    dcsdata.ModuleInventory
 	commander  Commander
 	hub        *hub
 	theatres   []theatre.Theatre
@@ -118,6 +120,13 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		chartsDir:  cfg.ChartsDir,
 		localOnly:  isLoopbackAddr(cfg.HTTPAddr),
 	}
+}
+
+// SetModules installs the DCS module inventory read from the installation. It is
+// a setter rather than a constructor argument: the inventory is optional data,
+// and the constructor already carries the optional collaborators.
+func (s *Server) SetModules(inv dcsdata.ModuleInventory) {
+	s.modules = inv
 }
 
 // Handler returns the HTTP router.
@@ -225,6 +234,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/charts/file/", s.handleChartFile)
 	mux.HandleFunc("/api/maintenance", s.handleMaintenance)
 	mux.HandleFunc("/api/maintenance/purge", s.handlePurge)
+	mux.HandleFunc("/api/modules", s.handleModules)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

@@ -49,6 +49,23 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un onglet Modules liste ce que DCS lui-même déclare installer.** Le gestionnaire
+  lit l'inventaire de DCS (`Saved Games\DCS\MissionEditor\modules.lua`) au lieu d'un
+  catalogue maintenu à la main : terrains, appareils, systèmes de navigation, packs
+  techniques, campagnes et lots, chacun avec son **type**, son développeur, son id
+  DCS et les **versions installées**, et s'il est **possédé**.
+  - `internal/dcsdata` analyse le fichier avec le parseur Lua existant (aucune
+    nouvelle dépendance) et normalise les sections que DCS écrit tantôt en listes,
+    tantôt en tables numérotées. Il dégrade proprement : un fichier absent donne un
+    inventaire vide, pas une erreur.
+  - `GET /api/modules` renvoie la liste, avec `?owned=1` pour le sous-ensemble
+    possédé.
+  - L'onglet filtre par **recherche** (titre, développeur, id), par **catégorie** et
+    par **possédés uniquement**, et affiche le compte possédés/total. Sur la machine
+    de test il trouve 183 entrées, 22 possédées, 17 terrains dont 5 possédés.
+  - Couvert par un test sur le vrai `modules.lua` de la machine quand il est présent,
+    plus un document synthétique et les cas vide et filtré de l'API.
+
 - **Le chat peut désormais être envoyé dans DCS (canal de commandes).** La liaison
   TCP était déjà bidirectionnelle par construction ; le backend écrit maintenant des
   commandes sur la même connexion que celle utilisée par le hook pour remonter, et

@@ -47,6 +47,22 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **A Modules tab lists what DCS itself reports as installed.** The manager reads
+  DCS's own inventory (`Saved Games\DCS\MissionEditor\modules.lua`) instead of a
+  hand-maintained catalogue: terrains, aircraft, navigation systems, tech packs,
+  campaigns and bundles, each with its **type**, developer, DCS id and the
+  **installed versions**, and whether the player **owns** it.
+  - `internal/dcsdata` parses the file with the existing Lua parser (no new
+    dependency) and normalises the sections DCS writes as either slices or
+    numbered maps. It degrades gracefully: a missing file yields an empty
+    inventory, not an error.
+  - `GET /api/modules` returns the list, with `?owned=1` for the owned subset.
+  - The tab filters by **search** (title, developer, id), by **category** and by
+    **owned only**, and shows the owned/total count. On the test machine it finds
+    183 entries, 22 owned, 17 terrains of which 5 owned.
+  - Covered by a test against the machine's real `modules.lua` when one is
+    present, plus a synthetic document and the API's empty and filtered cases.
+
 - **Chat messages can now be sent into DCS (command channel).** The TCP link was
   already bidirectional by construction; the backend now writes commands down the
   same connection the hook uses to report, and the hook executes them.

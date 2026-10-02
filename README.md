@@ -34,6 +34,7 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Analytical maps & sortie | ✅ Phase 4 bis | Heatmap and flight-path plot, sortie analysis, ownship telemetry |
 | Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **101 airfields listed, 69 mappable** across 5 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts |
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
+| Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still
 > received and sampled: it feeds the statistics, the heatmaps and the airfields

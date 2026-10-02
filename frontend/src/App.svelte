@@ -7,6 +7,7 @@
   import StatsPanel from './lib/StatsPanel.svelte';
   import AnalyticsPanel from './lib/AnalyticsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
+  import ModulesPanel from './lib/ModulesPanel.svelte';
   import { connected, paused, fetchTheatres } from './lib/units.js';
   import { events, players, mission } from './lib/session.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
@@ -38,6 +39,7 @@
       <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
       <button class:active={tab === 'analytics'} on:click={() => goTo('analytics')}>{$t('tab.analytics')}</button>
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
+      <button class:active={tab === 'modules'} on:click={() => goTo('modules')}>{$t('tab.modules')}</button>
     </nav>
 
     {#if $mission}
@@ -91,6 +93,10 @@
     {:else if tab === 'analytics'}
       <div class="session wide">
         <AnalyticsPanel />
+      </div>
+    {:else if tab === 'modules'}
+      <div class="session wide">
+        <ModulesPanel />
       </div>
     {:else}
       <div class="session wide">

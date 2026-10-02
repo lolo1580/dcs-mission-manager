@@ -41,6 +41,7 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmap et tracés de vol, analyse de sortie, télémétrie ownship |
 | Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **101 aérodromes listés, 69 plaçables** sur 5 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes |
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
+| Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
 > est toujours reçue et échantillonnée : elle alimente les statistiques, les heatmaps

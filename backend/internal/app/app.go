@@ -31,6 +31,7 @@ import (
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
+	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/dcsdir"
 	"dcsmanager/internal/debriefstore"
 	"dcsmanager/internal/ingest"
@@ -217,6 +218,18 @@ func Run(onReady func(addr string)) error {
 	}
 
 	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, tcpListener)
+	// The module inventory comes from DCS's own list, so the UI can show what is
+	// installed and owned rather than a hand-maintained catalogue.
+	if cfg.SavedGames != "" {
+		if inv, err := dcsdata.LoadModules(cfg.SavedGames); err != nil {
+			log.Printf("modules: inventory unavailable: %v", err)
+		} else if inv.Total > 0 {
+			log.Printf("modules: %d entries, %d owned (%s)", inv.Total, inv.Owned, dcsdata.ModuleInventoryPath(cfg.SavedGames))
+			srv.SetModules(inv)
+		} else {
+			log.Printf("modules: none found in %s (optional)", dcsdata.ModuleInventoryPath(cfg.SavedGames))
+		}
+	}
 	// The mission's options are recorded for the session description.
 	tcpListener.OnOptions = srv.ApplyMissionOptions
 
