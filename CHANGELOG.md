@@ -47,6 +47,20 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **A Configuration tab shows DCS's own settings.** The manager reads
+  `Saved Games\DCS\Config` and lays the game's options out as DCS stores them:
+  the `options.lua` groups (graphics, difficulty, VR, sound, views, cockpit,
+  miscellaneous, plugins) with their key/values, the **disabled terrains and
+  modules** from `pluginsEnabled.lua` (which often explains a map that refuses to
+  load), the UI language and the folder inspected.
+  - Every section can be browsed on its own; `GET /api/config?section=graphics`
+    returns one, `GET /api/config` the whole picture.
+  - Booleans read as `on`/`off` rather than `true`/`false`, and a nested table is
+    shown as its item count, so nothing is silently dropped.
+  - Covered by a test reading the machine's real `Config` folder when present, a
+    synthetic `options.lua` + `pluginsEnabled.lua`, the value-formatting helper,
+    and the API's empty, filtered and unknown-section cases.
+
 - **A DCS install tab shows what lives on the game's side of the fence.** It reports
   the mods installed under `Saved Games\DCS\Mods` and the state of the scripts, so a
   broken or half-finished install is visible instead of silent.

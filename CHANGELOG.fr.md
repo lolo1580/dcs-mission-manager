@@ -49,6 +49,21 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un onglet Configuration affiche les réglages de DCS lui-même.** Le gestionnaire
+  lit `Saved Games\DCS\Config` et présente les options du jeu telles que DCS les
+  stocke : les groupes d'`options.lua` (graphismes, difficulté, VR, son, vues,
+  cockpit, divers, plugins) avec leurs clés/valeurs, les **terrains et modules
+  désactivés** d'après `pluginsEnabled.lua` (ce qui explique souvent une carte qui
+  refuse de se charger), la langue de l'interface et le dossier inspecté.
+  - Chaque section se parcourt séparément ; `GET /api/config?section=graphics` en
+    renvoie une, `GET /api/config` le tableau complet.
+  - Les booléens s'affichent `on`/`off` plutôt que `true`/`false`, et une table
+    imbriquée est montrée par son nombre d'éléments, donc rien n'est perdu en
+    silence.
+  - Couvert par un test lisant le vrai dossier `Config` de la machine quand il est
+    présent, un `options.lua` + `pluginsEnabled.lua` synthétiques, l'aide de
+    formatage des valeurs, et les cas vide, filtré et section inconnue de l'API.
+
 - **Un onglet Installation DCS montre ce qui vit du côté du jeu.** Il rapporte les
   mods installés dans `Saved Games\DCS\Mods` et l'état des scripts, pour qu'une
   installation cassée ou à moitié faite soit visible au lieu de silencieuse.

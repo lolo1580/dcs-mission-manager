@@ -45,6 +45,7 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Carrière | ✅ Nouveau | Le logbook du joueur : grade, escadrille, décorations, heures et kills par appareil |
 | Bibliothèque de missions | ✅ Nouveau | Les `.miz` de Saved Games : théâtre, date, météo, taille |
 | Installation DCS | ✅ Nouveau | Mods installés, état des scripts, `Export.lua` partagé, restes du renommage |
+| Configuration | ✅ Nouveau | Les options de DCS : graphismes, difficulté, VR, terrains désactivés |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
 > est toujours reçue et échantillonnée : elle alimente les statistiques, les heatmaps
