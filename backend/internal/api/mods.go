@@ -3,8 +3,8 @@ package api
 import "net/http"
 
 // handleScripts returns the state of the DCS side: the manager's own managed
-// files (installed / outdated / missing), the tools merged into Export.lua, the
-// legacy pre-rename leftovers, and other tools' hook files.
+// files (installed / outdated / missing), the tools merged into Export.lua, and
+// other tools' hook files.
 func (s *Server) handleScripts(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.scripts)
 }

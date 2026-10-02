@@ -262,7 +262,7 @@ func Run(onReady func(addr string)) error {
 		}
 
 		// The DCS-side script status: our own files via the installer's status,
-		// plus the legacy leftovers and other tools' hooks.
+		// plus other tools' hooks.
 		ins := install.New(FindLuaDir(), cfg.SavedGames)
 		managed := ins.Status(install.DefaultTargets())
 		states := make([]dcsdata.ScriptState, 0, len(managed))
@@ -275,8 +275,8 @@ func Run(onReady func(addr string)) error {
 		}
 		scripts := dcsdata.InspectScripts(cfg.SavedGames, states)
 		srv.SetScripts(scripts)
-		log.Printf("scripts: %d managed, %d legacy leftover(s), %d third-party hook(s)",
-			len(scripts.Managed), len(scripts.Legacy), len(scripts.ThirdParty))
+		log.Printf("scripts: %d managed, %d third-party hook(s)",
+			len(scripts.Managed), len(scripts.ThirdParty))
 
 		// DCS's own configuration: options.lua, pluginsEnabled.lua, lang.cfg.
 		if dcsCfg, err := dcsdata.LoadConfig(cfg.SavedGames); err != nil {

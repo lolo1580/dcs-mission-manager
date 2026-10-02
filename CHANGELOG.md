@@ -16,14 +16,10 @@ to [semantic versioning](https://semver.org/).
   `dcsmm.exe` → `dcsmanager.exe`, the Go module `dcsmm` → `dcsmanager`, the CLI
   name, the environment variables `DCSMM_*` → `DCSMANAGER_*`, the Lua config
   `dcsmm.cfg` → `dcsmanager.cfg` and the hook `Hooks/dcsmm.lua` →
-  `Hooks/dcsmanager.lua`.
-  - This is a **breaking change**: the embedded Lua scripts and the config file
-    both changed name, so an existing install must run `dcsmanager install-lua`
-    again and move `Config\dcsmm.cfg` to `Config\dcsmanager.cfg`. Environment
-    variables set as `DCSMM_*` are no longer read.
-  - The install markers in `Export.lua` are now `DCSMANAGER-BEGIN` / `-END`, so the
-    old block is not recognised and must be removed (or the file restored from
-    its backup) before reinstalling.
+  `Hooks/dcsmanager.lua`. The install markers in `Export.lua` became
+  `DCSMANAGER-BEGIN` / `-END`.
+  - A fresh install: nothing is carried over from the previous name, and no
+    migration path is provided. `dcsmanager install-lua` writes the new files.
 
 ### Removed
 
@@ -69,15 +65,13 @@ to [semantic versioning](https://semver.org/).
   - **Manager scripts**: each managed file as up to date / outdated / not installed.
   - **Export.lua**: which other tools share it (Tacview, DCS-BIOS, SRS, LotAtc,
     VAICOM, BattleHub…), detected from the `dofile`/`require` lines.
-  - **Leftovers**: files and marker blocks from the **previous name** (`dcsmm.lua`,
-    `dcsmm.cfg`, the `DCSMM` block), which the rename made unmanaged and which the
-    user has to clean up. A summary banner says when anything needs attention.
+  - A summary banner says when a managed file needs attention.
   - `internal/dcsdata` reads the Mods tree and inspects the Scripts folder; it
     reuses `internal/install`'s own status for the managed files rather than
     duplicating the comparison. `GET /api/mods` and `GET /api/scripts` expose it.
   - Covered by tests building a Mods tree and a Scripts folder in a temp dir
-    (including backups, our own files being excluded from the third-party list,
-    and the legacy detection), plus the API's empty and populated cases.
+    (including backups, and our own files being excluded from the third-party
+    list), plus the API's empty and populated cases.
 
 - **A Missions tab is a library of the `.miz` saved in Saved Games.** A `.miz` is a
   ZIP; the manager reads the editor data inside it and lists each mission with its

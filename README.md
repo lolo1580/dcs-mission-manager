@@ -37,7 +37,7 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory |
 | Career | ✅ New | The player's logbook: rank, squadron, awards, hours and kills per airframe |
 | Mission library | ✅ New | The `.miz` in Saved Games: theatre, date, weather, size |
-| DCS install | ✅ New | Installed mods, script state, shared `Export.lua`, rename leftovers |
+| DCS install | ✅ New | Installed mods, script state, shared `Export.lua` |
 | Configuration | ✅ New | DCS's own options: graphics, difficulty, VR, disabled terrains |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still

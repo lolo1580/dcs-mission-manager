@@ -16,15 +16,10 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   `dcsmm.exe` → `dcsmanager.exe`, le module Go `dcsmm` → `dcsmanager`, le nom de la
   CLI, les variables d'environnement `DCSMM_*` → `DCSMANAGER_*`, la config Lua
   `dcsmm.cfg` → `dcsmanager.cfg` et le hook `Hooks/dcsmm.lua` →
-  `Hooks/dcsmanager.lua`.
-  - C'est un **changement cassant** : les scripts Lua embarqués et le fichier de
-    configuration ont tous deux changé de nom, donc une installation existante doit
-    relancer `dcsmanager install-lua` et déplacer `Config\dcsmm.cfg` vers
-    `Config\dcsmanager.cfg`. Les variables d'environnement réglées en `DCSMM_*` ne
-    sont plus lues.
-  - Les marqueurs d'installation dans `Export.lua` sont désormais `DCSMANAGER-BEGIN`
-    / `-END`, donc l'ancien bloc n'est pas reconnu : il faut le retirer (ou restaurer
-    le fichier depuis sa sauvegarde) avant de réinstaller.
+  `Hooks/dcsmanager.lua`. Les marqueurs d'installation dans `Export.lua` sont
+  désormais `DCSMANAGER-BEGIN` / `-END`.
+  - Installation neuve : rien n'est repris de l'ancien nom, et aucune migration
+    n'est fournie. `dcsmanager install-lua` écrit les nouveaux fichiers.
 
 ### Retiré
 
@@ -73,17 +68,13 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   - **Scripts du gestionnaire** : chaque fichier géré, à jour / périmé / non installé.
   - **Export.lua** : quels autres outils le partagent (Tacview, DCS-BIOS, SRS, LotAtc,
     VAICOM, BattleHub…), détectés d'après les lignes `dofile`/`require`.
-  - **Restes** : fichiers et blocs de marqueurs de l'**ancien nom** (`dcsmm.lua`,
-    `dcsmm.cfg`, le bloc `DCSMM`), que le renommage a rendus non gérés et que
-    l'utilisateur doit nettoyer. Un bandeau résumé signale quand quelque chose
-    demande attention.
+  - Un bandeau résumé signale quand un fichier géré demande attention.
   - `internal/dcsdata` lit l'arbre Mods et inspecte le dossier Scripts ; il réutilise
     le statut de `internal/install` pour les fichiers gérés au lieu de dupliquer la
     comparaison. `GET /api/mods` et `GET /api/scripts` l'exposent.
   - Couvert par des tests construisant un arbre Mods et un dossier Scripts dans un
-    dossier temporaire (y compris les sauvegardes, l'exclusion de nos propres
-    fichiers de la liste des tiers, et la détection des restes), plus les cas vide
-    et rempli de l'API.
+    dossier temporaire (y compris les sauvegardes, et l'exclusion de nos propres
+    fichiers de la liste des tiers), plus les cas vide et rempli de l'API.
 
 - **Un onglet Missions est une bibliothèque des `.miz` enregistrés dans Saved
   Games.** Un `.miz` est un ZIP ; le gestionnaire lit les données d'éditeur qu'il

@@ -37,7 +37,6 @@ func TestScriptsEndpointReturnsStatus(t *testing.T) {
 		SavedGames: `C:\SG`,
 		Managed:    []dcsdata.ScriptState{{DestRel: "Scripts/Hooks/dcsmanager.lua", State: "installed"}},
 		Exports:    []string{"Tacview"},
-		Legacy:     []string{"Config/dcsmm.cfg"},
 		ThirdParty: []dcsdata.ThirdPartyHook{{Name: "bhHook.lua", Dir: "Scripts/Hooks", Tool: "BattleHub", SizeBytes: 8711}},
 	})
 
@@ -50,7 +49,6 @@ func TestScriptsEndpointReturnsStatus(t *testing.T) {
 			State   string `json:"state"`
 		} `json:"managed"`
 		Exports    []string `json:"exports"`
-		Legacy     []string `json:"legacy"`
 		ThirdParty []struct {
 			Name string `json:"name"`
 			Tool string `json:"tool"`
@@ -64,9 +62,6 @@ func TestScriptsEndpointReturnsStatus(t *testing.T) {
 	}
 	if len(body.Exports) != 1 || body.Exports[0] != "Tacview" {
 		t.Errorf("exports = %v", body.Exports)
-	}
-	if len(body.Legacy) != 1 || body.Legacy[0] != "Config/dcsmm.cfg" {
-		t.Errorf("legacy = %v", body.Legacy)
 	}
 	if len(body.ThirdParty) != 1 || body.ThirdParty[0].Tool != "BattleHub" {
 		t.Errorf("third party = %+v", body.ThirdParty)

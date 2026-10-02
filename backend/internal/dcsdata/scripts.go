@@ -37,10 +37,6 @@ type ScriptStatus struct {
 	Managed []ScriptState `json:"managed"`
 	// Exports is the Export.lua picture: which tools hook into it.
 	Exports []string `json:"exports"`
-	// Legacy holds leftovers from the pre-rename install (dcsmm.* / DCSMM-*
-	// markers), which the current version does not manage and which the user
-	// has to remove.
-	Legacy []string `json:"legacy"`
 	// ThirdParty lists other tools' hook files.
 	ThirdParty []ThirdPartyHook `json:"thirdParty"`
 	// SavedGames is the folder inspected.
@@ -48,34 +44,17 @@ type ScriptStatus struct {
 }
 
 // InspectScripts reports what is installed in a Saved Games folder: our managed
-// files (via the installer's own status), the tools merged into Export.lua, the
-// legacy pre-rename leftovers, and other tools' hook files.
+// files (via the installer's own status), the tools merged into Export.lua, and
+// other tools' hook files.
 func InspectScripts(savedGames string, managed []ScriptState) ScriptStatus {
 	st := ScriptStatus{SavedGames: savedGames, Managed: managed}
 	if savedGames == "" {
 		return st
 	}
-	scripts := filepath.Join(savedGames, "Scripts")
 
 	// Which tools are merged into Export.lua.
-	if data, err := os.ReadFile(filepath.Join(scripts, "Export.lua")); err == nil {
+	if data, err := os.ReadFile(filepath.Join(savedGames, "Scripts", "Export.lua")); err == nil {
 		st.Exports = detectExportUsers(string(data))
-	}
-
-	// Legacy leftovers from before the rename.
-	for _, rel := range []string{
-		filepath.Join("Scripts", "Hooks", "dcsmm.lua"),
-		filepath.Join("Config", "dcsmm.cfg"),
-	} {
-		if fileExists(filepath.Join(savedGames, rel)) {
-			st.Legacy = append(st.Legacy, filepath.ToSlash(rel))
-		}
-	}
-	// The old marker block, still present in Export.lua.
-	if data, err := os.ReadFile(filepath.Join(scripts, "Export.lua")); err == nil {
-		if strings.Contains(string(data), "DCSMM-BEGIN") {
-			st.Legacy = append(st.Legacy, filepath.ToSlash(filepath.Join("Scripts", "Export.lua"))+" (bloc DCSMM)")
-		}
 	}
 
 	// Other tools' hooks.
@@ -119,17 +98,16 @@ func InspectScripts(savedGames string, managed []ScriptState) ScriptStatus {
 	return st
 }
 
-// isOurFile reports whether a hook file is one the manager itself owns — either
-// the current name or a leftover from before the rename. Those are reported as
-// legacy, not as another tool's hook.
+// isOurFile reports whether a hook file is one the manager itself owns, so it is
+// never listed as another tool's hook.
 func isOurFile(name string) bool {
 	lower := strings.ToLower(name)
-	for _, ours := range []string{"dcsmanager.lua", "export.lua", "dcsmm.lua"} {
+	for _, ours := range []string{"dcsmanager.lua", "export.lua"} {
 		if lower == ours || strings.HasPrefix(lower, ours+".bak-") {
 			return true
 		}
 	}
-	return lower == "export.lua" || strings.HasPrefix(lower, "export.lua.bak-")
+	return false
 }
 
 // guessTool matches a hook file name to the tool it belongs to, for the ones

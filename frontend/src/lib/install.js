@@ -35,11 +35,9 @@ export const modsTotalBytes = derived(mods, ($m) =>
   $m.reduce((sum, x) => sum + (x.sizeBytes ?? 0), 0)
 );
 
-/** True when something on the DCS side needs attention (legacy or a managed file
- *  that is not up to date). Drives a summary banner. */
+/** True when a managed file is not up to date. Drives a summary banner. */
 export const installNeedsAttention = derived(scriptStatus, ($s) => {
   if (!$s) return false;
-  if (($s.legacy ?? []).length > 0) return true;
   return ($s.managed ?? []).some((m) => m.state === 'missing' || m.state === 'outdated');
 });
 

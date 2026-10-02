@@ -69,25 +69,20 @@
       </table>
     </div>
 
-    {#if ($scriptStatus.exports ?? []).length || ($scriptStatus.legacy ?? []).length}
+    {#if ($scriptStatus.exports ?? []).length}
       <div class="block">
         <h3>{$t('install.export')}</h3>
-        {#if ($scriptStatus.exports ?? []).length}
-          <p class="line">
-            {$t('install.sharedWith')}
-            {#each $scriptStatus.exports as e, i (e)}
-              {#if i}<span class="sep">·</span>{/if}<span class="tool">{e}</span>
-            {/each}
-          </p>
-        {:else}
-          <p class="line muted">{$t('install.notShared')}</p>
-        {/if}
-        {#if ($scriptStatus.legacy ?? []).length}
-          <p class="line warn">
-            {$t('install.legacy')}
-            {#each $scriptStatus.legacy as l (l)}<code>{l}</code>{/each}
-          </p>
-        {/if}
+        <p class="line">
+          {$t('install.sharedWith')}
+          {#each $scriptStatus.exports as e, i (e)}
+            {#if i}<span class="sep">·</span>{/if}<span class="tool">{e}</span>
+          {/each}
+        </p>
+      </div>
+    {:else}
+      <div class="block">
+        <h3>{$t('install.export')}</h3>
+        <p class="line muted">{$t('install.notShared')}</p>
       </div>
     {/if}
 
@@ -300,10 +295,6 @@
     color: var(--muted);
   }
 
-  .line.warn {
-    color: #f0b429;
-  }
-
   .sep {
     margin: 0 0.35rem;
     color: var(--muted);
@@ -311,15 +302,6 @@
 
   .tool {
     color: var(--blue);
-  }
-
-  code {
-    margin-left: 0.4rem;
-    padding: 0.05rem 0.35rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-size: 0.72rem;
   }
 
   .tag {
