@@ -94,6 +94,7 @@ type Server struct {
 	charts     *charts.Catalog
 	modules    dcsdata.ModuleInventory
 	logbook    dcsdata.Logbook
+	missions   []dcsdata.MissionFile
 	commander  Commander
 	hub        *hub
 	theatres   []theatre.Theatre
@@ -133,6 +134,11 @@ func (s *Server) SetModules(inv dcsdata.ModuleInventory) {
 // SetLogbook installs the player's career logbook read from the installation.
 func (s *Server) SetLogbook(lb dcsdata.Logbook) {
 	s.logbook = lb
+}
+
+// SetMissions installs the mission library read from Saved Games.
+func (s *Server) SetMissions(list []dcsdata.MissionFile) {
+	s.missions = list
 }
 
 // Handler returns the HTTP router.
@@ -242,6 +248,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/maintenance/purge", s.handlePurge)
 	mux.HandleFunc("/api/modules", s.handleModules)
 	mux.HandleFunc("/api/career", s.handleCareer)
+	mux.HandleFunc("/api/missions", s.handleMissions)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

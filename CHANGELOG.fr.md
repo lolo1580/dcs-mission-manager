@@ -49,6 +49,19 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un onglet Missions est une bibliothèque des `.miz` enregistrés dans Saved
+  Games.** Un `.miz` est un ZIP ; le gestionnaire lit les données d'éditeur qu'il
+  contient et liste chaque mission avec son **théâtre**, sa **date et son heure de
+  début** en jeu, sa **météo et sa température**, sa **taille** et sa dernière
+  modification — sans lancer le jeu.
+  - `internal/dcsdata` ouvre l'archive, ne lit que l'entrée `mission` (bornée, pour
+    qu'une archive hostile ne puisse pas épuiser la mémoire) et analyse les
+    métadonnées avec le parseur Lua existant. Une archive cassée ou vide est
+    quand même listée ; un dossier absent donne une liste vide, jamais une erreur.
+  - `GET /api/missions` renvoie la bibliothèque ; `?theatre=` la filtre.
+  - Testé en fabriquant un `.miz` en mémoire, sur les vraies missions de la machine,
+    et sur les cas dossier absent et API vide.
+
 - **Un onglet Carrière affiche le logbook du joueur.** DCS tient un carnet de
   carrière dans `Saved Games\DCS\MissionEditor\logbook.lua` ; le gestionnaire le lit
   désormais et affiche le **grade**, l'**escadrille**, les **décorations** et

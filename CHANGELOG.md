@@ -47,6 +47,18 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **A Missions tab is a library of the `.miz` saved in Saved Games.** A `.miz` is a
+  ZIP; the manager reads the editor data inside it and lists each mission with its
+  **theatre**, **in-game date and start time**, **weather and temperature**,
+  **size** and last modification — without launching the game.
+  - `internal/dcsdata` opens the archive, reads only the `mission` entry (bounded,
+    so a hostile archive cannot exhaust memory) and parses the metadata with the
+    existing Lua parser. A broken or empty archive is still listed; a missing
+    folder yields an empty list, never an error.
+  - `GET /api/missions` returns the library; `?theatre=` filters it.
+  - Tested by building a `.miz` in memory, against the machine's real missions,
+    and on the missing-folder and empty-API cases.
+
 - **A Career tab shows the player's own logbook.** DCS keeps a career record in
   `Saved Games\DCS\MissionEditor\logbook.lua`; the manager now reads it and shows
   the pilot's **rank**, **squadron**, **awards** and **invulnerability**, the

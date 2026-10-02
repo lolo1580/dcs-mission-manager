@@ -43,6 +43,7 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS |
 | Carrière | ✅ Nouveau | Le logbook du joueur : grade, escadrille, décorations, heures et kills par appareil |
+| Bibliothèque de missions | ✅ Nouveau | Les `.miz` de Saved Games : théâtre, date, météo, taille |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
 > est toujours reçue et échantillonnée : elle alimente les statistiques, les heatmaps
