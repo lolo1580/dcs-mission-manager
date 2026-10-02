@@ -229,6 +229,16 @@ func Run(onReady func(addr string)) error {
 		} else {
 			log.Printf("modules: none found in %s (optional)", dcsdata.ModuleInventoryPath(cfg.SavedGames))
 		}
+
+		// The logbook is the player's own career record, kept by DCS.
+		if lb, err := dcsdata.LoadLogbook(cfg.SavedGames); err != nil {
+			log.Printf("career: logbook unavailable: %v", err)
+		} else if len(lb.Players) > 0 {
+			log.Printf("career: %d profile(s) from %s", len(lb.Players), dcsdata.LogbookPath(cfg.SavedGames))
+			srv.SetLogbook(lb)
+		} else {
+			log.Printf("career: no logbook in %s (optional)", dcsdata.LogbookPath(cfg.SavedGames))
+		}
 	}
 	// The mission's options are recorded for the session description.
 	tcpListener.OnOptions = srv.ApplyMissionOptions

@@ -93,6 +93,7 @@ type Server struct {
 	aerodromes *aerodrome.Catalog
 	charts     *charts.Catalog
 	modules    dcsdata.ModuleInventory
+	logbook    dcsdata.Logbook
 	commander  Commander
 	hub        *hub
 	theatres   []theatre.Theatre
@@ -127,6 +128,11 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 // and the constructor already carries the optional collaborators.
 func (s *Server) SetModules(inv dcsdata.ModuleInventory) {
 	s.modules = inv
+}
+
+// SetLogbook installs the player's career logbook read from the installation.
+func (s *Server) SetLogbook(lb dcsdata.Logbook) {
+	s.logbook = lb
 }
 
 // Handler returns the HTTP router.
@@ -235,6 +241,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/maintenance", s.handleMaintenance)
 	mux.HandleFunc("/api/maintenance/purge", s.handlePurge)
 	mux.HandleFunc("/api/modules", s.handleModules)
+	mux.HandleFunc("/api/career", s.handleCareer)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

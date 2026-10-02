@@ -8,6 +8,7 @@
   import AnalyticsPanel from './lib/AnalyticsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
   import ModulesPanel from './lib/ModulesPanel.svelte';
+  import CareerPanel from './lib/CareerPanel.svelte';
   import { connected, paused, fetchTheatres } from './lib/units.js';
   import { events, players, mission } from './lib/session.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
@@ -37,6 +38,7 @@
       </button>
       <button class:active={tab === 'debriefs'} on:click={() => goTo('debriefs')}>{$t('tab.debriefs')}</button>
       <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
+      <button class:active={tab === 'career'} on:click={() => goTo('career')}>{$t('tab.career')}</button>
       <button class:active={tab === 'analytics'} on:click={() => goTo('analytics')}>{$t('tab.analytics')}</button>
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
       <button class:active={tab === 'modules'} on:click={() => goTo('modules')}>{$t('tab.modules')}</button>
@@ -89,6 +91,10 @@
     {:else if tab === 'stats'}
       <div class="session wide">
         <StatsPanel />
+      </div>
+    {:else if tab === 'career'}
+      <div class="session wide">
+        <CareerPanel />
       </div>
     {:else if tab === 'analytics'}
       <div class="session wide">

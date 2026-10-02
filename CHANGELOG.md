@@ -47,6 +47,19 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **A Career tab shows the player's own logbook.** DCS keeps a career record in
+  `Saved Games\DCS\MissionEditor\logbook.lua`; the manager now reads it and shows
+  the pilot's **rank**, **squadron**, **awards** and **invulnerability**, the
+  career totals (flight hours, missions, landings, score), and a **per-airframe
+  breakdown**: flight hours, landings, deaths, ejections and air-to-air /
+  air-to-ground kills, with a bar scaled to the aircraft flown the most.
+  - `GET /api/career` returns the profiles; the tab switches between them when a
+    machine has more than one.
+  - This is the pilot's record as DCS itself keeps it, complementing the
+    statistics the manager builds from its own recorded sessions.
+  - Covered by a test against the machine's real `logbook.lua` when present, a
+    synthetic document, and the API's empty and populated cases.
+
 - **A Modules tab lists what DCS itself reports as installed.** The manager reads
   DCS's own inventory (`Saved Games\DCS\MissionEditor\modules.lua`) instead of a
   hand-maintained catalogue: terrains, aircraft, navigation systems, tech packs,

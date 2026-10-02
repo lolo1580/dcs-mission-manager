@@ -49,6 +49,20 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un onglet Carrière affiche le logbook du joueur.** DCS tient un carnet de
+  carrière dans `Saved Games\DCS\MissionEditor\logbook.lua` ; le gestionnaire le lit
+  désormais et affiche le **grade**, l'**escadrille**, les **décorations** et
+  l'**invulnérabilité** du pilote, les totaux de carrière (heures de vol, missions,
+  atterrissages, score), et un **détail par appareil** : heures de vol,
+  atterrissages, morts, éjections et kills air-air / air-sol, avec une barre à
+  l'échelle de l'appareil le plus volé.
+  - `GET /api/career` renvoie les profils ; l'onglet permet de basculer entre eux
+    quand une machine en a plusieurs.
+  - C'est le carnet du pilote tel que DCS le tient lui-même, en complément des
+    statistiques que le gestionnaire construit à partir de ses propres sessions.
+  - Couvert par un test sur le vrai `logbook.lua` de la machine quand il est présent,
+    un document synthétique, et les cas vide et rempli de l'API.
+
 - **Un onglet Modules liste ce que DCS lui-même déclare installer.** Le gestionnaire
   lit l'inventaire de DCS (`Saved Games\DCS\MissionEditor\modules.lua`) au lieu d'un
   catalogue maintenu à la main : terrains, appareils, systèmes de navigation, packs
