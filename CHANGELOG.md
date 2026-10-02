@@ -47,6 +47,24 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **A DCS install tab shows what lives on the game's side of the fence.** It reports
+  the mods installed under `Saved Games\DCS\Mods` and the state of the scripts, so a
+  broken or half-finished install is visible instead of silent.
+  - **Mods**: category, name, file count and size, and whether the mod ships an
+    `entry.lua` (its absence flags an incomplete mod). Total size is summed.
+  - **Manager scripts**: each managed file as up to date / outdated / not installed.
+  - **Export.lua**: which other tools share it (Tacview, DCS-BIOS, SRS, LotAtc,
+    VAICOM, BattleHub…), detected from the `dofile`/`require` lines.
+  - **Leftovers**: files and marker blocks from the **previous name** (`dcsmm.lua`,
+    `dcsmm.cfg`, the `DCSMM` block), which the rename made unmanaged and which the
+    user has to clean up. A summary banner says when anything needs attention.
+  - `internal/dcsdata` reads the Mods tree and inspects the Scripts folder; it
+    reuses `internal/install`'s own status for the managed files rather than
+    duplicating the comparison. `GET /api/mods` and `GET /api/scripts` expose it.
+  - Covered by tests building a Mods tree and a Scripts folder in a temp dir
+    (including backups, our own files being excluded from the third-party list,
+    and the legacy detection), plus the API's empty and populated cases.
+
 - **A Missions tab is a library of the `.miz` saved in Saved Games.** A `.miz` is a
   ZIP; the manager reads the editor data inside it and lists each mission with its
   **theatre**, **in-game date and start time**, **weather and temperature**,

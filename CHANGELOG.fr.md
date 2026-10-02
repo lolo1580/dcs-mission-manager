@@ -49,6 +49,27 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un onglet Installation DCS montre ce qui vit du côté du jeu.** Il rapporte les
+  mods installés dans `Saved Games\DCS\Mods` et l'état des scripts, pour qu'une
+  installation cassée ou à moitié faite soit visible au lieu de silencieuse.
+  - **Mods** : catégorie, nom, nombre de fichiers et taille, et si le mod livre un
+    `entry.lua` (son absence signale un mod incomplet). La taille totale est
+    additionnée.
+  - **Scripts du gestionnaire** : chaque fichier géré, à jour / périmé / non installé.
+  - **Export.lua** : quels autres outils le partagent (Tacview, DCS-BIOS, SRS, LotAtc,
+    VAICOM, BattleHub…), détectés d'après les lignes `dofile`/`require`.
+  - **Restes** : fichiers et blocs de marqueurs de l'**ancien nom** (`dcsmm.lua`,
+    `dcsmm.cfg`, le bloc `DCSMM`), que le renommage a rendus non gérés et que
+    l'utilisateur doit nettoyer. Un bandeau résumé signale quand quelque chose
+    demande attention.
+  - `internal/dcsdata` lit l'arbre Mods et inspecte le dossier Scripts ; il réutilise
+    le statut de `internal/install` pour les fichiers gérés au lieu de dupliquer la
+    comparaison. `GET /api/mods` et `GET /api/scripts` l'exposent.
+  - Couvert par des tests construisant un arbre Mods et un dossier Scripts dans un
+    dossier temporaire (y compris les sauvegardes, l'exclusion de nos propres
+    fichiers de la liste des tiers, et la détection des restes), plus les cas vide
+    et rempli de l'API.
+
 - **Un onglet Missions est une bibliothèque des `.miz` enregistrés dans Saved
   Games.** Un `.miz` est un ZIP ; le gestionnaire lit les données d'éditeur qu'il
   contient et liste chaque mission avec son **théâtre**, sa **date et son heure de

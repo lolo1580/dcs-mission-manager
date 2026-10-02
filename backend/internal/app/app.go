@@ -35,6 +35,7 @@ import (
 	"dcsmanager/internal/dcsdir"
 	"dcsmanager/internal/debriefstore"
 	"dcsmanager/internal/ingest"
+	"dcsmanager/internal/install"
 	"dcsmanager/internal/live"
 	"dcsmanager/internal/model"
 	"dcsmanager/internal/source"
@@ -249,6 +250,33 @@ func Run(onReady func(addr string)) error {
 		} else {
 			log.Printf("missions: none in %s (optional)", dcsdata.MissionsDir(cfg.SavedGames))
 		}
+
+		// The mods installed under Mods/.
+		if mods, err := dcsdata.InstalledMods(cfg.SavedGames); err != nil {
+			log.Printf("mods: listing failed: %v", err)
+		} else if len(mods) > 0 {
+			log.Printf("mods: %d installed in %s", len(mods), dcsdata.ModsDir(cfg.SavedGames))
+			srv.SetMods(mods)
+		} else {
+			log.Printf("mods: none in %s (optional)", dcsdata.ModsDir(cfg.SavedGames))
+		}
+
+		// The DCS-side script status: our own files via the installer's status,
+		// plus the legacy leftovers and other tools' hooks.
+		ins := install.New(FindLuaDir(), cfg.SavedGames)
+		managed := ins.Status(install.DefaultTargets())
+		states := make([]dcsdata.ScriptState, 0, len(managed))
+		for _, r := range managed {
+			states = append(states, dcsdata.ScriptState{
+				DestRel: filepath.ToSlash(r.DestRel),
+				State:   r.Action,
+				Note:    r.Note,
+			})
+		}
+		scripts := dcsdata.InspectScripts(cfg.SavedGames, states)
+		srv.SetScripts(scripts)
+		log.Printf("scripts: %d managed, %d legacy leftover(s), %d third-party hook(s)",
+			len(scripts.Managed), len(scripts.Legacy), len(scripts.ThirdParty))
 	}
 	// The mission's options are recorded for the session description.
 	tcpListener.OnOptions = srv.ApplyMissionOptions

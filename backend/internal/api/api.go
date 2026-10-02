@@ -95,6 +95,8 @@ type Server struct {
 	modules    dcsdata.ModuleInventory
 	logbook    dcsdata.Logbook
 	missions   []dcsdata.MissionFile
+	mods       []dcsdata.InstalledMod
+	scripts    dcsdata.ScriptStatus
 	commander  Commander
 	hub        *hub
 	theatres   []theatre.Theatre
@@ -139,6 +141,16 @@ func (s *Server) SetLogbook(lb dcsdata.Logbook) {
 // SetMissions installs the mission library read from Saved Games.
 func (s *Server) SetMissions(list []dcsdata.MissionFile) {
 	s.missions = list
+}
+
+// SetMods installs the list of mods found under Saved Games\DCS\Mods.
+func (s *Server) SetMods(mods []dcsdata.InstalledMod) {
+	s.mods = mods
+}
+
+// SetScripts installs the DCS-side script status picture.
+func (s *Server) SetScripts(st dcsdata.ScriptStatus) {
+	s.scripts = st
 }
 
 // Handler returns the HTTP router.
@@ -249,6 +261,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/modules", s.handleModules)
 	mux.HandleFunc("/api/career", s.handleCareer)
 	mux.HandleFunc("/api/missions", s.handleMissions)
+	mux.HandleFunc("/api/mods", s.handleMods)
+	mux.HandleFunc("/api/scripts", s.handleScripts)
 	mux.Handle("/", s.webHandler())
 	return mux
 }
