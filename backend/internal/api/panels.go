@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"dcsmanager/internal/dcsbios"
+	"dcsmanager/internal/mapping"
 	"dcsmanager/internal/panel"
 	"dcsmanager/internal/panelservice"
 )
@@ -73,6 +74,11 @@ func panelControlKindName(k panel.ControlKind) string {
 func (s *Server) SetPanels(svc *panelservice.Service, bios *dcsbios.Client) {
 	s.panels = svc
 	s.bios = bios
+}
+
+// SetMappings gives the server the panel-to-command binding store.
+func (s *Server) SetMappings(m *mapping.Store) {
+	s.mappings = m
 }
 
 // handlePanels reports the connected panels: model, identity, and whether the

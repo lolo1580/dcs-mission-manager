@@ -56,6 +56,39 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **The cockpit hardware side of the DCS Panel Manager is now part of the
+  manager.** A Logitech/Saitek PZ55 Switch Panel and PZ70 Multi Panel can be
+  driven directly, and DCS-BIOS is spoken rather than reimplemented, so a cockpit
+  already running it needs no second tool. This absorbed a separate C#/Avalonia
+  application into this one, in Go, keeping the single-binary `CGO_ENABLED=0`
+  build.
+  - **`internal/hid`** reads Windows HID devices with no cgo:
+    enumerate, open, read the caps, read reports with a timeout, write output
+    reports. Four traps had to be found on real hardware — the interface path is
+    at offset 4 (not 8) in `SP_DEVICE_INTERFACE_DETAIL_DATA_W`,
+    `SetupDiEnumDeviceInterfaces` takes five arguments, `HidP_GetCaps` wants the
+    preparsed data rather than the device handle (passing the handle crashes the
+    process), and the handle must be opened with `FILE_FLAG_OVERLAPPED` or
+    `ReadFile` blocks forever on an idle panel.
+  - **`internal/panel`** decodes and encodes the PZ55/PZ70 protocol: switches,
+    buttons and encoders (reporting on the rising edge, so one detent is one
+    event), gear LEDs, the autopilot LCD and its button lights.
+  - **`internal/panelservice`** keeps a reader per panel, handles hot-plug, and
+    publishes the inputs as events. A panel another tool holds, or a read that
+    keeps failing, is reported rather than fatal.
+  - **`internal/dcsbios`** decodes DCS-BIOS' export stream (the `0x55` sync and its
+    address/length/data blocks), resynchronises after a lost datagram, lifts the
+    active aircraft out of the memory image, and sends commands back.
+  - **`internal/biosmeta`** reads the control catalogue DCS-BIOS publishes per
+    aircraft, and **`internal/mapping`** binds a panel control to one of those
+    commands. Sending is **off by default and off again on every restart**: driving
+    a live cockpit must be deliberate, and must not survive a restart unnoticed.
+  - A **Cockpit panels** tab shows the DCS-BIOS link, one card per panel, a live
+    monitor of the inputs, and a mapping editor (286 bindable controls on the
+    F-16C, read from its own metadata).
+  - The manager's own telemetry moved to **UDP 7776** so it can run alongside
+    DCS-BIOS, which owns 7778.
+
 - **A Configuration tab shows DCS's own settings.** The manager reads
   `Saved Games\DCS\Config` and lays the game's options out as DCS stores them:
   the `options.lua` groups (graphics, difficulty, VR, sound, views, cockpit,

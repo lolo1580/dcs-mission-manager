@@ -46,6 +46,7 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Bibliothèque de missions | ✅ Nouveau | Les `.miz` de Saved Games : théâtre, date, météo, taille |
 | Installation DCS | ✅ Nouveau | Mods installés, état des scripts, `Export.lua` partagé |
 | Configuration | ✅ Nouveau | Les options de DCS : graphismes, difficulté, VR, terrains désactivés |
+| Panneaux de cockpit | ✅ Nouveau | Panneaux PZ55/PZ70 pilotés directement, DCS-BIOS lu et commandé, associations |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
 > est toujours reçue et échantillonnée : elle alimente les statistiques, les heatmaps

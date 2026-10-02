@@ -17,12 +17,14 @@ import (
 	"time"
 
 	"dcsmanager/internal/aerodrome"
+	"dcsmanager/internal/biosmeta"
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
 	"dcsmanager/internal/dcsbios"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/live"
+	"dcsmanager/internal/mapping"
 	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
@@ -102,6 +104,9 @@ type Server struct {
 	dcsConfig  dcsdata.DCSConfig
 	panels     *panelservice.Service
 	bios       *dcsbios.Client
+	mappings   *mapping.Store
+	controls   map[string]*biosmeta.Catalog
+	controlsMu sync.Mutex
 	commander  Commander
 	hub        *hub
 	theatres   []theatre.Theatre
@@ -276,6 +281,9 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/config", s.handleDCSConfig)
 	mux.HandleFunc("/api/panels", s.handlePanels)
 	mux.HandleFunc("/api/dcsbios", s.handleDCSBIOS)
+	mux.HandleFunc("/api/mappings", s.handleMappings)
+	mux.HandleFunc("/api/mappings/safety", s.handleMappingSafety)
+	mux.HandleFunc("/api/controls", s.handleControls)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

@@ -27,6 +27,7 @@ import (
 
 	"dcsmanager/internal/aerodrome"
 	"dcsmanager/internal/api"
+	"dcsmanager/internal/biosmeta"
 	"dcsmanager/internal/category"
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
@@ -38,6 +39,7 @@ import (
 	"dcsmanager/internal/ingest"
 	"dcsmanager/internal/install"
 	"dcsmanager/internal/live"
+	"dcsmanager/internal/mapping"
 	"dcsmanager/internal/model"
 	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/source"
@@ -319,12 +321,6 @@ func Run(onReady func(addr string)) error {
 	// The manager drives Logitech panels directly and speaks DCS-BIOS' protocol,
 	// so a cockpit with either can be watched. Both are best-effort: a machine
 	// without panels or without DCS-BIOS simply sees nothing here.
-	panelSvc := panelservice.New(panelservice.DefaultOptions(), func(e panelservice.Event) {
-		srv.BroadcastMessage(map[string]any{"type": "panel", "panel": api.PanelEventJSON(e)})
-	})
-	panelSvc.Start()
-	defer panelSvc.Stop()
-
 	bios := dcsbios.New(dcsbios.DefaultOptions(), func(st dcsbios.State) {
 		srv.BroadcastMessage(map[string]any{
 			"type": "dcsbios",
@@ -341,7 +337,33 @@ func Run(onReady func(addr string)) error {
 		defer bios.Stop()
 		log.Printf("dcsbios: listening on %s:%d", dcsbios.DefaultMulticast, dcsbios.DefaultReceivePort)
 	}
+
+	// The binding store sends DCS-BIOS commands when a panel control moves. It
+	// starts disabled on every run: sending into a live cockpit is opt-in.
+	mappings := mapping.NewStore(mappingPath(cfg), func(line string) error {
+		identifier, value := parseCommandLine(line)
+		return bios.SendCommand(identifier, value)
+	})
+
+	panelSvc := panelservice.New(panelservice.DefaultOptions(), func(e panelservice.Event) {
+		srv.BroadcastMessage(map[string]any{"type": "panel", "panel": api.PanelEventJSON(e)})
+		// A panel input drives the bound command, when the aircraft is known and
+		// sending is enabled.
+		if e.Kind == panelservice.KindInput {
+			if aircraft := bios.State().Aircraft; aircraft != "" {
+				if cat, err := biosmeta.LoadModule(cfg.SavedGames, aircraft); err == nil {
+					for _, line := range mappings.Apply(aircraft, e.Input, cat) {
+						srv.BroadcastMessage(map[string]any{"type": "command", "command": line})
+					}
+				}
+			}
+		}
+	})
+	panelSvc.Start()
+	defer panelSvc.Stop()
+
 	srv.SetPanels(panelSvc, bios)
+	srv.SetMappings(mappings)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -437,6 +459,40 @@ func probeExistingServer(addr string) bool {
 		return false
 	}
 	return health.Service == "dcsmanager"
+}
+
+// mappingPath is where the panel-to-command bindings live: beside the database, so
+// the whole manager's state sits in one folder.
+func mappingPath(cfg config.Config) string {
+	dir := filepath.Dir(cfg.DBPath)
+	if dir == "" || dir == "." {
+		return "mappings.json"
+	}
+	return filepath.Join(dir, "mappings.json")
+}
+
+// parseCommandLine splits the "IDENTIFIER value\n" line the mapping store builds
+// back into the parts SendCommand wants. A line it cannot parse yields an empty
+// identifier, which SendCommand refuses rather than sending nonsense.
+func parseCommandLine(line string) (string, int) {
+	line = strings.TrimSpace(line)
+	i := strings.LastIndexByte(line, ' ')
+	if i <= 0 {
+		return "", 0
+	}
+	identifier := line[:i]
+	value := 0
+	for _, r := range line[i+1:] {
+		if r == '-' {
+			value = -value
+			continue
+		}
+		if r < '0' || r > '9' {
+			return identifier, value
+		}
+		value = value*10 + int(r-'0')
+	}
+	return identifier, value
 }
 
 // LogFilePath is where a window-mode launch writes its log, since a

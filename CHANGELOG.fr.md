@@ -59,6 +59,42 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Le volet matériel de cockpit du DCS Panel Manager fait désormais partie du
+  gestionnaire.** Un Switch Panel PZ55 et un Multi Panel PZ70 de Logitech/Saitek
+  peuvent être pilotés directement, et DCS-BIOS est parlé plutôt que réimplémenté :
+  un cockpit qui tourne déjà avec lui n'a besoin d'aucun second outil. Cela a
+  absorbé une application C#/Avalonia séparée dans celle-ci, en Go, en gardant le
+  build binaire unique `CGO_ENABLED=0`.
+  - **`internal/hid`** lit les périphériques HID Windows sans cgo : énumérer,
+    ouvrir, lire les capacités, lire les rapports avec un délai, écrire des
+    rapports de sortie. Quatre pièges ont dû être trouvés sur du vrai matériel — le
+    chemin d'interface est à l'offset 4 (pas 8) dans
+    `SP_DEVICE_INTERFACE_DETAIL_DATA_W`, `SetupDiEnumDeviceInterfaces` prend cinq
+    arguments, `HidP_GetCaps` veut les *preparsed data* et non le handle du
+    périphérique (passer le handle fait planter le processus), et le handle doit
+    être ouvert avec `FILE_FLAG_OVERLAPPED`, sinon `ReadFile` bloque indéfiniment
+    sur un panneau inactif.
+  - **`internal/panel`** décode et encode le protocole PZ55/PZ70 : interrupteurs,
+    boutons et encodeurs (rapportés sur le front montant, donc un cran = un
+    événement), LEDs de train, LCD et LEDs d'autopilote.
+  - **`internal/panelservice`** entretient un lecteur par panneau, gère le
+    branchement à chaud et publie les entrées sous forme d'événements. Un panneau
+    occupé par un autre outil, ou une lecture qui échoue en boucle, est signalé
+    plutôt que fatal.
+  - **`internal/dcsbios`** décode le flux d'export de DCS-BIOS (le sync `0x55` et
+    ses blocs adresse/longueur/données), resynchronise après un paquet perdu,
+    extrait l'appareil actif de l'image mémoire, et renvoie des commandes.
+  - **`internal/biosmeta`** lit le catalogue de commandes que DCS-BIOS publie par
+    appareil, et **`internal/mapping`** associe un contrôle de panneau à une de ces
+    commandes. L'envoi est **désactivé par défaut et de nouveau à chaque
+    redémarrage** : piloter un cockpit vivant doit être délibéré, et ne doit pas
+    survivre à un redémarrage sans qu'on le sache.
+  - Un onglet **Panneaux de cockpit** affiche la liaison DCS-BIOS, une carte par
+    panneau, un moniteur temps réel des entrées, et un éditeur d'associations (286
+    commandes associables sur le F-16C, lues depuis ses propres métadonnées).
+  - La télémétrie du gestionnaire passe sur **UDP 7776** pour cohabiter avec
+    DCS-BIOS, qui possède 7778.
+
 - **Un onglet Configuration affiche les réglages de DCS lui-même.** Le gestionnaire
   lit `Saved Games\DCS\Config` et présente les options du jeu telles que DCS les
   stocke : les groupes d'`options.lua` (graphismes, difficulté, VR, son, vues,
