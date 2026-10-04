@@ -23,6 +23,15 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Retiré
 
+- **L'onglet Analyse a été retiré.** Il dessinait une carte de chaleur et les
+  trajectoires de vol, plus un tableau d'analyse de sortie par unité, à partir des
+  positions enregistrées. L'onglet, son graphique et son store disparaissent
+  (`AnalyticsPanel.svelte`, `AnalyticsPlot.svelte`, `analytics.js`), avec les routes
+  `/api/analytics/{heatmap,tracks,sorties}` et le calcul de sortie qu'elles seules
+  utilisaient (`tracker.Analyse` et ses aides), et le bundle passe d'environ 187 Ko
+  à 166 Ko. **Les positions et les pertes sont toujours échantillonnées et
+  stockées** : le tracker n'est pas touché, donc l'historique est conservé et une
+  future vue d'analyse aurait de quoi dessiner. Seule la vue disparaît.
 - **L'onglet Session a été retiré.** Il affichait les joueurs connectés, les
   événements de jeu en direct et le chat. Le gestionnaire ouvre maintenant sur
   **Débriefs**, le relevé durable d'un vol. Le backend reçoit et stocke toujours

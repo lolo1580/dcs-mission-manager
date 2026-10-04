@@ -3,7 +3,6 @@
   import logo from './assets/logo.png';
   import DebriefPanel from './lib/DebriefPanel.svelte';
   import CareerPanel from './lib/CareerPanel.svelte';
-  import AnalyticsPanel from './lib/AnalyticsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
   import ModulesPanel from './lib/ModulesPanel.svelte';
   import MissionsPanel from './lib/MissionsPanel.svelte';
@@ -49,7 +48,6 @@
       <button class:active={tab === 'debriefs'} on:click={() => goTo('debriefs')}>{$t('tab.debriefs')}</button>
       <button class:active={tab === 'missions'} on:click={() => goTo('missions')}>{$t('tab.library')}</button>
       <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
-      <button class:active={tab === 'analytics'} on:click={() => goTo('analytics')}>{$t('tab.analytics')}</button>
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
       <button class:active={tab === 'modules'} on:click={() => goTo('modules')}>{$t('tab.modules')}</button>
       <button class:active={tab === 'install'} on:click={() => goTo('install')}>{$t('tab.install')}</button>
@@ -95,10 +93,6 @@
     {:else if tab === 'missions'}
       <div class="session wide">
         <MissionsPanel />
-      </div>
-    {:else if tab === 'analytics'}
-      <div class="session wide">
-        <AnalyticsPanel />
       </div>
     {:else if tab === 'modules'}
       <div class="session wide">

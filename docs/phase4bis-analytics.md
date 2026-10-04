@@ -1,5 +1,12 @@
 # Analytical maps & sortie analysis (Phase 4 bis)
 
+> **The Analysis view has been removed.** The tab, its plot and the
+> `/api/analytics/*` routes are gone, and the sortie computation with them. What
+> remains is the collection described below: `internal/tracker` still samples
+> positions and records losses, so the history is kept in the database. This
+> document is kept as the reference for that collection (and for the day the view
+> comes back); the endpoints and the sortie statistics it describes no longer exist.
+
 ## Principle: no per-theatre projection
 
 Modules 4.3 (maps) and 4.5 (sortie) rely on the **position history**.

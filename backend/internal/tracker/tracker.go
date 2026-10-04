@@ -8,7 +8,6 @@ package tracker
 
 import (
 	"log"
-	"math"
 	"sync"
 	"time"
 
@@ -360,69 +359,3 @@ func (t *Tracker) detectLosses(seenNow map[string]bool, missionID, nowMs int64) 
 		delete(t.lostIDs, id)
 	}
 }
-
-// Stats is a sortie analysis for one unit track.
-type Stats struct {
-	UnitID      string  `json:"unitId"`
-	Name        string  `json:"name,omitempty"`
-	Type        string  `json:"type,omitempty"`
-	Points      int     `json:"points"`
-	DistanceKm  float64 `json:"distanceKm"`
-	MaxAlt      float64 `json:"maxAlt"`
-	MaxSpeed    float64 `json:"maxSpeed"`
-	MaxG        float64 `json:"maxG"`
-	AvgSpeed    float64 `json:"avgSpeed"`
-	DurationSec float64 `json:"durationSec"`
-}
-
-// Analyse computes per-unit sortie statistics from stored trails.
-func Analyse(trails map[string][]db.TrailPoint) []Stats {
-	out := make([]Stats, 0, len(trails))
-	for unitID, pts := range trails {
-		if len(pts) < 2 {
-			continue
-		}
-		s := Stats{UnitID: unitID, Points: len(pts)}
-		var totalSpeed float64
-		for i, p := range pts {
-			if p.Alt > s.MaxAlt {
-				s.MaxAlt = p.Alt
-			}
-			if p.Speed > s.MaxSpeed {
-				s.MaxSpeed = p.Speed
-			}
-			if p.G > s.MaxG {
-				s.MaxG = p.G
-			}
-			totalSpeed += p.Speed
-			if i > 0 {
-				s.DistanceKm += haversineKm(
-					pts[i-1].Lat, pts[i-1].Lng, p.Lat, p.Lng)
-			}
-		}
-		s.AvgSpeed = totalSpeed / float64(len(pts))
-		s.DurationSec = float64(pts[len(pts)-1].RealTS-pts[0].RealTS) / 1000.0
-		out = append(out, s)
-	}
-	sortStats(out)
-	return out
-}
-
-// haversineKm returns the great-circle distance between two points, in km.
-func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
-	const r = 6371.0
-	dLat := rad(lat2 - lat1)
-	dLng := rad(lng2 - lng1)
-	sdLat := math.Sin(dLat / 2)
-	sdLng := math.Sin(dLng / 2)
-	a := sdLat*sdLat + math.Cos(rad(lat1))*math.Cos(rad(lat2))*sdLng*sdLng
-	if a < 0 {
-		a = 0
-	}
-	if a > 1 {
-		a = 1
-	}
-	return 2 * r * math.Asin(math.Sqrt(a))
-}
-
-func rad(deg float64) float64 { return deg * math.Pi / 180 }

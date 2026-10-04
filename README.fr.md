@@ -40,7 +40,6 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 |---|---|---|
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
 | Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission), fusionnés avec le logbook dans un onglet **Carrière & statistiques** |
-| Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmap et tracés de vol, analyse de sortie, télémétrie ownship |
 | Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **220 aérodromes listés, 146 plaçables** sur 6 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes. Un jeu embarqué couvre le Caucase et l'Allemagne Guerre froide si DCS est introuvable |
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
@@ -51,14 +50,14 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Panneaux de cockpit | ✅ Nouveau | Panneaux PZ55/PZ70 pilotés directement, DCS-BIOS lu et commandé, associations |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
-> est toujours reçue et échantillonnée : elle alimente les statistiques, les heatmaps
-> et l'onglet Aérodromes (aérodrome le plus proche). Le gestionnaire s'axe désormais
-> sur les débriefs, les statistiques, l'analyse et les aérodromes.
+> est toujours reçue et échantillonnée : elle alimente les statistiques et l'onglet
+> Aérodromes (aérodrome le plus proche), et reste stockée en base pour qu'une future
+> vue d'analyse dispose d'un historique. Le gestionnaire s'axe désormais sur les
+> débriefs, les statistiques et les aérodromes.
 ### Statistiques avancées (prévues)
 
 - **Fiche pilote & carrière** — kills/morts/KD, éjections, crashes, temps de vol, par **UCID**
 - **Analyse d'armes** — efficacité par arme, matrice de kills, friendly-fire
-- **Cartes analytiques** — heatmaps kills/morts, traces de vol rejouables
 - **Balance & méta** — balance coalition, appareils joués, timeline de mission
 - **Analyse de sortie** — durée, distance, altitude/vitesse/G max (telemetry)
 - **Qualité réseau** — ping, déconnexions, codes d'erreur

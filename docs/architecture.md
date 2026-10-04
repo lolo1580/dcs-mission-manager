@@ -85,7 +85,7 @@ dcsmanager version
 | `internal/charts` | Aeronautical chart scans, indexed from `maps_dcs/` |
 | `internal/debrief` | `debrief.log` parser (Phase 3) |
 | `internal/db` | SQLite persistence (pure Go) |
-| `internal/tracker` | Position history, loss detection and sortie analysis |
+| `internal/tracker` | Position history and loss detection |
 | `internal/stats` | Statistical aggregations (Phase 4) |
 
 ## Frontend
@@ -95,10 +95,10 @@ versioned), then embedded into the Go binary via `//go:embed`. Result: **a singl
 executable** contains the backend and the interface. If the frontend has not been
 built, a fallback page is served automatically.
 
-The UI is organised in tabs: **Session** (players, events, chat), **Debriefs**,
-**Statistics**, **Analysis** and **Airfields** (reference data, frequencies and
-charts). There is no live map any more; the unit telemetry is still received and
-sampled, and it feeds the statistics, the heatmaps and the airfields tab.
+The UI is organised in tabs: **Debriefs**, **Missions**, **Career & statistics**,
+**Airfields** (reference data, frequencies and charts) and the install, config and
+panels tabs. There is no live map and no analysis view any more; the unit telemetry
+is still received and sampled, and it feeds the statistics and the airfields tab.
 
 ## Application window
 

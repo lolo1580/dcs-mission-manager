@@ -33,7 +33,6 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 |---|---|---|
 | Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
 | Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission), merged with the logbook in one **Career & statistics** tab |
-| Analytical maps & sortie | ✅ Phase 4 bis | Heatmap and flight-path plot, sortie analysis, ownship telemetry |
 | Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **220 airfields listed, 146 mappable** across 6 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts. A bundled dataset covers Caucasus and Cold War Germany when DCS cannot be read |
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
@@ -44,17 +43,15 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Cockpit panels | ✅ New | PZ55/PZ70 panels driven directly, DCS-BIOS read and commanded, mappings |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still
-> received and sampled: it feeds the statistics, the heatmaps and the airfields
-> tab (nearest field). The manager is now debrief-, stats-, analysis- and
-> airfields-oriented.
+> received and sampled: it feeds the statistics and the airfields tab (nearest
+> field), and it is kept in the database so a future analysis view would have a
+> history to draw on. The manager is now debrief-, stats- and airfields-oriented.
 
 ### Advanced statistics (planned)
 
 - **Pilot & career profile** — kills/deaths/KD, ejections, crashes, flight time, by **UCID**
 - **Weapon analysis** — effectiveness per weapon, kill matrix, friendly-fire
-- **Analytical maps** — kill/death heatmaps, replayable flight trails
 - **Balance & meta** — coalition balance, aircraft flown, mission timeline
-- **Sortie analysis** — duration, distance, altitude/speed/G max (telemetry)
 - **Network quality** — ping, disconnections, error codes
 - **Analysis by engine** — exact **DCS type** granularity (`F-16C_50`, `T-72B`, `SA-10`…), platform + target + matchups
 

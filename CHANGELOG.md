@@ -31,6 +31,14 @@ to [semantic versioning](https://semver.org/).
 
 ### Removed
 
+- **The Analysis tab has been removed.** It drew a heatmap and flight paths, and a
+  per-unit sortie table, from the recorded positions. The tab, its plot and its
+  store are gone (`AnalyticsPanel.svelte`, `AnalyticsPlot.svelte`, `analytics.js`),
+  along with the `/api/analytics/{heatmap,tracks,sorties}` routes and the sortie
+  computation they alone used (`tracker.Analyse` and its helpers), and the bundle
+  dropped from ~187 KB to ~166 KB. **Positions and losses are still sampled and
+  stored**: the tracker is untouched, so the history is kept and a future analysis
+  view would have something to draw on. Only the view is gone.
 - **The Session tab has been removed.** It showed the connected players, the live
   game events and the chat. The manager now opens on **Debriefs**, the durable
   record of a flight. The backend still receives and stores events, players and
