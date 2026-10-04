@@ -4,10 +4,8 @@
   import DebriefPanel from './lib/DebriefPanel.svelte';
   import CareerPanel from './lib/CareerPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
-  import ModulesPanel from './lib/ModulesPanel.svelte';
   import MissionsPanel from './lib/MissionsPanel.svelte';
-  import InstallPanel from './lib/InstallPanel.svelte';
-  import PanelsPanel from './lib/PanelsPanel.svelte';
+  import SettingsPanel from './lib/SettingsPanel.svelte';
   import { connected, paused, mission, fetchTheatres, connect } from './lib/units.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
   import { onMount } from 'svelte';
@@ -48,9 +46,7 @@
       <button class:active={tab === 'missions'} on:click={() => goTo('missions')}>{$t('tab.library')}</button>
       <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
-      <button class:active={tab === 'modules'} on:click={() => goTo('modules')}>{$t('tab.modules')}</button>
-      <button class:active={tab === 'install'} on:click={() => goTo('install')}>{$t('tab.install')}</button>
-      <button class:active={tab === 'panels'} on:click={() => goTo('panels')}>{$t('tab.panels')}</button>
+      <button class:active={tab === 'settings'} on:click={() => goTo('settings')}>{$t('tab.settings')}</button>
     </nav>
 
     {#if $mission}
@@ -92,17 +88,9 @@
       <div class="session wide">
         <MissionsPanel />
       </div>
-    {:else if tab === 'modules'}
+    {:else if tab === 'settings'}
       <div class="session wide">
-        <ModulesPanel />
-      </div>
-    {:else if tab === 'install'}
-      <div class="session wide">
-        <InstallPanel />
-      </div>
-    {:else if tab === 'panels'}
-      <div class="session wide">
-        <PanelsPanel />
+        <SettingsPanel />
       </div>
     {:else}
       <div class="session wide">

@@ -11,6 +11,13 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Modifié
 
+- **Les onglets Installation, Modules et Panneaux forment désormais un onglet
+  « Paramètres » avec des sous-onglets.** Les trois étaient devenus un groupe
+  d'onglets orientés configuration dans la barre principale ; ils sont réunis
+  derrière **Paramètres** — sous-onglets *Installation DCS*, *Modules* et
+  *Panneaux* — laissant la barre aux vues de vol (Débriefs, Missions, Carrière &
+  statistiques, Aérodromes). Les panneaux sont inchangés, seule leur place dans la
+  barre a bougé.
 - **Le projet est renommé DCS Manager.** Il a dépassé le cadre des missions, donc le
   nom, le binaire et tous les identifiants qui portaient l'ancien ont changé :
   `dcsmm.exe` → `dcsmanager.exe`, le module Go `dcsmm` → `dcsmanager`, le nom de la

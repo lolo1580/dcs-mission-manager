@@ -11,6 +11,12 @@ to [semantic versioning](https://semver.org/).
 
 ### Changed
 
+- **The install, modules and panels tabs are now one "Settings" tab with
+  sub-tabs.** The three had become a cluster of configuration-focused tabs in the
+  main bar, so they are gathered behind **Settings** — sub-tabs *DCS install*,
+  *Modules* and *Panels* — leaving the bar to the flight-facing views (Debriefs,
+  Missions, Career & statistics, Airfields). The panels are unchanged; only their
+  place in the bar moved.
 - **Statistics and Career are now one tab, "Career & statistics".** The two
   answer different questions — "what does DCS say I have done?" (the logbook in
   `MissionEditor/logbook.lua`: rank, squadron, awards, hours, per-airframe kills)
