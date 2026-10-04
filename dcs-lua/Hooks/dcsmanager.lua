@@ -167,6 +167,33 @@ do
     return '"' .. jsonEscape(tostring(v)) .. '"'
   end
 
+  -- Hooks run in the GUI Lua state, where the export API lives in the Export.
+  -- namespace and NOT as a global: `LoGetModelTime` is nil here, so the old
+  -- `(LoGetModelTime and LoGetModelTime()) or 0` was always 0 and every periodic
+  -- timer (players, slots, commands) was stuck. Resolve it through Export.
+  local function modelTime()
+    local fn = (Export and Export.LoGetModelTime) or rawget(_G, "LoGetModelTime")
+    if not fn then return 0 end
+    local ok, v = pcall(fn)
+    if ok and type(v) == "number" then return v end
+    return 0
+  end
+
+  -- The running theatre, so a mission is recorded on the map it is actually
+  -- flown on instead of defaulting to Caucasus. Sim.getCurrentMission returns
+  -- the loaded mission table; the id sits in `.theatre` (or `.mission.theatre`).
+  local function missionTheatre()
+    if not (Sim and Sim.getCurrentMission) then return "" end
+    local ok, m = pcall(Sim.getCurrentMission)
+    if not ok or type(m) ~= "table" then return "" end
+    local t = m.theatre
+    if type(t) ~= "string" and type(m.mission) == "table" then
+      t = m.mission.theatre
+    end
+    if type(t) == "string" then return t end
+    return ""
+  end
+
   ---------------------------------------------------------------------------
   -- Game events
   ---------------------------------------------------------------------------
@@ -176,7 +203,7 @@ do
       type = "event",
       event = eventName,
       args = args,
-      t = (LoGetModelTime and LoGetModelTime()) or 0,
+      t = modelTime(),
     }
     sendLine(toJson(payload))
   end
@@ -396,14 +423,15 @@ do
     return table.concat(out)
   end
 
-  -- Injects a chat message into DCS. net.send_chat sends to everyone;
-  -- net.send_chat_to targets one player. We keep it simple and broadcast.
+  -- Injects a chat message into DCS. net.send_chat(message, all): without the
+  -- second argument it only reaches the sender's own coalition, so the command
+  -- channel looked dead for everyone else. `true` broadcasts to all.
   local function injectChat(message, from)
     if not message or message == "" then return end
     local text = message
     if from and from ~= "" then text = "[" .. from .. "] " .. message end
     if net and net.send_chat then
-      local ok, err = pcall(net.send_chat, text)
+      local ok, err = pcall(net.send_chat, text, true)
       if not ok then say("chat send failed: " .. tostring(err)) end
     end
   end
@@ -479,6 +507,7 @@ do
       type = "mission",
       phase = "start",
       name = name,
+      theatre = missionTheatre(),
       options = options,
     }))
     sendPlayers()
@@ -499,17 +528,21 @@ do
     say("mission ended")
   end
 
-  function dcsmanager.onGameEvent(eventName, arg1, arg2, arg3, arg4)
-    -- We forward all non-nil arguments; the backend stores them as-is.
+  -- DCS passes up to seven arguments, and the number depends on the event: a
+  -- "kill" carries killerPlayerID, killerUnitType, killerSide, victimPlayerID,
+  -- victimUnitType, victimSide, weaponName. Declaring fewer parameters silently
+  -- dropped the tail, which is why weapon statistics were empty. All of them are
+  -- forwarded; the backend keeps them as-is.
+  function dcsmanager.onGameEvent(eventName, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
     local args = {}
-    for _, a in ipairs({ arg1, arg2, arg3, arg4 }) do
+    for _, a in ipairs({ arg1, arg2, arg3, arg4, arg5, arg6, arg7 }) do
       if a ~= nil then args[#args + 1] = a end
     end
     sendLine(toJson({
       type = "event",
       event = eventName,
       args = args,
-      t = (LoGetModelTime and LoGetModelTime()) or 0,
+      t = modelTime(),
     }))
 
     -- A slot change or a connection changes the players' state:
@@ -520,8 +553,17 @@ do
     end
   end
 
+  -- DCS passes a numeric playerID as `from`. The backend decodes `from` as a
+  -- string, so sending the number made the whole JSON line fail to unmarshal and
+  -- every chat message was silently dropped. Resolve the player's name; fall back
+  -- to the id as text so a message is never lost.
   function dcsmanager.onChatMessage(message, from)
-    sendLine(toJson({ type = "chat", from = from or "", message = message or "" }))
+    local sender = ""
+    if from ~= nil then
+      sender = info(from, "name") or ""
+      if sender == "" then sender = tostring(from) end
+    end
+    sendLine(toJson({ type = "chat", from = sender, message = message or "" }))
   end
 
   function dcsmanager.onPlayerConnect(id) sendPlayers() end
@@ -536,7 +578,7 @@ do
   local commandInterval = 0.25
 
   function dcsmanager.onSimulationFrame()
-    local t = (LoGetModelTime and LoGetModelTime()) or 0
+    local t = modelTime()
     if not nextSlotsAt then nextSlotsAt = t + 30.0 end
     if t >= nextSlotsAt then
       refreshSlotTypes()

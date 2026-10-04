@@ -16,7 +16,20 @@ import dgram from 'node:dgram';
 const host = process.argv[2] ?? '127.0.0.1';
 const port = Number(process.argv[3] ?? 7776);
 
+// A non-numeric port becomes NaN, which dgram rejects with an uncaught
+// RangeError from inside the interval. Validate it up front and report it.
+if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+  console.error(`invalid port: ${process.argv[3] ?? '(none)'} (expected 1..65535)`);
+  process.exit(2);
+}
+
 const socket = dgram.createSocket('udp4');
+// An unreachable host or a refused send emits 'error'; without a handler that
+// is an uncaught exception and a stack trace.
+socket.on('error', (err) => {
+  console.error(`udp error: ${err.message}`);
+  process.exit(1);
+});
 
 const center = { lat: 42.0, lng: 41.5 };
 const radius = 0.5;

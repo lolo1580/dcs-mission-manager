@@ -15,7 +15,23 @@ const port = Number(process.argv[3] ?? 7776);
 const name = process.argv[4] ?? 'Cellar';
 const seconds = Number(process.argv[5] ?? 5);
 
+// An invalid port or duration silently became NaN: dgram throws on the port
+// from inside the interval, and setTimeout(fn, NaN) fires immediately (the tool
+// would report "sent 0" instead of running). Reject both up front.
+if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+  console.error(`invalid port: ${process.argv[3] ?? '(none)'} (expected 1..65535)`);
+  process.exit(2);
+}
+if (!Number.isFinite(seconds) || seconds <= 0) {
+  console.error(`invalid duration: ${process.argv[5] ?? '(none)'} (expected seconds > 0)`);
+  process.exit(2);
+}
+
 const socket = dgram.createSocket('udp4');
+socket.on('error', (err) => {
+  console.error(`udp error: ${err.message}`);
+  process.exit(1);
+});
 let t = 0;
 
 const timer = setInterval(() => {

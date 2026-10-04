@@ -69,10 +69,20 @@ for (const rel of files) {
   }
 }
 
-// The config is data, not code: at least check the keys are declared.
+// The config is real Lua: the DCS-side scripts load it with loadfile(), and the
+// backend parses it with the same grammar. A `#` comment (shell/INI style) is a
+// syntax error that makes loadfile() reject the whole chunk, so none of the
+// settings apply — silently, because the error is swallowed. Parsing it here
+// catches that before it reaches a user. The keys must also be present.
 const cfgPath = path.join(root, 'dcs-lua/Config/dcsmanager.cfg');
 if (fs.existsSync(cfgPath)) {
   const cfg = fs.readFileSync(cfgPath, 'utf8');
+  try {
+    luaparse.parse(cfg, { luaVersion: '5.1', comments: false, scope: false });
+  } catch (e) {
+    failed = true;
+    console.log(`  ERREUR    dcs-lua/Config/dcsmanager.cfg: ${e.message}`);
+  }
   for (const key of ['dcsmanager_host', 'dcsmanager_udp_port', 'dcsmanager_tcp_port', 'dcsmanager_enabled']) {
     if (!cfg.includes(key)) {
       console.log(`  cfg sans ${key}`);
