@@ -284,3 +284,58 @@ func buildCatalog(t *testing.T, ctl biosmeta.Control) *biosmeta.Catalog {
 	}
 	return cat
 }
+
+// TestSetProfileNotPublishedWhenSaveFails locks the fix: when the write fails, the
+// in-memory profile must not change. Publishing before persisting let the UI report
+// an error while the manager kept the new bindings, and a panel could act on them.
+func TestSetProfileNotPublishedWhenSaveFails(t *testing.T) {
+	// A path whose parent is a file, so MkdirAll/WriteFile cannot succeed.
+	blocker := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := NewStore(filepath.Join(blocker, "mappings.json"), (&recorder{}).send)
+
+	err := s.SetProfile(Profile{
+		Aircraft: "CUSTOM",
+		Bindings: []Binding{{Model: panel.PZ70, Control: "AP_BUTTON", Command: "AP_BTN_Hdg", Interface: "action"}},
+	})
+	if err == nil {
+		t.Fatal("the save should have failed")
+	}
+	if got := s.Profile("CUSTOM"); len(got.Bindings) != 0 {
+		t.Fatalf("a failed save must not publish the profile, got %d bindings", len(got.Bindings))
+	}
+}
+
+// TestDeleteProfileRestoredWhenSaveFails checks the same rule for deletion.
+func TestDeleteProfileRestoredWhenSaveFails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mappings.json")
+	rec := &recorder{}
+	s := NewStore(path, rec.send)
+	if err := s.SetProfile(Profile{
+		Aircraft: "CUSTOM",
+		Bindings: []Binding{{Model: panel.PZ70, Control: "AP_BUTTON", Command: "AP_BTN_Hdg", Interface: "action"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make the target unwritable by turning the parent into a file.
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.DeleteProfile("CUSTOM"); err == nil {
+		t.Fatal("the delete should have failed")
+	}
+	if got := s.Profile("CUSTOM"); len(got.Bindings) != 1 {
+		t.Fatalf("a failed delete must keep the profile, got %d bindings", len(got.Bindings))
+	}
+}

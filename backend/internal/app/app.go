@@ -302,6 +302,9 @@ func Run(onReady func(addr string)) error {
 	writer := ingest.New(database, liveStore)
 	writer.SetSourceFunc(sessionSource)
 	debriefs := debriefstore.New(database)
+	// A corrupt assembled debrief is written beside the database so it can be
+	// examined, rather than dropped with only its first log line.
+	debriefs.DumpDir = filepath.Join(filepath.Dir(cfg.DBPath), "rejected")
 	debriefs.OnDebrief = func(d model.Debrief) {
 		srv.BroadcastMessage(map[string]any{"type": "debrief", "debrief": d})
 	}

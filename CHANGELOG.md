@@ -71,6 +71,19 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **Ready-made panel profiles for four aircraft.** The first time the binding
+  file is absent, the Cockpit panels tab is seeded with working bindings for the
+  F/A-18C, the F-16C, the F-5E-3 and the Mirage 2000C — the aircraft the original
+  DCS Panel Manager shipped profiles for — so a new cockpit has something that
+  works without mapping every switch by hand. They are adapted to this manager's
+  one-command-per-control model: the battery switch maps to a single `set_state`
+  binding, and the gear lever is two controls (`GEAR_UP`/`GEAR_DOWN`) driving the
+  two positions of one command. Output bindings (gear lights, the PZ70 LCD and
+  button LEDs) are not part of the model yet, so they are not reproduced.
+  Seeding is one-way and only fills a missing file: an existing binding file,
+  even one emptied by the operator, is never touched, and seeding never arms
+  sending. A test validates every shipped command and interface against the
+  machine's real DCS-BIOS metadata.
 - **A logo.** The header now shows the DCS Manager emblem beside the title, and
   the README opens on it. The source art lives in `Logo/`; build-friendly copies
   are `frontend/src/assets/logo.png` (the transparent emblem, 128 px, resized and
@@ -261,6 +274,55 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **A player's totals were multiplied by the number of samples.** The hook resends
+  the same cumulative counters every few seconds (and at each connect, disconnect
+  and slot change), and statistics summed every row: three snapshots of "1 kill,
+  100 points" read 3 kills and 300 points, for the player and for their coalition.
+  Per-player and per-coalition totals now come from the **latest snapshot per
+  mission**, the final counters DCS reported, so one sortie counts once.
+- **A DCS player id reused in a later mission attributed deaths to the wrong
+  player.** Event arguments carry the *DCS* player id, which is only meaningful
+  within its mission: a career-wide `id → name` map gave one player's deaths to
+  another whenever an id was reused. Events are now resolved by
+  `(mission_id, dcs_player_id)` before being aggregated by identity.
+- **A name-only player never adopted their UCID.** A player first recorded without
+  a UCID kept an empty one even after DCS reported it, so a later rename created a
+  second identity. The UCID is now recorded when an anonymous row is matched.
+- **Several missions could be open at once, or a new flight merged into a stale
+  one.** The open-mission get-or-create is race-prone, and a mission start arriving
+  while a previous mission was still open (manager interrupted, end message lost)
+  was merged into it. The get-or-create is now serialised and backed by a unique
+  index, and an explicit start closes the stale session first while an identical
+  repeated start stays the same flight.
+- **Purged missions left the ingestion with a dead id.** After a purge, events
+  failed on the foreign key and were lost until a restart. The writer revalidates
+  the mission before writing and opens a fresh one when it is gone.
+- **A corrupt binding file no longer hides a stale mission's samples.** The tracker
+  now releases a mission that has ended instead of pinning samples to it, so a new
+  flight is never recorded into the previous one.
+- **A failed profile save no longer changed the active profile.** Bindings were
+  published in memory before being written, so a refused save reported an error
+  while the manager kept the new state (and a panel could act on it). The new state
+  is persisted first and published only on success; a failed delete restores the
+  previous profile too.
+- **A corrupt debrief transfer is recovered, not lost.** The TCP sender declares
+  the file size in every chunk, but the assembled content can come out longer
+  (observed in the field: the valid file followed by `2 × base64(fragment)`, a
+  transport corruption between DCS's LuaSocket and the backend). The assembler now
+  compares the assembled length to the declared size: when it is **longer**, the
+  real file is its first `size` bytes and that prefix is stored once it parses;
+  when it is **shorter**, data is genuinely missing and the transfer is dropped and
+  written to `data/rejected/` for inspection.
+- **An empty player roster was dropped, taking the whole message with it.** When
+  no player was connected, the Lua serializer sent the roster as `{}`: its
+  `isArray = #v > 0` test cannot tell an empty table from an empty object, so an
+  empty table came out as an object, and the backend's `[]Player` field refused
+  it. `json.Unmarshal` failed on the **whole line**, so the roster — and any event
+  it travelled with, since the hook resends the roster on every connect, disconnect
+  and slot change — was lost in silence. The serializer now emits `[]` for an empty
+  table, and the backend accepts both shapes: an empty roster, a roster keyed by
+  player id, and an empty `[]` where the mission options are a map. A roster that
+  is neither an array nor an object is still reported rather than hidden.
 - **Career flight hours were wildly inflated.** The Career tab showed thousands
   of hours for a handful of flights (5 477 h for 6 sorties), because DCS stores
   the `flightHours`, `daytime` and `nighttime` fields in **seconds** despite

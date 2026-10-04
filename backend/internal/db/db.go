@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	_ "modernc.org/sqlite"
 )
@@ -15,6 +16,12 @@ import (
 // DB wraps the SQLite handle.
 type DB struct {
 	sql *sql.DB
+	// openMissionMu serialises the get-or-create of the open mission. Several
+	// components (the ingest writer, the tracker, the API) may ask for the open
+	// mission at once; without this, they could all see "no open mission" and
+	// each insert one, leaving several open missions at a time. It is held only
+	// around the short get-or-create, never around I/O of other kinds.
+	openMissionMu sync.Mutex
 }
 
 // Open opens (and migrates) the database at path. Parent directories are
@@ -190,7 +197,33 @@ CREATE INDEX IF NOT EXISTS idx_missions_source ON missions(source);
 	if err := d.migrations(); err != nil {
 		return err
 	}
-	_, err := d.sql.Exec(indexes)
+	if _, err := d.sql.Exec(indexes); err != nil {
+		return err
+	}
+	return d.ensureSingleOpenMissionIndex()
+}
+
+// ensureSingleOpenMissionIndex enforces "at most one open mission" at the database
+// level, so a race between components cannot leave several missions open. A
+// previously written database may already violate it, so older duplicates are
+// reconciled (all but the newest are closed) before the index is created.
+func (d *DB) ensureSingleOpenMissionIndex() error {
+	const create = `CREATE UNIQUE INDEX IF NOT EXISTS idx_missions_one_open
+		ON missions((1)) WHERE ended_at IS NULL`
+	if _, err := d.sql.Exec(create); err == nil {
+		return nil
+	}
+
+	// Reconcile a database that predates the constraint: close every open mission
+	// but the most recent one.
+	if _, err := d.sql.Exec(`
+		UPDATE missions SET ended_at = started_at
+		WHERE ended_at IS NULL
+		  AND id <> (SELECT id FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1)`,
+	); err != nil {
+		return err
+	}
+	_, err := d.sql.Exec(create)
 	return err
 }
 

@@ -113,12 +113,31 @@ func (t *Tracker) currentSource() string {
 }
 
 // currentMissionID returns the mission to attach samples to.
+//
+// The remembered id is revalidated against the database on every call: a mission
+// that has ended (or was purged) must not keep receiving samples, or a new flight
+// would silently be recorded into the previous one. When the remembered mission
+// is gone, the callback and then the create path are consulted.
 func (t *Tracker) currentMissionID() int64 {
 	t.mu.Lock()
 	id := t.missionID
 	fn := t.missionIDFn
 	t.mu.Unlock()
 
+	if id != 0 && t.db != nil {
+		if open := t.db.OpenMissionID(); open == id {
+			return id
+		}
+		// The remembered mission is no longer open: forget it and fall through.
+		t.mu.Lock()
+		if t.missionID == id {
+			t.missionID = 0
+			t.seen = make(map[string]model.Sample)
+			t.lostIDs = make(map[string]bool)
+		}
+		t.mu.Unlock()
+		id = 0
+	}
 	if id != 0 {
 		return id
 	}

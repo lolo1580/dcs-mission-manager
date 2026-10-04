@@ -33,6 +33,27 @@ func (s *Server) handlePurge(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 
+	// Exactly one scope must be named. Accepting several would make `all=1`
+	// silently win and delete everything, which is the opposite of what a caller
+	// passing several might intend. The CLI already enforces this; the API must
+	// too.
+	scopes := 0
+	if q.Get("all") == "1" {
+		scopes++
+	}
+	if q.Get("source") != "" {
+		scopes++
+	}
+	if q.Get("missionId") != "" {
+		scopes++
+	}
+	if scopes > 1 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "ambiguous purge: pass exactly one of source=test, missionId=N or all=1",
+		})
+		return
+	}
+
 	switch {
 	case q.Get("all") == "1":
 		res, err := s.db.PurgeAll()

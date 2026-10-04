@@ -32,10 +32,17 @@ func ValidSource(s string) bool {
 // EnsureMissionTagged returns the id of the open mission, creating one with the
 // given source if none exists. The default is SourceLive, so an ordinary
 // incoming mission is never tagged by accident.
+//
+// The get-or-create is serialised by d.openMissionMu and backed by a unique
+// index, so concurrent callers (the ingest writer, the tracker, the API) cannot
+// each open a mission and leave several open at once.
 func (d *DB) EnsureMissionTagged(name, theatre, source string) (int64, error) {
 	if !ValidSource(source) {
 		source = SourceLive
 	}
+
+	d.openMissionMu.Lock()
+	defer d.openMissionMu.Unlock()
 
 	var id int64
 	err := d.sql.QueryRow(`SELECT id FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`).Scan(&id)
@@ -54,6 +61,66 @@ func (d *DB) EnsureMissionTagged(name, theatre, source string) (int64, error) {
 		return id, nil
 	}
 	if err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	res, err := d.sql.Exec(
+		`INSERT INTO missions(name, theatre, source, started_at) VALUES(?, ?, ?, ?)`,
+		name, theatre, source, time.Now().UnixMilli(),
+	)
+	if err != nil {
+		// A concurrent caller may have won the race despite the mutex (another
+		// process, or a direct insert): reuse the mission it opened.
+		if id := d.OpenMissionID(); id != 0 {
+			return id, nil
+		}
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// StartMission records the start of a mission, opening a new one even if another
+// mission is still open. A mission start announced while a previous mission was
+// never closed (the manager was interrupted, or the end message was lost) is a
+// genuine transition, not a reconnect, so the stale session is closed first
+// rather than the new flight being merged into it.
+//
+// An identical repeated start (same name and theatre, still open) is treated as
+// the same flight and left alone, so a reconnect mid-mission does not split it.
+func (d *DB) StartMission(name, theatre, source string) (int64, error) {
+	if !ValidSource(source) {
+		source = SourceLive
+	}
+
+	d.openMissionMu.Lock()
+	defer d.openMissionMu.Unlock()
+
+	var (
+		id      int64
+		oldName string
+		oldThe  string
+	)
+	err := d.sql.QueryRow(
+		`SELECT id, name, COALESCE(theatre,'') FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`,
+	).Scan(&id, &oldName, &oldThe)
+
+	switch {
+	case err == nil && oldName == name && oldThe == theatre:
+		// Same flight announced again: keep it, do not double-open.
+		if source == SourceTest {
+			if _, upErr := d.sql.Exec(`UPDATE missions SET source = ? WHERE id = ? AND source = ?`,
+				SourceTest, id, SourceLive); upErr != nil {
+				return id, upErr
+			}
+		}
+		return id, nil
+	case err == nil:
+		// A different mission is still open: close it before opening the new one.
+		if _, endErr := d.sql.Exec(
+			`UPDATE missions SET ended_at = ? WHERE id = ?`, time.Now().UnixMilli(), id); endErr != nil {
+			return 0, endErr
+		}
+	case err != sql.ErrNoRows:
 		return 0, err
 	}
 

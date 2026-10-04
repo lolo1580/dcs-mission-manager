@@ -5,6 +5,8 @@ package debriefstore
 import (
 	"encoding/base64"
 	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -19,6 +21,12 @@ import (
 // so a slow or aborted transfer never blocks another.
 type Assembler struct {
 	db *db.DB
+
+	// DumpDir, when set, is where an assembled debrief that fails to parse is
+	// written for inspection. A malformed transfer is otherwise dropped with only
+	// its first log line, which is not enough to tell a transport corruption from
+	// a parser gap. Empty disables the dump.
+	DumpDir string
 
 	mu        sync.Mutex
 	transfers map[string]*transfer
@@ -74,6 +82,16 @@ func (a *Assembler) Handle(m model.Message) bool {
 		return m.Type == "debrief"
 	}
 
+	// The chunk metadata must be self-consistent before any of it is trusted: a
+	// negative or out-of-range index, or a non-positive count, is a broken sender
+	// and must not become a stored debrief. (A count of 0 is allowed by some
+	// senders meaning "unknown", but then only chunk 0 is meaningful.)
+	if m.Chunk < 0 || m.Chunks < 0 || (m.Chunks > 0 && m.Chunk >= m.Chunks) {
+		log.Printf("debrief: rejecting chunk %d/%d of %s: invalid index",
+			m.Chunk, m.Chunks, m.TransferID)
+		return true
+	}
+
 	raw, err := base64.StdEncoding.DecodeString(m.Data)
 	if err != nil {
 		log.Printf("debrief: invalid chunk %d of %s: %v", m.Chunk, m.TransferID, err)
@@ -95,6 +113,15 @@ func (a *Assembler) Handle(m model.Message) bool {
 		}
 		tr = &transfer{chunks: make(map[int][]byte), total: m.Chunks}
 		a.transfers[m.TransferID] = tr
+	} else if m.Chunks > 0 && tr.total > 0 && m.Chunks != tr.total {
+		// The number of chunks changed mid-transfer: the sender is confused (or
+		// two transfers collided on the same id). Refuse rather than assemble a
+		// mix of two different files.
+		log.Printf("debrief: transfer %s announced %d chunks then %d; dropping",
+			m.TransferID, tr.total, m.Chunks)
+		delete(a.transfers, m.TransferID)
+		a.mu.Unlock()
+		return true
 	}
 	tr.lastSeen = now
 	tr.chunks[m.Chunk] = raw
@@ -139,6 +166,38 @@ func (a *Assembler) Handle(m model.Message) bool {
 	for _, i := range indexes {
 		content = append(content, tr.chunks[i]...)
 	}
+
+	// The hook declares the file size in every chunk. A mismatch means the
+	// transfer was corrupted on the wire (a duplicated or truncated chunk). When
+	// the assembled content is *longer* than declared, the real file is its first
+	// `size` bytes — the corruption appends a base64 fragment after the valid data
+	// — so the transfer can be recovered instead of lost. When it is shorter, the
+	// data is genuinely missing and the transfer is dropped.
+	if tr.size > 0 && len(content) != tr.size {
+		if len(content) > tr.size {
+			candidate := content[:tr.size]
+			if _, err := debrief.Parse(candidate); err == nil {
+				log.Printf("debrief: transfer %s assembled %d bytes but the sender declared %d; recovered the first %d bytes",
+					m.TransferID, len(content), tr.size, tr.size)
+				content = candidate
+			} else {
+				log.Printf("debrief: transfer %s assembled %d bytes but the sender declared %d, and the prefix does not parse; dropping",
+					m.TransferID, len(content), tr.size)
+				a.dump(content, m.TransferID)
+				delete(a.transfers, m.TransferID)
+				a.mu.Unlock()
+				return true
+			}
+		} else {
+			log.Printf("debrief: transfer %s assembled %d bytes but the sender declared %d (truncated); dropping",
+				m.TransferID, len(content), tr.size)
+			a.dump(content, m.TransferID)
+			delete(a.transfers, m.TransferID)
+			a.mu.Unlock()
+			return true
+		}
+	}
+
 	delete(a.transfers, m.TransferID)
 	a.mu.Unlock()
 
@@ -155,6 +214,7 @@ func (a *Assembler) store(content []byte, theatre, mission string) {
 	parsed, err := debrief.Parse(content)
 	if err != nil {
 		log.Printf("debrief: parse failed (%d bytes): %v", len(content), err)
+		a.dump(content, "parse")
 		return
 	}
 	data := parsed.ToModel()
@@ -180,6 +240,24 @@ func (a *Assembler) store(content []byte, theatre, mission string) {
 		saved.Raw = ""
 		a.OnDebrief(saved)
 	}
+}
+
+// dump writes a corrupt assembled debrief where it can be examined. It is
+// best-effort: a failure to write must not turn a dropped debrief into a crash.
+func (a *Assembler) dump(content []byte, tag string) {
+	if a.DumpDir == "" {
+		return
+	}
+	name := filepath.Join(a.DumpDir, "debrief-failed-"+tag+"-"+time.Now().Format("20060102-150405")+".bin")
+	if err := os.MkdirAll(a.DumpDir, 0o755); err != nil {
+		log.Printf("debrief: could not create dump dir: %v", err)
+		return
+	}
+	if err := os.WriteFile(name, content, 0o644); err != nil {
+		log.Printf("debrief: could not dump failed transfer: %v", err)
+		return
+	}
+	log.Printf("debrief: dumped failed transfer to %s", name)
 }
 
 // InFlight returns the number of transfers currently being assembled (useful

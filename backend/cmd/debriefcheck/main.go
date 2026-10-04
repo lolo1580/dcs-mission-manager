@@ -14,6 +14,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: debriefcheck <path-to-debrief.log>")
+		os.Exit(2)
+	}
 	data, err := os.ReadFile(os.Args[1])
 	if err != nil {
 		fmt.Println("read:", err)

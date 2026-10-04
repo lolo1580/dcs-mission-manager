@@ -48,3 +48,6 @@ __pycache__/
 
 # Local DCS scripts (never commit personal paths)
 dcs-lua/Config/dcsmanager.local.cfg
+
+# Local investigation notes (debug context, machine-specific)
+/notes/

@@ -2,6 +2,7 @@ package debriefstore
 
 import (
 	"encoding/base64"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -193,6 +194,7 @@ func TestInFlightTransfersAreCapped(t *testing.T) {
 	}
 }
 
+// TestConcurrentTransfersStayIndependent interleaves two transfers chunk by chunk.
 func TestConcurrentTransfersStayIndependent(t *testing.T) {
 	a, database := newAssembler(t)
 
@@ -209,5 +211,132 @@ func TestConcurrentTransfersStayIndependent(t *testing.T) {
 	list, _ := database.Debriefs(10)
 	if len(list) != 2 {
 		t.Fatalf("want 2 debriefs in db, got %d", len(list))
+	}
+}
+
+// TestSizeMismatchIsRefused covers the corruption seen in the field: the sender
+// declares the file size in every chunk, but the assembled content came out at
+// roughly twice that (a duplicated base64 fragment on the wire). The wrong bytes
+// must never be parsed or stored.
+func TestSizeMismatchIsRefused(t *testing.T) {
+	a, database := newAssembler(t)
+	a.DumpDir = t.TempDir()
+
+	var stored int
+	a.OnDebrief = func(model.Debrief) { stored++ }
+
+	// Two chunks whose declared total size does not match what they assemble to.
+	a.Handle(model.Message{
+		Type: "debrief", TransferID: "corrupt", Chunk: 0, Chunks: 2, Size: len(debriefSample),
+		Data: base64.StdEncoding.EncodeToString([]byte(debriefSample[:20])),
+	})
+	a.Handle(model.Message{
+		Type: "debrief", TransferID: "corrupt", Chunk: 1, Chunks: 2, Size: len(debriefSample),
+		Data: base64.StdEncoding.EncodeToString([]byte("this is more than the declared total")),
+	})
+
+	if stored != 0 {
+		t.Fatalf("a size mismatch must not be stored, got %d stored", stored)
+	}
+	if a.InFlight() != 0 {
+		t.Fatalf("the corrupt transfer should be dropped, %d in flight", a.InFlight())
+	}
+	list, _ := database.Debriefs(10)
+	if len(list) != 0 {
+		t.Fatalf("nothing should be in the database, got %d", len(list))
+	}
+	// The bytes were kept for inspection.
+	entries, _ := os.ReadDir(a.DumpDir)
+	if len(entries) == 0 {
+		t.Error("a refused transfer should be dumped for inspection")
+	}
+}
+
+// TestSizeMatchIsStored checks a matching size still stores normally, so the
+// guard does not reject valid transfers.
+func TestSizeMatchIsStored(t *testing.T) {
+	a, _ := newAssembler(t)
+
+	var stored int
+	a.OnDebrief = func(model.Debrief) { stored++ }
+	sendChunks(a, debriefSample, len(debriefSample), "ok")
+
+	if stored != 1 {
+		t.Fatalf("a matching transfer should be stored, got %d", stored)
+	}
+}
+
+// TestOverlongTransferIsRecovered locks the recovery of the corruption seen in the
+// field: the reassembled content was the valid file followed by a duplicated base64
+// fragment, and the sender declares the real size. The valid prefix must be stored
+// rather than the whole thing dropped.
+func TestOverlongTransferIsRecovered(t *testing.T) {
+	a, database := newAssembler(t)
+
+	var got model.Debrief
+	a.OnDebrief = func(d model.Debrief) { got = d }
+
+	// Assemble the real content plus two copies of a base64 fragment, exactly the
+	// corruption observed, while declaring the true size.
+	blob := debriefSample + debriefSample[100:180] + debriefSample[100:180]
+	half := len(blob) / 2
+	a.Handle(model.Message{Type: "debrief", TransferID: "over", Chunk: 0, Chunks: 2, Size: len(debriefSample),
+		Data: base64.StdEncoding.EncodeToString([]byte(blob[:half]))})
+	a.Handle(model.Message{Type: "debrief", TransferID: "over", Chunk: 1, Chunks: 2, Size: len(debriefSample),
+		Data: base64.StdEncoding.EncodeToString([]byte(blob[half:]))})
+
+	if got.ID == 0 {
+		t.Fatal("the valid prefix should have been recovered and stored")
+	}
+	if len(got.Parsed.Events) != 2 {
+		t.Fatalf("want 2 events from the recovered debrief, got %d", len(got.Parsed.Events))
+	}
+	if list, _ := database.Debriefs(10); len(list) != 1 {
+		t.Fatalf("want 1 stored debrief, got %d", len(list))
+	}
+}
+
+// TestInvalidChunkIndexIsRefused checks an out-of-range chunk index is rejected
+// instead of being stored: chunk 99 of 1 is a broken sender.
+func TestInvalidChunkIndexIsRefused(t *testing.T) {
+	a, database := newAssembler(t)
+	a.DumpDir = t.TempDir()
+
+	var stored int
+	a.OnDebrief = func(model.Debrief) { stored++ }
+
+	a.Handle(model.Message{
+		Type: "debrief", TransferID: "badidx", Chunk: 99, Chunks: 1, Size: len(debriefSample),
+		Data: base64.StdEncoding.EncodeToString([]byte(debriefSample)),
+	})
+
+	if stored != 0 {
+		t.Fatalf("an out-of-range chunk must not be stored, got %d", stored)
+	}
+	if a.InFlight() != 0 {
+		t.Fatalf("the broken transfer must not stay in flight, %d", a.InFlight())
+	}
+	if list, _ := database.Debriefs(10); len(list) != 0 {
+		t.Fatalf("nothing should be in the database, got %d", len(list))
+	}
+}
+
+// TestChunkCountChangeDropsTransfer checks a transfer that announces one chunk
+// count and then another is dropped rather than assembled from mixed data.
+func TestChunkCountChangeDropsTransfer(t *testing.T) {
+	a, _ := newAssembler(t)
+
+	var stored int
+	a.OnDebrief = func(model.Debrief) { stored++ }
+
+	payload := base64.StdEncoding.EncodeToString([]byte("x"))
+	a.Handle(model.Message{Type: "debrief", TransferID: "changing", Chunk: 0, Chunks: 2, Data: payload})
+	a.Handle(model.Message{Type: "debrief", TransferID: "changing", Chunk: 1, Chunks: 3, Data: payload})
+
+	if stored != 0 {
+		t.Fatalf("a changing chunk count must be dropped, got %d stored", stored)
+	}
+	if a.InFlight() != 0 {
+		t.Fatalf("the confused transfer must be dropped, %d in flight", a.InFlight())
 	}
 }

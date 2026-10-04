@@ -247,3 +247,101 @@ func TestEnginesUseResolvedUnitTypes(t *testing.T) {
 		t.Fatalf("F-16C_50 sorties = %d, want 1", byType["F-16C_50"].Sorties)
 	}
 }
+
+// TestRepeatedSnapshotsAreNotSummed locks the fix for stats being multiplied by
+// the sampling rate: the hook resends the same cumulative counters every few
+// seconds, and summing every snapshot read 3 kills for a single kill.
+func TestRepeatedSnapshotsAreNotSummed(t *testing.T) {
+	svc, database := setup(t)
+	missionID, err := database.EnsureMission("Repeats", "Caucasus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid, err := database.UpsertPlayer("u-viper", "Viper")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Three identical snapshots of the same cumulative counters.
+	for i := 0; i < 3; i++ {
+		if err := database.SaveStats(missionID, pid, model.Player{
+			ID: 1, Name: "Viper", Side: 2, Score: 100, KillsAir: 1, Ping: 50,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pilots, err := svc.Pilots(Scope{Mode: "career"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pilots) != 1 {
+		t.Fatalf("want 1 pilot, got %d", len(pilots))
+	}
+	if pilots[0].Kills != 1 || pilots[0].Score != 100 {
+		t.Fatalf("repeated snapshots must not be summed: %+v", pilots[0])
+	}
+
+	// Coalitions must not be multiplied either.
+	coal, err := svc.Coalitions(Scope{Mode: "career"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(coal) != 1 || coal[0].Score != 100 || coal[0].Kills != 1 {
+		t.Fatalf("coalition totals must not be summed: %+v", coal)
+	}
+}
+
+// TestSameDCSIDAcrossMissions checks a DCS player id reused by another player in
+// a later mission does not get its deaths attributed to the first player. The id
+// is only meaningful within its mission.
+func TestSameDCSIDAcrossMissions(t *testing.T) {
+	svc, database := setup(t)
+
+	// Mission A: Alice is DCS id 2 and dies.
+	missionA, err := database.EnsureMission("A", "Caucasus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	alice, err := database.UpsertPlayer("u-alice", "Alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveStats(missionA, alice, model.Player{ID: 2, Name: "Alice", Side: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveEvent(missionA, model.Event{Event: "pilot_death", Args: []any{2.0, 1.0}, RealTS: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.EndOpenMission(""); err != nil {
+		t.Fatal(err)
+	}
+
+	// Mission B: Bob reuses DCS id 2 and also dies.
+	missionB, err := database.EnsureMission("B", "Caucasus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := database.UpsertPlayer("u-bob", "Bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveStats(missionB, bob, model.Player{ID: 2, Name: "Bob", Side: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveEvent(missionB, model.Event{Event: "pilot_death", Args: []any{2.0, 1.0}, RealTS: 2}); err != nil {
+		t.Fatal(err)
+	}
+
+	pilots, err := svc.Pilots(Scope{Mode: "career"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]PilotStats{}
+	for _, p := range pilots {
+		byName[p.Name] = p
+	}
+	if byName["Alice"].Deaths != 1 || byName["Bob"].Deaths != 1 {
+		t.Fatalf("each should have exactly 1 death: Alice=%d Bob=%d",
+			byName["Alice"].Deaths, byName["Bob"].Deaths)
+	}
+}

@@ -67,6 +67,21 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Des profils de panneaux prêts à l'emploi pour quatre appareils.** La première
+  fois que le fichier d'associations est absent, l'onglet Panneaux de cockpit est
+  pré-rempli avec des associations fonctionnelles pour le F/A-18C, le F-16C, le
+  F-5E-3 et le Mirage 2000C — les appareils pour lesquels le DCS Panel Manager
+  d'origine livrait des profils — pour qu'un nouveau cockpit ait quelque chose qui
+  marche sans mapper chaque interrupteur à la main. Ils sont adaptés au modèle de
+  ce gestionnaire, une commande par contrôle : l'interrupteur de batterie devient
+  une seule association `set_state`, et la manette de train deux contrôles
+  (`GEAR_UP`/`GEAR_DOWN`) pilotant les deux positions d'une même commande. Les
+  sorties (feux de train, LCD du PZ70, LEDs des boutons) ne font pas encore partie
+  du modèle, elles ne sont donc pas reproduites. Le pré-remplissage est à sens
+  unique et ne remplit qu'un fichier manquant : un fichier existant, même vidé par
+  l'opérateur, n'est jamais touché, et il n'arme jamais l'envoi. Un test valide
+  chaque commande et interface livrées contre les véritables métadonnées DCS-BIOS
+  de la machine.
 - **Un logo.** L'en-tête affiche désormais l'emblème DCS Manager à côté du titre,
   et le README s'ouvre dessus. L'art source vit dans `Logo/` ; les copies prêtes
   pour le build sont `frontend/src/assets/logo.png` (l'emblème transparent,
@@ -272,6 +287,59 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- **Les totaux d'un pilote étaient multipliés par le nombre de relevés.** Le hook
+  renvoie les mêmes compteurs cumulés toutes les quelques secondes (et à chaque
+  connexion, déconnexion et changement de siège), et les statistiques sommaient
+  chaque ligne : trois relevés de « 1 kill, 100 points » affichaient 3 kills et
+  300 points, pour le pilote comme pour sa coalition. Les totaux par pilote et par
+  coalition proviennent désormais du **dernier relevé par mission**, les compteurs
+  finaux rapportés par DCS : une sortie ne compte plus qu'une fois.
+- **Un id de joueur DCS réutilisé dans une mission ultérieure attribuait les décès
+  au mauvais pilote.** Les arguments d'événement portent l'id *DCS*, qui n'a de sens
+  que dans sa mission : une table `id → nom` couvrant toute la carrière donnait les
+  décès d'un joueur à un autre à chaque réutilisation. Les événements sont
+  maintenant résolus par `(mission_id, dcs_player_id)` avant agrégation par
+  identité.
+- **Un joueur enregistré sans UCID n'adoptait jamais le sien.** Un joueur
+  d'abord vu sans UCID le gardait vide même après que DCS l'ait fourni, si bien
+  qu'un renommage ultérieur créait une seconde identité. L'UCID est désormais
+  enregistré quand une ligne anonyme est rapprochée.
+- **Plusieurs missions pouvaient être ouvertes à la fois, ou un nouveau vol
+  fusionné dans une ancienne.** Le get-or-create de la mission ouverte est exposé
+  aux courses, et un début de mission arrivant alors qu'une précédente était encore
+  ouverte (gestionnaire interrompu, fin perdue) y était fusionné. Le get-or-create
+  est maintenant sérialisé et adossé à un index unique, et un début explicite ferme
+  d'abord l'ancienne session, un début identique répété restant le même vol.
+- **Une purge laissait l'ingestion avec un id mort.** Après une purge, les
+  événements échouaient sur la clé étrangère et étaient perdus jusqu'au redémarrage.
+  Le writer revalide la mission avant d'écrire et en ouvre une nouvelle si besoin.
+- **Le tracker libère désormais une mission terminée** au lieu d'y épingler les
+  relevés, si bien qu'un nouveau vol n'est plus enregistré dans le précédent.
+- **Une sauvegarde de profil refusée ne modifie plus le profil actif.** Les
+  associations étaient publiées en mémoire avant d'être écrites : une sauvegarde
+  refusée signalait une erreur alors que l'état avait changé (et un panneau pouvait
+  agir dessus). Le nouvel état est persisté d'abord et publié seulement en cas de
+  succès ; une suppression en échec restaure aussi le profil précédent.
+- **Un débrief corrompu au transport est récupéré, plus perdu.** L'émetteur TCP
+  déclare la taille du fichier dans chaque chunk, mais le contenu assemblé peut
+  ressortir plus long (constaté sur le terrain : le fichier valide suivi de
+  `2 × base64(fragment)`, une corruption de transport entre LuaSocket de DCS et le
+  backend). L'assembleur compare désormais la longueur assemblée à la taille
+  déclarée : si elle est **plus longue**, le vrai fichier en est les `size` premiers
+  octets et ce préfixe est stocké dès qu'il parse ; si elle est **plus courte**, des
+  données manquent réellement et le transfert est refusé puis écrit dans
+  `data/rejected/` pour analyse.
+- **Une liste de joueurs vide était rejetée, entraînant tout le message avec
+  elle.** Quand aucun joueur n'était connecté, le sérialiseur Lua envoyait la
+  liste sous la forme `{}` : son test `isArray = #v > 0` ne sait pas distinguer une
+  table vide d'un objet vide, donc une table vide sortait en objet, et le champ
+  `[]Player` du backend la refusait. `json.Unmarshal` échouait alors sur **toute la
+  ligne** : la liste — et tout événement qui l'accompagnait, puisque le hook la
+  renvoie à chaque connexion, déconnexion et changement de siège — était perdue en
+  silence. Le sérialiseur émet maintenant `[]` pour une table vide, et le backend
+  accepte les deux formes : une liste vide, une liste indexée par id de joueur, et
+  un `[]` vide là où les options de mission sont une map. Une liste qui n'est ni
+  tableau ni objet est toujours signalée plutôt que masquée.
 - **Les endpoints de statistiques paniquaient sans base de données.** Avec la
   persistance désactivée (`DCSMANAGER_DB_ENABLED=false`, le mode des outils de
   test), `stats.New` renvoie un service non nul mais dont la base est nulle : le

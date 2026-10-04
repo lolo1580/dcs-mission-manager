@@ -138,15 +138,26 @@ type Overview struct {
 
 // Pilots returns per-player statistics, best score first.
 //
-// Deaths and friendly-fire are derived from events: DCS event arguments carry
-// the *DCS* player id, which we recorded alongside each stat snapshot, so we can
-// join them back to a player.
+// Kills, score, crashes, ejections and landings come from the *latest* snapshot
+// per mission, not from every snapshot: the hook resends the same cumulative
+// counters every few seconds, so summing all rows multiplied a player's totals by
+// the number of samples. One mission contributes its final counters; a career
+// sums those finals across missions.
+//
+// Deaths and friendly-fire are derived from events: DCS event arguments carry the
+// *DCS* player id, and the same id can belong to different people in different
+// missions, so the id is resolved per mission.
 func (s *Service) Pilots(sc Scope) ([]PilotStats, error) {
 	where, args := sc.filter("ps.mission_id")
 
-	// Kills and score come from the stats snapshots (authoritative, from DCS).
 	rows, err := s.db.SQL().Query(`
-		SELECT COALESCE(p.ucid,''), p.name,
+		WITH latest AS (
+			SELECT MAX(id) AS id
+			FROM player_stats ps
+			WHERE 1=1`+where+`
+			GROUP BY ps.mission_id, ps.player_id
+		)
+		SELECT p.id, COALESCE(p.ucid,''), p.name,
 		       COUNT(DISTINCT ps.mission_id),
 		       COALESCE(SUM(ps.score),0),
 		       COALESCE(SUM(ps.kills_air),0), COALESCE(SUM(ps.kills_car),0), COALESCE(SUM(ps.kills_ship),0),
@@ -154,7 +165,7 @@ func (s *Service) Pilots(sc Scope) ([]PilotStats, error) {
 		       AVG(NULLIF(ps.ping,0))
 		FROM player_stats ps
 		JOIN players p ON p.id = ps.player_id
-		WHERE 1=1`+where+`
+		WHERE ps.id IN (SELECT id FROM latest)
 		GROUP BY p.id
 		ORDER BY COALESCE(SUM(ps.score),0) DESC`, args...)
 	if err != nil {
@@ -163,11 +174,12 @@ func (s *Service) Pilots(sc Scope) ([]PilotStats, error) {
 	defer rows.Close()
 
 	var out []PilotStats
-	byName := map[string]int{} // name -> index in out
+	byID := map[int64]int{} // player row id -> index in out
 	for rows.Next() {
 		var p PilotStats
+		var id int64
 		var avgPing *float64
-		if err := rows.Scan(&p.UCID, &p.Name, &p.Missions, &p.Score,
+		if err := rows.Scan(&id, &p.UCID, &p.Name, &p.Missions, &p.Score,
 			&p.KillsAir, &p.KillsCar, &p.KillsShip,
 			&p.Crashes, &p.Ejections, &p.Landings, &avgPing); err != nil {
 			return nil, err
@@ -176,21 +188,21 @@ func (s *Service) Pilots(sc Scope) ([]PilotStats, error) {
 			p.AvgPing = *avgPing
 		}
 		p.Kills = p.KillsAir + p.KillsCar + p.KillsShip
-		byName[p.Name] = len(out)
+		byID[id] = len(out)
 		out = append(out, p)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	// Deaths and friendly-fire, resolved through the DCS player id.
-	deaths, ff, err := s.eventCountsByName(sc)
+	// Deaths and friendly-fire, resolved per mission through the DCS player id.
+	deaths, ff, err := s.eventCountsByPlayer(sc)
 	if err != nil {
 		return nil, err
 	}
-	for name, idx := range byName {
-		out[idx].Deaths = deaths[name]
-		out[idx].FriendlyFF = ff[name]
+	for id, idx := range byID {
+		out[idx].Deaths = deaths[id]
+		out[idx].FriendlyFF = ff[id]
 		if out[idx].Deaths > 0 {
 			out[idx].KD = float64(out[idx].Kills) / float64(out[idx].Deaths)
 		} else if out[idx].Kills > 0 {
@@ -200,69 +212,68 @@ func (s *Service) Pilots(sc Scope) ([]PilotStats, error) {
 	return out, nil
 }
 
-// dcsPlayerNames builds a map from DCS player id to player name for the scope.
-func (s *Service) dcsPlayerNames(sc Scope) (map[int64]string, error) {
+// eventCountsByPlayer counts deaths and friendly-fire per player row, resolving
+// each event's DCS player id within its own mission. The same DCS id can belong
+// to different players in different missions, so a career-wide id→name map would
+// attribute one player's deaths to another.
+func (s *Service) eventCountsByPlayer(sc Scope) (deaths, ff map[int64]int, err error) {
+	// (mission_id, dcs_player_id) -> player row id.
+	resolver := map[[2]int64]int64{}
 	where, args := sc.filter("ps.mission_id")
 	rows, err := s.db.SQL().Query(`
-		SELECT DISTINCT ps.dcs_player_id, p.name
+		SELECT DISTINCT ps.mission_id, ps.dcs_player_id, ps.player_id
 		FROM player_stats ps
-		JOIN players p ON p.id = ps.player_id
-		WHERE ps.dcs_player_id IS NOT NULL`+where, args...)
+		WHERE ps.dcs_player_id IS NOT NULL AND ps.mission_id IS NOT NULL`+where, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	defer rows.Close()
-
-	m := map[int64]string{}
 	for rows.Next() {
-		var id int64
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			return nil, err
+		var missionID, dcsID, playerID int64
+		if err := rows.Scan(&missionID, &dcsID, &playerID); err != nil {
+			rows.Close()
+			return nil, nil, err
 		}
-		m[id] = name
+		resolver[[2]int64{missionID, dcsID}] = playerID
 	}
-	return m, rows.Err()
-}
-
-func (s *Service) eventCountsByName(sc Scope) (deaths, ff map[string]int, err error) {
-	names, err := s.dcsPlayerNames(sc)
-	if err != nil {
+	rows.Close()
+	if err := rows.Err(); err != nil {
 		return nil, nil, err
 	}
 
-	where, args := sc.filter("mission_id")
-	rows, err := s.db.SQL().Query(
-		`SELECT event, args FROM events WHERE event IN ('pilot_death','friendly_fire')`+where, args...)
+	eWhere, eArgs := sc.filter("mission_id")
+	erows, err := s.db.SQL().Query(
+		`SELECT mission_id, event, args FROM events
+		 WHERE event IN ('pilot_death','friendly_fire') AND mission_id IS NOT NULL`+eWhere, eArgs...)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer erows.Close()
 
-	deaths = map[string]int{}
-	ff = map[string]int{}
-	for rows.Next() {
+	deaths = map[int64]int{}
+	ff = map[int64]int{}
+	for erows.Next() {
+		var missionID int64
 		var kind, argsJSON string
-		if err := rows.Scan(&kind, &argsJSON); err != nil {
+		if err := erows.Scan(&missionID, &kind, &argsJSON); err != nil {
 			return nil, nil, err
 		}
 		var a []any
 		_ = json.Unmarshal([]byte(argsJSON), &a)
 
+		playerID, ok := resolver[[2]int64{missionID, int64(num(a, 0))}]
+		if !ok {
+			continue
+		}
 		switch kind {
 		case "pilot_death":
 			// DCS: playerID, unit_missionID
-			if name, ok := names[int64(num(a, 0))]; ok {
-				deaths[name]++
-			}
+			deaths[playerID]++
 		case "friendly_fire":
 			// DCS: playerID, weaponName, victimPlayerID
-			if name, ok := names[int64(num(a, 0))]; ok {
-				ff[name]++
-			}
+			ff[playerID]++
 		}
 	}
-	return deaths, ff, rows.Err()
+	return deaths, ff, erows.Err()
 }
 
 // Weapons aggregates weapon performance from kill and friendly-fire events.
@@ -386,16 +397,24 @@ func (s *Service) Engines(sc Scope) ([]EngineStats, error) {
 	return out, nil
 }
 
-// Coalitions aggregates performance per coalition.
+// Coalitions aggregates performance per coalition, from the latest snapshot of
+// each player in each mission (see Pilots: summing every snapshot multiplied the
+// totals by the sampling rate).
 func (s *Service) Coalitions(sc Scope) ([]CoalitionStats, error) {
 	where, args := sc.filter("ps.mission_id")
 	rows, err := s.db.SQL().Query(`
+		WITH latest AS (
+			SELECT MAX(id) AS id
+			FROM player_stats ps
+			WHERE 1=1`+where+`
+			GROUP BY ps.mission_id, ps.player_id
+		)
 		SELECT ps.side,
 		       COALESCE(SUM(ps.score),0),
 		       COALESCE(SUM(ps.kills_air + ps.kills_car + ps.kills_ship),0),
 		       COUNT(DISTINCT ps.player_id)
 		FROM player_stats ps
-		WHERE 1=1`+where+`
+		WHERE ps.id IN (SELECT id FROM latest)
 		GROUP BY ps.side`, args...)
 	if err != nil {
 		return nil, err

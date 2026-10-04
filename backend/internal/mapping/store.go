@@ -64,13 +64,34 @@ type Store struct {
 // NewStore creates a store backed by a JSON file. send is the function that
 // actually transmits a command line; it may be nil, in which case enabling the
 // store is refused (there is nothing to send with).
+//
+// Built-in starter profiles are seeded only when the file does not exist yet, so
+// a new cockpit has working bindings out of the box. An existing file is never
+// overwritten or seeded over, even if it is empty or unreadable: a corrupt
+// binding file may still hold the operator's bindings, and silently replacing it
+// with the defaults would destroy them.
 func NewStore(path string, send func(command string) error) *Store {
 	s := &Store{
 		path:     path,
 		profiles: map[string]*Profile{},
 		send:     send,
 	}
-	s.load()
+	switch s.load() {
+	case fileAbsent:
+		for _, p := range Starter() {
+			p := p
+			s.profiles[p.Aircraft] = &p
+		}
+		// A failure to seed is not fatal: the profiles are a convenience, and the
+		// in-memory set is already usable even if the file cannot be written.
+		_ = s.saveLocked()
+	case filePresent:
+		// The file exists: respect it, do not seed over the operator's edits.
+	case fileUnreadable:
+		// A file that exists but cannot be read (invalid JSON, I/O error) must be
+		// preserved, not replaced. Leave the store empty; the operator can fix or
+		// rebuild it in the UI.
+	}
 	return s
 }
 
@@ -130,16 +151,35 @@ func (s *Store) SetProfile(p Profile) error {
 	if p.Aircraft == "" {
 		return fmt.Errorf("mapping: a profile needs an aircraft")
 	}
+	// Persist first, then publish: a failed write must not leave the in-memory
+	// state changed, or the UI would report an error while the manager behaves as
+	// if the save had succeeded (and a panel could act on the unsaved profile).
+	previous, had := s.profiles[p.Aircraft]
 	s.profiles[p.Aircraft] = &p
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		if had {
+			s.profiles[p.Aircraft] = previous
+		} else {
+			delete(s.profiles, p.Aircraft)
+		}
+		return err
+	}
+	return nil
 }
 
 // DeleteProfile removes an aircraft's bindings.
 func (s *Store) DeleteProfile(aircraft string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous, had := s.profiles[aircraft]
 	delete(s.profiles, aircraft)
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		if had {
+			s.profiles[aircraft] = previous
+		}
+		return err
+	}
+	return nil
 }
 
 // Apply handles one panel input event, sending every command that matches. The
@@ -198,23 +238,42 @@ func (s *Store) Apply(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []
 	return sent
 }
 
-// load reads the JSON file, ignoring a missing or corrupt one: losing the bindings
-// must not stop the manager, and the operator can rebuild them in the UI.
-func (s *Store) load() {
+// loadResult says how reading the binding file went, which is what lets NewStore
+// seed the starter profiles on a fresh install without ever touching a file that
+// already exists.
+type loadResult int
+
+const (
+	// fileAbsent means there is no binding file yet: a fresh install.
+	fileAbsent loadResult = iota
+	// filePresent means the file was read and parsed.
+	filePresent
+	// fileUnreadable means the file exists but could not be read or parsed. Its
+	// bytes are left alone.
+	fileUnreadable
+)
+
+// load reads the JSON file. A missing file is a fresh install; an unreadable one
+// is left untouched, because it may still hold the operator's bindings.
+func (s *Store) load() loadResult {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
-		return
+		if os.IsNotExist(err) {
+			return fileAbsent
+		}
+		return fileUnreadable
 	}
 	var file struct {
 		Profiles []Profile `json:"profiles"`
 	}
 	if err := json.Unmarshal(data, &file); err != nil {
-		return
+		return fileUnreadable
 	}
 	for i := range file.Profiles {
 		p := file.Profiles[i]
 		s.profiles[p.Aircraft] = &p
 	}
+	return filePresent
 }
 
 // saveLocked writes the file. The caller must hold the mutex.

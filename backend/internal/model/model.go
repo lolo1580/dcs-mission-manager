@@ -44,6 +44,63 @@ type Message struct {
 	Telemetry *Telemetry `json:"telemetry,omitempty"`
 }
 
+// UnmarshalJSON decodes a Message, tolerating the shapes DCS actually sends.
+// In particular the player roster arrives as a JSON object ({}) when the server
+// has no connected player, because the Lua serializer cannot tell an empty table
+// from an empty object; the strict slice decode used to reject the whole line,
+// dropping the message. A one-element object keyed by the player id is treated
+// the same way, for an older hook that iterated with pairs().
+func (m *Message) UnmarshalJSON(data []byte) error {
+	type alias Message
+	aux := struct {
+		Players json.RawMessage `json:"players"`
+		Options json.RawMessage `json:"options"`
+		*alias
+	}{alias: (*alias)(m)}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// An empty table is serialized as [] on the Lua side (an empty table is a
+	// list there). Mission options are a map, so an empty [] means "no options"
+	// rather than a decoding error.
+	if len(aux.Options) > 0 {
+		var opts map[string]any
+		if err := json.Unmarshal(aux.Options, &opts); err == nil {
+			m.Options = opts
+		}
+	}
+
+	if len(aux.Players) == 0 {
+		return nil
+	}
+
+	var list []Player
+	if err := json.Unmarshal(aux.Players, &list); err == nil {
+		m.Players = list
+		return nil
+	}
+
+	// `{}` from an empty roster, or an object keyed by player id.
+	var byKey map[string]Player
+	if err := json.Unmarshal(aux.Players, &byKey); err == nil {
+		if len(byKey) == 0 {
+			m.Players = []Player{}
+			return nil
+		}
+		m.Players = make([]Player, 0, len(byKey))
+		for _, p := range byKey {
+			m.Players = append(m.Players, p)
+		}
+		return nil
+	}
+
+	// Let the strict error surface (a truly malformed roster).
+	var strict []Player
+	return json.Unmarshal(aux.Players, &strict)
+}
+
 // Command is a message the backend pushes to the DCS hook over the same TCP
 // connection the hook uses to report. The hook executes it on receipt.
 type Command struct {

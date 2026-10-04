@@ -77,9 +77,13 @@ func (w *Writer) handleMission(m model.Message) {
 		if theatre == "" {
 			theatre = "Caucasus"
 		}
-		id, err := w.db.EnsureMissionTagged(m.Name, theatre, w.currentSource())
+		// A start is a transition, not a mere get-or-create: if a previous mission
+		// was left open (interrupted manager, lost end message), close it rather
+		// than merging the new flight into it. An identical repeated start is kept
+		// as the same flight.
+		id, err := w.db.StartMission(m.Name, theatre, w.currentSource())
 		if err != nil {
-			log.Printf("ingest: ensure mission: %v", err)
+			log.Printf("ingest: start mission: %v", err)
 			return
 		}
 		w.setMissionID(id)
@@ -153,8 +157,13 @@ func (w *Writer) upgradeSource(missionID int64) {
 
 // missionIDFor returns the id of the open mission, opening a default one when
 // DCS did not announce a mission start (for example a mid-mission reconnect).
+//
+// The remembered id is revalidated against the database: a purge can delete the
+// mission while the writer still holds its id, and writing an event against a
+// missing mission then fails on the foreign key (and the event is lost). When the
+// id is stale a fresh mission is opened.
 func (w *Writer) missionIDFor(m model.Message) int64 {
-	if id := w.currentMissionID(); id != 0 {
+	if id := w.currentMissionID(); id != 0 && w.missionExists(id) {
 		return id
 	}
 	name := m.Name
@@ -168,6 +177,14 @@ func (w *Writer) missionIDFor(m model.Message) int64 {
 	}
 	w.setMissionID(id)
 	return id
+}
+
+// missionExists reports whether the mission row is still present. A NULL result
+// or an error is treated as "gone", so the caller opens a new one.
+func (w *Writer) missionExists(id int64) bool {
+	var got int64
+	err := w.db.SQL().QueryRow(`SELECT id FROM missions WHERE id = ?`, id).Scan(&got)
+	return err == nil && got == id
 }
 
 func (w *Writer) currentMissionID() int64 {

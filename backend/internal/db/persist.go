@@ -74,6 +74,13 @@ func (d *DB) UpsertPlayer(ucid, name string) (int64, error) {
 	var id int64
 	err := d.sql.QueryRow(`SELECT id FROM players WHERE name = ? AND (ucid IS NULL OR ucid = '')`, name).Scan(&id)
 	if err == nil {
+		// A name-only row matched. If we now know the UCID, record it: leaving it
+		// empty made the identity fragile the moment the player renamed, since the
+		// next lookup would find nothing and create a second identity.
+		if ucid != "" {
+			_, updErr := d.sql.Exec(`UPDATE players SET ucid = ?, last_seen = ? WHERE id = ?`, ucid, now, id)
+			return id, updErr
+		}
 		_, updErr := d.sql.Exec(`UPDATE players SET last_seen = ? WHERE id = ?`, now, id)
 		return id, updErr
 	}

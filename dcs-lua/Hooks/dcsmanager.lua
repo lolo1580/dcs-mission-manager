@@ -150,6 +150,11 @@ do
     if t == "boolean" then return v and "true" or "false" end
     if t == "string" then return '"' .. jsonEscape(v) .. '"' end
     if t == "table" then
+      -- An empty table is ambiguous in Lua. Every table this function emits
+      -- when empty is a list (the player roster, an event's arguments), and the
+      -- backend decodes those as JSON arrays: emitting {} made it reject the
+      -- whole line, losing the player roster whenever no player was connected.
+      if next(v) == nil then return "[]" end
       -- List vs object detection.
       local isArray = #v > 0
       local parts = {}
