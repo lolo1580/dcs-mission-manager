@@ -283,17 +283,6 @@ func Run(onReady func(addr string)) error {
 		srv.SetScripts(scripts)
 		log.Printf("scripts: %d managed, %d third-party hook(s)",
 			len(scripts.Managed), len(scripts.ThirdParty))
-
-		// DCS's own configuration: options.lua, pluginsEnabled.lua, lang.cfg.
-		if dcsCfg, err := dcsdata.LoadConfig(cfg.SavedGames); err != nil {
-			log.Printf("config: unavailable: %v", err)
-		} else if len(dcsCfg.Sections) > 0 {
-			log.Printf("config: %d section(s), %d plugin toggle(s), language %q",
-				len(dcsCfg.Sections), len(dcsCfg.Plugins), dcsCfg.Language)
-			srv.SetDCSConfig(dcsCfg)
-		} else {
-			log.Printf("config: none in %s (optional)", dcsdata.ConfigDir(cfg.SavedGames))
-		}
 	}
 	// The mission's options are recorded for the session description.
 	tcpListener.OnOptions = srv.ApplyMissionOptions

@@ -23,6 +23,12 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Retiré
 
+- **L'onglet Configuration a été retiré.** Il listait les réglages de DCS lus dans
+  `Saved Games\DCS\Config` (groupes d'`options.lua`, bascules de
+  `pluginsEnabled.lua`, langue de l'interface). L'onglet, son store, la route
+  `GET /api/config` et le lecteur de config `internal/dcsdata` qu'il seul utilisait
+  disparaissent, et le bundle passe d'environ 166 Ko à 156 Ko. Le gestionnaire ne lit
+  plus ce dossier.
 - **L'onglet Analyse a été retiré.** Il dessinait une carte de chaleur et les
   trajectoires de vol, plus un tableau d'analyse de sortie par unité, à partir des
   positions enregistrées. L'onglet, son graphique et son store disparaissent
@@ -144,21 +150,6 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
     commandes associables sur le F-16C, lues depuis ses propres métadonnées).
   - La télémétrie du gestionnaire passe sur **UDP 7776** pour cohabiter avec
     DCS-BIOS, qui possède 7778.
-
-- **Un onglet Configuration affiche les réglages de DCS lui-même.** Le gestionnaire
-  lit `Saved Games\DCS\Config` et présente les options du jeu telles que DCS les
-  stocke : les groupes d'`options.lua` (graphismes, difficulté, VR, son, vues,
-  cockpit, divers, plugins) avec leurs clés/valeurs, les **terrains et modules
-  désactivés** d'après `pluginsEnabled.lua` (ce qui explique souvent une carte qui
-  refuse de se charger), la langue de l'interface et le dossier inspecté.
-  - Chaque section se parcourt séparément ; `GET /api/config?section=graphics` en
-    renvoie une, `GET /api/config` le tableau complet.
-  - Les booléens s'affichent `on`/`off` plutôt que `true`/`false`, et une table
-    imbriquée est montrée par son nombre d'éléments, donc rien n'est perdu en
-    silence.
-  - Couvert par un test lisant le vrai dossier `Config` de la machine quand il est
-    présent, un `options.lua` + `pluginsEnabled.lua` synthétiques, l'aide de
-    formatage des valeurs, et les cas vide, filtré et section inconnue de l'API.
 
 - **Un onglet Installation DCS montre ce qui vit du côté du jeu.** Il rapporte les
   mods installés dans `Saved Games\DCS\Mods` et l'état des scripts, pour qu'une

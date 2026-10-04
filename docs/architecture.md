@@ -96,9 +96,10 @@ executable** contains the backend and the interface. If the frontend has not bee
 built, a fallback page is served automatically.
 
 The UI is organised in tabs: **Debriefs**, **Missions**, **Career & statistics**,
-**Airfields** (reference data, frequencies and charts) and the install, config and
-panels tabs. There is no live map and no analysis view any more; the unit telemetry
-is still received and sampled, and it feeds the statistics and the airfields tab.
+**Airfields** (reference data, frequencies and charts) and the install and panels
+tabs. There is no live map, no analysis view and no DCS-configuration view any more;
+the unit telemetry is still received and sampled, and it feeds the statistics and the
+airfields tab.
 
 ## Application window
 

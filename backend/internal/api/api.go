@@ -101,7 +101,6 @@ type Server struct {
 	missions   []dcsdata.MissionFile
 	mods       []dcsdata.InstalledMod
 	scripts    dcsdata.ScriptStatus
-	dcsConfig  dcsdata.DCSConfig
 	panels     *panelservice.Service
 	bios       *dcsbios.Client
 	mappings   *mapping.Store
@@ -161,11 +160,6 @@ func (s *Server) SetMods(mods []dcsdata.InstalledMod) {
 // SetScripts installs the DCS-side script status picture.
 func (s *Server) SetScripts(st dcsdata.ScriptStatus) {
 	s.scripts = st
-}
-
-// SetDCSConfig installs DCS's own configuration read from Saved Games.
-func (s *Server) SetDCSConfig(cfg dcsdata.DCSConfig) {
-	s.dcsConfig = cfg
 }
 
 // Handler returns the HTTP router.
@@ -275,7 +269,6 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/missions", s.handleMissions)
 	mux.HandleFunc("/api/mods", s.handleMods)
 	mux.HandleFunc("/api/scripts", s.handleScripts)
-	mux.HandleFunc("/api/config", s.handleDCSConfig)
 	mux.HandleFunc("/api/panels", s.handlePanels)
 	mux.HandleFunc("/api/dcsbios", s.handleDCSBIOS)
 	mux.HandleFunc("/api/mappings", s.handleMappings)

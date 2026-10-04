@@ -31,6 +31,11 @@ to [semantic versioning](https://semver.org/).
 
 ### Removed
 
+- **The Configuration tab has been removed.** It listed DCS's own settings read
+  from `Saved Games\DCS\Config` (`options.lua` groups, the `pluginsEnabled.lua`
+  toggles, the UI language). The tab, its store, the `GET /api/config` route and the
+  `internal/dcsdata` config reader it alone used are gone, and the bundle dropped
+  from ~166 KB to ~156 KB. The manager no longer reads that folder.
 - **The Analysis tab has been removed.** It drew a heatmap and flight paths, and a
   per-unit sortie table, from the recorded positions. The tab, its plot and its
   store are gone (`AnalyticsPanel.svelte`, `AnalyticsPlot.svelte`, `analytics.js`),
@@ -140,20 +145,6 @@ to [semantic versioning](https://semver.org/).
     F-16C, read from its own metadata).
   - The manager's own telemetry moved to **UDP 7776** so it can run alongside
     DCS-BIOS, which owns 7778.
-
-- **A Configuration tab shows DCS's own settings.** The manager reads
-  `Saved Games\DCS\Config` and lays the game's options out as DCS stores them:
-  the `options.lua` groups (graphics, difficulty, VR, sound, views, cockpit,
-  miscellaneous, plugins) with their key/values, the **disabled terrains and
-  modules** from `pluginsEnabled.lua` (which often explains a map that refuses to
-  load), the UI language and the folder inspected.
-  - Every section can be browsed on its own; `GET /api/config?section=graphics`
-    returns one, `GET /api/config` the whole picture.
-  - Booleans read as `on`/`off` rather than `true`/`false`, and a nested table is
-    shown as its item count, so nothing is silently dropped.
-  - Covered by a test reading the machine's real `Config` folder when present, a
-    synthetic `options.lua` + `pluginsEnabled.lua`, the value-formatting helper,
-    and the API's empty, filtered and unknown-section cases.
 
 - **A DCS install tab shows what lives on the game's side of the fence.** It reports
   the mods installed under `Saved Games\DCS\Mods` and the state of the scripts, so a

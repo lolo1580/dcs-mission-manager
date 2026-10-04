@@ -7,7 +7,6 @@
   import ModulesPanel from './lib/ModulesPanel.svelte';
   import MissionsPanel from './lib/MissionsPanel.svelte';
   import InstallPanel from './lib/InstallPanel.svelte';
-  import ConfigPanel from './lib/ConfigPanel.svelte';
   import PanelsPanel from './lib/PanelsPanel.svelte';
   import { connected, paused, mission, fetchTheatres, connect } from './lib/units.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
@@ -51,7 +50,6 @@
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
       <button class:active={tab === 'modules'} on:click={() => goTo('modules')}>{$t('tab.modules')}</button>
       <button class:active={tab === 'install'} on:click={() => goTo('install')}>{$t('tab.install')}</button>
-      <button class:active={tab === 'config'} on:click={() => goTo('config')}>{$t('tab.config')}</button>
       <button class:active={tab === 'panels'} on:click={() => goTo('panels')}>{$t('tab.panels')}</button>
     </nav>
 
@@ -101,10 +99,6 @@
     {:else if tab === 'install'}
       <div class="session wide">
         <InstallPanel />
-      </div>
-    {:else if tab === 'config'}
-      <div class="session wide">
-        <ConfigPanel />
       </div>
     {:else if tab === 'panels'}
       <div class="session wide">
