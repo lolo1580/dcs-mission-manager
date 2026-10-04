@@ -15,7 +15,7 @@ func TestLoadModulesOnRealInventory(t *testing.T) {
 	if _, err := os.Stat(ModuleInventoryPath(sg)); err != nil {
 		t.Skip("no DCS install on this machine")
 	}
-	inv, err := LoadModules(sg)
+	inv, err := LoadModules(sg, "")
 	if err != nil {
 		t.Fatalf("LoadModules: %v", err)
 	}
@@ -41,6 +41,54 @@ func TestLoadModulesOnRealInventory(t *testing.T) {
 	}
 	t.Logf("inventory: %d modules, %d owned, %d terrains (%d owned)",
 		inv.Total, inv.Owned, terrains, ownedTerrains)
+}
+
+// TestInstalledIsMatchedFromAutoupdate checks the distinction the UI needs: a
+// module can be owned (have="1", bought) without being installed on disk. This
+// machine's Kola and Persian Gulf are exactly that case.
+func TestInstalledIsMatchedFromAutoupdate(t *testing.T) {
+	inv := ModuleInventory{Modules: []Module{
+		{Category: "terrains", ID: "Caucasus", Owned: true, matchKeys: []string{"Caucasus", "CAUCASUS_terrain"}},
+		{Category: "terrains", ID: "Kola", Owned: true, matchKeys: []string{"KOLA_terrain"}},
+		{Category: "moduls", ID: "F-16C", Owned: true, matchKeys: []string{"F-16C"}},
+		{Category: "moduls", ID: "F-14", Owned: true, matchKeys: []string{"HEATBLUR_F-14"}},
+		{Category: "campaigns", ID: "c1", Owned: true},
+	}}
+	inv.markInstalled(map[string]bool{
+		"CAUCASUS_TERRAIN": true,
+		"F-16C":            true,
+	})
+
+	byID := map[string]Module{}
+	for _, m := range inv.Modules {
+		byID[m.ID] = m
+	}
+	if !byID["Caucasus"].Installed {
+		t.Error("Caucasus is in the install list and must be installed")
+	}
+	if byID["Kola"].Installed {
+		t.Error("Kola is owned but absent from the install list, so not installed")
+	}
+	if !byID["F-16C"].Installed {
+		t.Error("F-16C is in the install list and must be installed")
+	}
+	if byID["F-14"].Installed {
+		t.Error("F-14 is owned but absent from the install list, so not installed")
+	}
+	// A campaign is not installable on its own: its state stays unknown.
+	if byID["c1"].InstallKnown {
+		t.Error("a campaign must not claim an install state")
+	}
+	if inv.Installed != 2 {
+		t.Errorf("Installed = %d, want 2", inv.Installed)
+	}
+
+	// Without autoupdate.cfg nothing is known, and nothing is reported installed.
+	unknown := ModuleInventory{Modules: inv.Modules}
+	unknown.markInstalled(nil)
+	if unknown.Installed != 0 {
+		t.Errorf("with no install list, Installed = %d, want 0", unknown.Installed)
+	}
 }
 
 // TestParseModuleInventorySynthetic checks the parser against a hand-written

@@ -69,7 +69,6 @@ var (
 	procCreateEventW  = kernel32.NewProc("CreateEventW")
 	procWaitForSingle = kernel32.NewProc("WaitForSingleObject")
 	procGetOverlapped = kernel32.NewProc("GetOverlappedResult")
-	procResetEvent    = kernel32.NewProc("ResetEvent")
 	procCancelIOEx    = kernel32.NewProc("CancelIoEx")
 )
 
@@ -89,13 +88,6 @@ func (h handle) close() error {
 
 // These mirror the C structs. Sizes and field order matter: they are passed
 // straight to the Win32 API.
-type spDevInfoData struct {
-	cbSize    uint32
-	classGUID windows.GUID
-	devInst   uint32
-	reserved  uintptr
-}
-
 type spDeviceInterfaceData struct {
 	cbSize             uint32
 	interfaceClassGUID windows.GUID

@@ -40,7 +40,7 @@ func TestCareerEndpointReturnsLogbook(t *testing.T) {
 			Name:     "Laurent Keller",
 			Rank:     "Second lieutenant",
 			Squadron: "FlSt17",
-			Aircraft: []dcsdata.AircraftCareer{{Type: "M-2000C", FlightHours: 4069.9}},
+			Aircraft: []dcsdata.AircraftCareer{{Type: "M-2000C", FlightHours: 1.1}},
 		}},
 	})
 
@@ -72,7 +72,7 @@ func TestCareerEndpointReturnsLogbook(t *testing.T) {
 	if p.Rank != "Second lieutenant" || p.Squadron != "FlSt17" {
 		t.Errorf("rank/squadron not serialized as the UI reads them: %+v", p)
 	}
-	if len(p.Aircraft) != 1 || p.Aircraft[0].FlightHours != 4069.9 {
+	if len(p.Aircraft) != 1 || p.Aircraft[0].FlightHours != 1.1 {
 		t.Errorf("aircraft not serialized: %+v", p.Aircraft)
 	}
 }

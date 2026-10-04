@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"dcsmanager/internal/lua"
 	"dcsmanager/internal/luafiles"
 )
 
@@ -482,6 +483,21 @@ func TestEmbeddedPathsAreForwardSlashed(t *testing.T) {
 		if _, err := in.readSource(target.Source); err != nil {
 			t.Errorf("default target %q does not resolve: %v", target.Source, err)
 		}
+	}
+}
+
+// TestEmbeddedConfigIsValidLua parses the embedded dcsmanager.cfg with the same
+// parser the backend and DCS use. The file is loaded via loadfile() on the DCS
+// side and parsed by internal/lua here; a `#` comment (shell/INI style) is a
+// syntax error, so loadfile() rejects the whole chunk and every setting is
+// silently ignored. This test keeps the shipped config parseable.
+func TestEmbeddedConfigIsValidLua(t *testing.T) {
+	raw, ok := luafiles.Get("Config/dcsmanager.cfg")
+	if !ok {
+		t.Fatal("the config should be embedded")
+	}
+	if _, err := lua.Parse(raw); err != nil {
+		t.Fatalf("embedded config is not valid Lua: %v", err)
 	}
 }
 

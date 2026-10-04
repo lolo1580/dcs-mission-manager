@@ -37,8 +37,15 @@ func (s *Server) scopeFromRequest(r *http.Request) stats.Scope {
 	return sc
 }
 
+// statsReady reports whether statistics can be served, and answers the request
+// itself when they cannot.
+//
+// The database can legitimately be absent: DCSMANAGER_DB_ENABLED=false keeps
+// everything in memory. stats.New still returns a service in that case, so the
+// guard must check the database too — otherwise the handlers dereference a nil
+// *db.DB and panic instead of degrading.
 func (s *Server) statsReady(w http.ResponseWriter) bool {
-	if s.stats == nil {
+	if s.stats == nil || s.db == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"enabled": false})
 		return false
 	}

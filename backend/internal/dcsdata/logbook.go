@@ -11,6 +11,11 @@ import (
 )
 
 // AircraftCareer is one airframe's record in the player's logbook.
+//
+// FlightHours, Daytime and Nighttime are in HOURS. DCS stores them in SECONDS
+// despite the field being named "flightHours" (a long-standing DCS quirk: the
+// game counts time in seconds, so a raw value reads as thousands of "hours").
+// The parser converts once, here, so every consumer sees real hours.
 type AircraftCareer struct {
 	// Type is the DCS aircraft type (M-2000C, F-16C_50…), as DCS keys it.
 	Type        string  `json:"type"`
@@ -19,8 +24,8 @@ type AircraftCareer struct {
 	Deaths      int     `json:"deaths"`
 	Ejections   int     `json:"ejections"`
 	Refuelings  int     `json:"refuelings"`
-	Nighttime   int     `json:"nighttime"`
-	Daytime     int     `json:"daytime"`
+	Nighttime   float64 `json:"nighttime"`
+	Daytime     float64 `json:"daytime"`
 	AAKills     int     `json:"aaKills"`
 	AGKills     int     `json:"agKills"`
 	Naval       int     `json:"naval"`
@@ -37,8 +42,10 @@ type PlayerCareer struct {
 	// Awards lists the medal ids DCS recorded for this player.
 	Awards []int `json:"awards,omitempty"`
 	// Aggregate holds the career totals DCS keeps outside the per-aircraft
-	// tables (flightHours, missionsCount, landings, aaKills…), left raw because
-	// DCS's set of keys varies with the module.
+	// tables (missionsCount, landings, aaKills…), left raw because DCS's set of
+	// keys varies with the module. flightHours/daytime/nighttime are converted
+	// from DCS's seconds to hours, like the per-aircraft values, so the payload
+	// never mixes two units.
 	Aggregate map[string]any `json:"aggregate"`
 	// Aircraft is the per-airframe breakdown, sorted by flight hours.
 	Aircraft []AircraftCareer `json:"aircraft"`
@@ -102,6 +109,13 @@ func parseLogbook(root map[string]any) Logbook {
 					career.Aircraft = append(career.Aircraft, parseAircraft(key, sub))
 					continue
 				}
+				// The same DCS quirk applies to the flat totals: flightHours,
+				// daytime and nighttime are seconds. Convert them so the whole
+				// payload is consistently in hours.
+				if key == "flightHours" || key == "daytime" || key == "nighttime" {
+					career.Aggregate[key] = num(value) / 3600
+					continue
+				}
 				career.Aggregate[key] = value
 			}
 		}
@@ -122,15 +136,17 @@ func parseLogbook(root map[string]any) Logbook {
 }
 
 func parseAircraft(typ string, m map[string]any) AircraftCareer {
+	// flightHours, daytime and nighttime are seconds in DCS's file; see the
+	// AircraftCareer doc comment. Everything else is a plain count.
 	return AircraftCareer{
 		Type:        typ,
-		FlightHours: num(m["flightHours"]),
+		FlightHours: num(m["flightHours"]) / 3600,
 		Landings:    int(num(m["landings"])),
 		Deaths:      int(num(m["deaths"])),
 		Ejections:   int(num(m["ejections"])),
 		Refuelings:  int(num(m["refuelings"])),
-		Nighttime:   int(num(m["nighttime"])),
-		Daytime:     int(num(m["daytime"])),
+		Nighttime:   num(m["nighttime"]) / 3600,
+		Daytime:     num(m["daytime"]) / 3600,
 		AAKills:     int(num(m["aaKills"])),
 		AGKills:     int(num(m["agKills"])),
 		Naval:       int(num(m["naval"])),

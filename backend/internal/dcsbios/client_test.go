@@ -11,11 +11,8 @@ import (
 // broadcasting. Joining is the part that fails if the address or the socket
 // options are wrong, and it needs no simulator.
 func TestClientJoinsMulticastAndTimesOut(t *testing.T) {
-	c := New(Options{
-		ReceivePort:       0, // port 0 is refused by the multicast bind; use a free high port
-		InactivityTimeout: 200 * time.Millisecond,
-	}, nil)
-	// Pick a free port by letting the OS pick one, then close and reuse it.
+	// Port 0 is refused by the multicast bind, so pick a free high port by
+	// letting the OS choose one, then close and reuse it.
 	probe, err := net.ListenPacket("udp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -23,7 +20,7 @@ func TestClientJoinsMulticastAndTimesOut(t *testing.T) {
 	port := probe.LocalAddr().(*net.UDPAddr).Port
 	probe.Close()
 
-	c = New(Options{ReceivePort: port, InactivityTimeout: 200 * time.Millisecond}, nil)
+	c := New(Options{ReceivePort: port, InactivityTimeout: 200 * time.Millisecond}, nil)
 	if err := c.Start(); err != nil {
 		t.Fatalf("Start: %v", err)
 	}

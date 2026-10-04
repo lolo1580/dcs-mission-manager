@@ -93,7 +93,6 @@ func Run(onReady func(addr string)) error {
 	}
 
 	log.Printf("dcsmanager %s", Version)
-	log.Printf("dcsmanager %s", Version)
 
 	store := state.New(cfg.UnitTTL, cfg.MaxUnits)
 	classifier := category.New(cfg.CategoriesFile)
@@ -224,12 +223,15 @@ func Run(onReady func(addr string)) error {
 
 	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, tcpListener)
 	// The module inventory comes from DCS's own list, so the UI can show what is
-	// installed and owned rather than a hand-maintained catalogue.
+	// installed and owned rather than a hand-maintained catalogue. "Owned" is the
+	// store's have="1" (bought); whether a module is actually on disk is answered
+	// by the installation itself, autoupdate.cfg at the game root.
 	if cfg.SavedGames != "" {
-		if inv, err := dcsdata.LoadModules(cfg.SavedGames); err != nil {
+		if inv, err := dcsdata.LoadModules(cfg.SavedGames, dcsInstall); err != nil {
 			log.Printf("modules: inventory unavailable: %v", err)
 		} else if inv.Total > 0 {
-			log.Printf("modules: %d entries, %d owned (%s)", inv.Total, inv.Owned, dcsdata.ModuleInventoryPath(cfg.SavedGames))
+			log.Printf("modules: %d entries, %d owned, %d installed on disk (%s)",
+				inv.Total, inv.Owned, inv.Installed, dcsdata.ModuleInventoryPath(cfg.SavedGames))
 			srv.SetModules(inv)
 		} else {
 			log.Printf("modules: none found in %s (optional)", dcsdata.ModuleInventoryPath(cfg.SavedGames))
