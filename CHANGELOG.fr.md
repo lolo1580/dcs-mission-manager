@@ -23,6 +23,14 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Retiré
 
+- **L'onglet Session a été retiré.** Il affichait les joueurs connectés, les
+  événements de jeu en direct et le chat. Le gestionnaire ouvre maintenant sur
+  **Débriefs**, le relevé durable d'un vol. Le backend reçoit et stocke toujours
+  les événements, les joueurs et le chat : ils alimentent les statistiques et les
+  débriefs, donc rien n'est perdu — seule la vue en direct disparaît.
+  `ChatPanel.svelte`, `PlayerPanel.svelte`, `EventPanel.svelte` et les stores de
+  session devenus inutiles ont été supprimés, et le bundle passe d'environ
+  204 Ko à 187 Ko.
 - **Les couches de compatibilité avec nos propres anciennes versions sont parties.**
   Maintenant que le projet démarre à neuf, le code qui n'existait que pour lire des
   artefacts produits par une ancienne version de chez nous est du poids mort :
@@ -59,6 +67,24 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un logo.** L'en-tête affiche désormais l'emblème DCS Manager à côté du titre,
+  et le README s'ouvre dessus. L'art source vit dans `Logo/` ; les copies prêtes
+  pour le build sont `frontend/src/assets/logo.png` (l'emblème transparent,
+  128 px, redimensionné et embarqué dans l'UI) et `docs/logo.png` (l'emblème à
+  fond sombre pour le README). Les originaux font 1,2 Mo chacun : ils ne sont
+  jamais livrés ni servis directement, et `Logo/` est ignoré par git (seuls les
+  dérivés optimisés sont versionnés).
+- **L'exécutable porte désormais une icône et les métadonnées de version.**
+  Windows tire l'icône d'un programme (et le FileDescription / ProductName / la
+  version affichés dans la barre des tâches, Alt-Tab et les Propriétés du
+  fichier) d'un objet de ressources lié au binaire.
+  `backend/cmd/dcsmanager/rsrc_windows_amd64.syso` le fournit : l'emblème en
+  16/32/48/64/128/256 px plus le bloc de version, donc `dcsmanager.exe` ressemble
+  à une application et non à un binaire générique. Le `.syso` est versionné, donc
+  un `go build` ordinaire l'embarque sans outil supplémentaire ; régénère-le avec
+  `.\build.ps1 -Target winres` (ou `make winres`) après un changement d'icône ou
+  de `winres/winres.json`, ce qui demande
+  `go install github.com/tc-hib/go-winres@latest`.
 - **Le volet matériel de cockpit du DCS Panel Manager fait désormais partie du
   gestionnaire.** Un Switch Panel PZ55 et un Multi Panel PZ70 de Logitech/Saitek
   peuvent être pilotés directement, et DCS-BIOS est parlé plutôt que réimplémenté :
@@ -225,8 +251,140 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   - Le câblage du manager est passé dans `internal/app`, pour que la fenêtre et le
     mode sans interface partagent une seule implémentation.
 
+- **L'Allemagne Guerre froide a désormais son jeu de données embarqué.** Le
+  manager lit déjà les aérodromes de chaque carte installée depuis les fichiers de
+  DCS, et l'Allemagne Guerre froide ne fait pas exception (119 aérodromes, avec
+  Tower/TACAN/ILS/NDB). Ce qui manquait, c'était le repli hors ligne : sans DCS
+  trouvé, le binaire retombait sur le seul jeu du Caucase.
+  `internal/aerodrome/data/germanycw.json` couvre maintenant ce théâtre aussi,
+  pour que l'onglet Aérodromes reste utile sans installation.
+  - Le fichier est **généré depuis DCS**, pas saisi à la main :
+    `go run ./cmd/gen-aerodrome <Mods/terrains> <Théâtre> <sortie.json>` extrait
+    `radio.lua` et `beacons.lua` et écrit le jeu pour n'importe quel théâtre.
+  - DCS donne une fréquence Tower à chaque aérodrome mais une position seulement
+    quand une aide à la navigation existe : **77 des 119 aérodromes ont des
+    coordonnées, 42 n'en ont pas.** L'interface affiche maintenant « non
+    positionné par DCS » au lieu d'écrire `0.0000°` comme si c'était un lieu, et
+    une coalition vide se lit « inconnue ».
+  - Un test dédié verrouille le jeu (119 aérodromes, le TACAN et la position de
+    Francfort, 70+ plaçables) ; le test d'intégrité n'exige plus de coordonnées
+    pour chaque aérodrome, ce que DCS ne peut pas fournir.
+
 ### Corrigé
 
+- **Les endpoints de statistiques paniquaient sans base de données.** Avec la
+  persistance désactivée (`DCSMANAGER_DB_ENABLED=false`, le mode des outils de
+  test), `stats.New` renvoie un service non nul mais dont la base est nulle : le
+  garde ne testait que `stats == nil`, jamais la base, et chaque route de stats
+  déréférençait un `*db.DB` nil. Elles répondent maintenant `{"enabled": false}`
+  en 200, et l'onglet affiche un message clair au lieu d'un tableau vide ou d'une
+  erreur. Couvert par un test sur les cinq routes.
+- **Les heures de vol de la Carrière étaient complètement faussées.** L'onglet
+  Carrière affichait des milliers d'heures pour quelques vols (5 477 h pour
+  6 sorties), parce que DCS stocke les champs `flightHours`, `daytime` et
+  `nighttime` en **secondes** malgré leur nom — un travers bien connu de DCS (le
+  jeu compte le temps en secondes, donc une valeur brute se lit comme des
+  milliers d'« heures »). Le manager affichait le nombre brut comme s'il
+  s'agissait d'heures.
+  - Le parseur du logbook divise désormais ces trois champs par 3 600, pour les
+    lignes par appareil comme pour les totaux de carrière, donc tout le payload
+    est cohérent en heures. Le même joueur affiche maintenant **1,5 h**
+    (M-2000C 1,1 h), ce qui correspond aux vols.
+  - Un test sur le `logbook.lua` réel de la machine rejette tout appareil
+    au-dessus de 5 000 h (signe d'un reste en secondes) et vérifie que le total
+    égale la somme des appareils ; le document synthétique utilise lui aussi des
+    secondes.
+- **L'onglet Modules confondait « possédé » et « installé ».** Le
+  `MissionEditor/modules.lua` de DCS est le catalogue du magasin : `have="1"`
+  signifie que le joueur a *acheté* le module, pas qu'il est sur le disque. Une
+  carte achetée puis **désinstallée pour libérer de la place garde `have="1"`
+  indéfiniment**, donc l'onglet continuait de l'afficher comme installée — Kola et
+  le Golfe Persique, par exemple, après les avoir désinstallés pour faire de la
+  place à l'Allemagne Guerre froide.
+  - Le manager lit désormais aussi **`autoupdate.cfg`** à la racine du jeu, la
+    liste par DCS des modules présents dans l'installation (`GERMANYCW_terrain`,
+    `CAUCASUS_terrain`…), et apparie chaque module sur tous ses identifiants
+    (`modulId`, `update_id`, `code`). Les deux notions sont affichées séparément :
+    **Possédé** et **Installé**.
+  - Seules les unités de contenu (terrains, appareils) portent un état
+    d'installation ; une campagne ou un lot vient avec un module et affiche
+    « n/d » plutôt qu'une valeur devinée. Quand aucune installation n'est trouvée,
+    l'état reste inconnu au lieu d'être supposé.
+  - Un nouveau filtre **« Installés uniquement »** rejoint « Possédés
+    uniquement » ; `/api/modules?installed=1` le sert. Couvert par des tests
+    utilisant les fichiers de cette machine.
+- **Passe de recherche de bugs sur le backend, les scripts Lua et l'interface.**
+  Les trouvailles les plus lourdes, toutes vérifiées contre la doc API réellement
+  installée de DCS (`API/Sim_ControlAPI.md`) ou les fichiers sur disque :
+  - **Chaque message de chat en jeu était perdu.** DCS passe à `onChatMessage`
+    un id joueur **numérique** comme `from`, or le backend décode `from` en
+    chaîne : `json.Unmarshal` échouait sur toute la ligne et le message était
+    jeté en silence (vue live et base). Le hook résout maintenant le nom du
+    joueur (repli sur l'id en texte), donc le chat n'est plus perdu.
+  - **Le fichier de configuration n'était jamais appliqué.** `dcsmanager.cfg`
+    commençait par des commentaires `#`, or il est chargé par `loadfile()` et
+    doit être du Lua valide ; `#` est une erreur de syntaxe, donc tout le bloc
+    était rejeté et **tous** les réglages — dont `dcsmanager_host` et les ports —
+    étaient ignorés en silence. Les commentaires sont désormais `--`,
+    `tools/check-lua.mjs` parse la config (un test la verrouille), et la copie
+    embarquée a été régénérée.
+  - **Tous les minuteurs périodiques du hook étaient bloqués.**
+    `LoGetModelTime` n'est pas un global dans l'état Lua des Hooks (l'API export
+    vit dans le namespace `Export.`), donc `t` valait toujours 0 et les minuteurs
+    « joueurs », « types de slots » et « lecture des commandes backend » ne se
+    déclenchaient jamais : `POST /api/chat` ne pouvait pas atteindre DCS. Le hook
+    appelle maintenant `Export.LoGetModelTime`.
+  - **Les stats d'armes, de victimes et de types de tueurs étaient vides.**
+    `onGameEvent` était déclaré avec quatre paramètres, mais DCS en passe jusqu'à
+    sept (`kill` = id/type/camp du tueur, id/type/camp de la victime, arme). La
+    fin — dont le nom de l'arme — était perdue. Tous les arguments sont
+    maintenant transmis.
+  - **Le théâtre de la mission n'était jamais envoyé,** donc chaque mission était
+    enregistrée comme « Caucasus » quelle que soit la carte. Le hook le lit
+    désormais via `Sim.getCurrentMission()`.
+  - **Le chat du canal de commandes n'atteignait que la coalition du serveur.**
+    `net.send_chat` exige `(message, true)` pour diffuser ; sans le second
+    argument, c'est limité au camp.
+  - **Les cartes aéronautiques étaient inaccessibles.** Rien ne sélectionnait les
+    cartes d'un aérodrome ni n'ouvrait la visionneuse : toute la fonctionnalité
+    était du code mort. Le volet de détail charge maintenant les cartes à la
+    sélection et les ouvre dans la visionneuse.
+  - **L'extraction TACAN/VOR embarquée pouvait garder la mauvaise aide.** Le VOR
+    d'un aérodrome était écrasé par un `world_*` rattaché par nom ; il garde
+    désormais le premier (celui de l'aérodrome).
+  - **Courses UI et données périmées :** sélectionner un débrief, changer la
+    portée des stats ou la source de la heatmap pouvait faire arriver une
+    ancienne réponse en dernier et afficher les mauvaises données ; les réponses
+    périmées sont maintenant écartées. Changer de théâtre ne garde plus
+    l'aérodrome de la carte précédente sélectionné, « Proches de moi » rafraîchit
+    le badge de source, un statut HTTP en erreur remonte comme erreur au lieu
+    d'un résultat vide, et la substitution i18n ne casse plus les valeurs
+    contenant `$&`.
+  - **Les outils de test plantaient sur un mauvais argument.** `node
+    send-telemetry.mjs host abc` levait un `ERR_SOCKET_BAD_PORT` non rattrapé ;
+    un port ou une durée invalide est désormais refusé avec un message clair, et
+    les erreurs UDP sont gérées.
+  - Suppression de deux déclarations mortes signalées par staticcheck ; un test
+    ne contient plus d'affectation « valeur jamais utilisée ». `staticcheck ./...`
+    et `go vet ./...` sont maintenant propres.
+- **Deux sortes de TACAN manquaient dans les données d'aérodrome.** Les deux ont
+  été trouvées sur l'Allemagne Guerre froide, et les deux faisaient disparaître
+  le TACAN silencieusement :
+  - DCS livre deux variantes de TACAN : `BEACON_TYPE_TACAN` (souvent couplé à un
+    VOR) et `BEACON_TYPE_AIRPORT_TACAN`, l'équipement propre à l'aérodrome. Seul
+    le premier était géré, donc **Nordholz (118X NDO)** perdait son TACAN, et
+    était même affiché comme un NDB car l'entrée non reconnue matchait un cas de
+    repli.
+  - Certaines aides sont modélisées comme une balise `world_*` **sans id
+    d'aérodrome**, qui nomme l'aérodrome dans `display_name`. Le lecteur de
+    balises écartait toute entrée `world_*`, donc les VORTAC de **Hamburg
+    (78X HAM)** et **Fulda (58X FUL)** n'atteignaient jamais leur aérodrome. Une
+    balise `world_*` **nommée** est désormais conservée et rattachée à
+    l'aérodrome du même nom ; une balise sans nom reste ignorée.
+  - L'Allemagne Guerre froide compte maintenant **22** aérodromes avec TACAN au
+    lieu de 19, et le jeu embarqué a été régénéré. Le Caucase est inchangé
+    (6 TACAN, 5 VOR, 4 RSBN) ; couvert par un test qui soumet les deux cas à
+    l'extracteur.
 - **La fenêtre native pouvait faire planter tout le manager au démarrage.** Le
   composant WebView2, ses objets COM et sa boucle de messages doivent vivre sur
   **un seul** thread système, or la fenêtre était créée depuis une goroutine que

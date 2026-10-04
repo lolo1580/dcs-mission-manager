@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/logo.png" alt="DCS Manager" width="200" />
+</div>
+
 # DCS Manager
 
 🇬🇧 English | [🇫🇷 Français](README.fr.md)
@@ -27,15 +31,13 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 
 | Feature | Status | Details |
 |---|---|---|
-| Events & players | ✅ Phase 2 | Kills, crashes, chat, players, SQLite history |
 | Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
-| Server control | ✅ Phase 2+ | Send a chat message into DCS (command channel) |
-| Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission) |
+| Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission), merged with the logbook in one **Career & statistics** tab |
 | Analytical maps & sortie | ✅ Phase 4 bis | Heatmap and flight-path plot, sortie analysis, ownship telemetry |
-| Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **101 airfields listed, 69 mappable** across 5 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts |
+| Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **220 airfields listed, 146 mappable** across 6 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts. A bundled dataset covers Caucasus and Cold War Germany when DCS cannot be read |
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
-| Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory |
-| Career | ✅ New | The player's logbook: rank, squadron, awards, hours and kills per airframe |
+| Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
+| Career | ✅ New | The player's logbook: rank, squadron, awards, hours and kills per airframe — shown atop the statistics |
 | Mission library | ✅ New | The `.miz` in Saved Games: theatre, date, weather, size |
 | DCS install | ✅ New | Installed mods, script state, shared `Export.lua` |
 | Configuration | ✅ New | DCS's own options: graphics, difficulty, VR, disabled terrains |
@@ -43,8 +45,8 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still
 > received and sampled: it feeds the statistics, the heatmaps and the airfields
-> tab (nearest field). The manager is now session-, debrief-, stats-, analysis-
-> and airfields-oriented.
+> tab (nearest field). The manager is now debrief-, stats-, analysis- and
+> airfields-oriented.
 
 ### Advanced statistics (planned)
 
@@ -147,8 +149,8 @@ Copy the files from `dcs-lua/` into your Saved Games folder — see
 
 ### 3. Launch DCS and a mission
 
-The manager picks the session up: players, events and chat appear live, and each
-mission is recorded for the debriefs and the statistics.
+The manager picks the session up: events and players are recorded, and each
+mission is saved for the debriefs and the statistics.
 
 ---
 
@@ -282,7 +284,7 @@ DCS Manager/
 ├─ README.fr.md              # French
 ├─ CHANGELOG.md / .fr.md
 ├─ VERSION
-├─ Makefile / build.ps1       # build commands
+├─ Makefile / build.ps1       # build commands (winres target regenerates the icon)
 ├─ install-dcs.ps1           # installs the Lua scripts into Saved Games
 ├─ dcs-lua/                  # scripts to install on the DCS side
 │   ├─ Config/dcsmanager.cfg      # configuration template
@@ -327,7 +329,7 @@ DCS Manager/
 ## Roadmap
 
 - [x] **Phase 0 — PoC**: `Export.lua` (player position) → Go → UI
-- [x] **Phase 2 — Events & players**: `onGameEvent`, chat, `net.get_stat`, SQLite history
+- [x] **Phase 2 — Events & players**: `onGameEvent`, `net.get_stat`, SQLite history (the Session tab is now removed; events and players are still recorded for the stats and the debriefs)
 - [x] **Phase 3 — Debriefings**: network transfer of `debrief.log`, Lua parser, history
 - [x] **Phase 4 — Advanced stats**: overview, pilots, weapons, engines, balance, network
 - [x] **Phase 4 bis — Analytical maps & sortie**: heatmaps, trails, telemetry

@@ -30,6 +30,12 @@
 /maps_dcs/*
 !/maps_dcs/README.md
 
+# Original logo sources (two ~1.2 MB PNGs). Kept locally; the optimized
+# derivatives actually shipped are committed:
+#   frontend/src/assets/logo.png  (transparent emblem, for the UI header)
+#   docs/logo.png                 (dark emblem, for the README)
+/Logo/
+
 # Editor / OS
 .vscode/
 .idea/

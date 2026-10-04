@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/logo.png" alt="DCS Manager" width="200" />
+</div>
+
 # DCS Manager
 
 [🇬🇧 English](README.md) | 🇫🇷 Français
@@ -34,15 +38,13 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 
 | Fonction | État | Détail |
 |---|---|---|
-| Événements & joueurs | ✅ Phase 2 | Kills, crashes, chat, joueurs, historique SQLite |
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
-| Contrôle serveur | ✅ Phase 2+ | Envoi d'un message de chat dans DCS (canal de commandes) |
-| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission) |
+| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission), fusionnés avec le logbook dans un onglet **Carrière & statistiques** |
 | Cartes analytiques & sortie | ✅ Phase 4 bis | Heatmap et tracés de vol, analyse de sortie, télémétrie ownship |
-| Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **101 aérodromes listés, 69 plaçables** sur 5 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes |
+| Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **220 aérodromes listés, 146 plaçables** sur 6 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes. Un jeu embarqué couvre le Caucase et l'Allemagne Guerre froide si DCS est introuvable |
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
-| Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS |
-| Carrière | ✅ Nouveau | Le logbook du joueur : grade, escadrille, décorations, heures et kills par appareil |
+| Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
+| Carrière | ✅ Nouveau | Le logbook du joueur : grade, escadrille, décorations, heures et kills par appareil — affiché au-dessus des statistiques |
 | Bibliothèque de missions | ✅ Nouveau | Les `.miz` de Saved Games : théâtre, date, météo, taille |
 | Installation DCS | ✅ Nouveau | Mods installés, état des scripts, `Export.lua` partagé |
 | Configuration | ✅ Nouveau | Les options de DCS : graphismes, difficulté, VR, terrains désactivés |
@@ -51,8 +53,7 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
 > est toujours reçue et échantillonnée : elle alimente les statistiques, les heatmaps
 > et l'onglet Aérodromes (aérodrome le plus proche). Le gestionnaire s'axe désormais
-> sur la session, les débriefs, les statistiques, l'analyse et les aérodromes.
-
+> sur les débriefs, les statistiques, l'analyse et les aérodromes.
 ### Statistiques avancées (prévues)
 
 - **Fiche pilote & carrière** — kills/morts/KD, éjections, crashes, temps de vol, par **UCID**
@@ -154,9 +155,9 @@ que de `Export.lua` et de `Config/dcsmanager.cfg`.
 
 ### 3. Lancer DCS et une mission
 
-Le gestionnaire prend la session en compte : joueurs, événements et chat
-apparaissent en direct, et chaque mission est enregistrée pour les débriefs et
-les statistiques.
+Le gestionnaire prend la session en compte : les événements et les joueurs sont
+enregistrés, et chaque mission est sauvegardée pour les débriefs et les
+statistiques.
 
 ---
 
@@ -292,7 +293,7 @@ DCS Manager/
 ├─ README.md
 ├─ CHANGELOG.md
 ├─ VERSION
-├─ Makefile / build.ps1       # commandes de build
+├─ Makefile / build.ps1       # commandes de build (cible winres pour régénérer l'icône)
 ├─ install-dcs.ps1           # installe les scripts Lua dans Saved Games
 ├─ dcs-lua/                  # scripts à installer côté DCS
 │   ├─ Config/dcsmanager.cfg      # modèle de configuration
@@ -337,7 +338,7 @@ DCS Manager/
 ## Roadmap
 
 - [x] **Phase 0 — PoC** : `Export.lua` (position joueur) → Go → UI
-- [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, chat, `net.get_stat`, historique SQLite
+- [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, `net.get_stat`, historique SQLite (l'onglet Session est retiré ; les événements et les joueurs restent enregistrés pour les stats et les débriefs)
 - [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
 - [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
 - [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie

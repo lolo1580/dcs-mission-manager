@@ -2,7 +2,7 @@
 
 VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 
-.PHONY: help frontend backend build run install test clean
+.PHONY: help frontend backend build run install test winres clean
 
 help: ## Show this help
 	@echo "Targets:"
@@ -12,6 +12,7 @@ help: ## Show this help
 	@echo "  run             Run the backend from source"
 	@echo "  install         Build everything then install the Lua scripts into DCS"
 	@echo "  test            Run Go tests"
+	@echo "  winres          Regenerate the Windows icon/version resources (.syso)"
 	@echo "  clean           Remove build artifacts"
 
 frontend: ## Build the web UI
@@ -30,6 +31,9 @@ install: build ## Build then install the Lua scripts into DCS
 
 test: ## Run Go tests
 	cd backend && go test ./...
+
+winres: ## Regenerate the Windows resources embedded in the exe
+	cd backend/cmd/dcsmanager && go-winres make --arch amd64 --file-version $(VERSION) --product-version $(VERSION)
 
 clean: ## Remove build artifacts
 	rm -rf dcsmanager dcsmanager.exe frontend/dist backend/internal/api/dist/assets backend/internal/api/dist/index.html

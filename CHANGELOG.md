@@ -11,6 +11,14 @@ to [semantic versioning](https://semver.org/).
 
 ### Changed
 
+- **Statistics and Career are now one tab, "Career & statistics".** The two
+  answer different questions — "what does DCS say I have done?" (the logbook in
+  `MissionEditor/logbook.lua`: rank, squadron, awards, hours, per-airframe kills)
+  and "what did the manager record?" (the aggregates built from its own sessions:
+  pilots, weapons, airframes, balance, network) — so they are stacked rather than
+  blended, the logbook on top and the statistics below, under a single Refresh
+  and a single scroll. `StatsPanel.svelte` was merged into `CareerPanel.svelte`;
+  the separate Career tab is gone.
 - **The project is renamed to DCS Manager.** It outgrew the mission-only scope,
   so the name, the binary and every identifier that carried the old one changed:
   `dcsmm.exe` → `dcsmanager.exe`, the Go module `dcsmm` → `dcsmanager`, the CLI
@@ -23,6 +31,13 @@ to [semantic versioning](https://semver.org/).
 
 ### Removed
 
+- **The Session tab has been removed.** It showed the connected players, the live
+  game events and the chat. The manager now opens on **Debriefs**, the durable
+  record of a flight. The backend still receives and stores events, players and
+  chat: they feed the statistics and the debriefs, so nothing is lost — only the
+  live view is gone. `ChatPanel.svelte`, `PlayerPanel.svelte`,
+  `EventPanel.svelte` and the now-unused session stores were deleted, and the
+  bundle dropped from ~204 KB to ~187 KB.
 - **The compatibility shims for our own former versions are gone.** Now that the
   project starts fresh, code that only existed to read artefacts an older build of
   ours had produced is dead weight:
@@ -36,9 +51,9 @@ to [semantic versioning](https://semver.org/).
   - What is kept is **robustness against external input**, not against our past: a
     malformed DCS file, an unreadable archive or a hand-edited `options.lua` still
     degrade quietly, and the additive DB migrations still run.
-- **The live map has been removed.** The manager now focuses on the session
-  (players, events, chat), the debriefs, the statistics, the analysis and the
-  airfields. Everything that only existed to serve the map went with it: the map
+- **The live map has been removed.** The manager now focuses on the debriefs,
+  the statistics, the analysis and the airfields. Everything that only existed to
+  serve the map went with it: the map
   view and its filters, the basemaps (satellite, relief, road, aeronautical,
   dark), the imported DCS F10 imagery (MBTiles/image/tile-set importers and the
   `tiles/` folder), the DCS terrain vectors (`vectors/`), the map extent outline,
@@ -56,6 +71,22 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **A logo.** The header now shows the DCS Manager emblem beside the title, and
+  the README opens on it. The source art lives in `Logo/`; build-friendly copies
+  are `frontend/src/assets/logo.png` (the transparent emblem, 128 px, resized and
+  bundled into the UI) and `docs/logo.png` (the dark-background emblem for the
+  README). The originals are 1.2 MB each, so they are never shipped or served
+  directly, and `Logo/` is git-ignored (only the optimized derivatives are
+  committed).
+- **The executable now carries an icon and version metadata.** Windows takes a
+  program's icon (and the FileDescription / ProductName / version shown in the
+  taskbar, Alt-Tab and the file's Properties) from a resource object linked into
+  the binary. `backend/cmd/dcsmanager/rsrc_windows_amd64.syso` provides it: the
+  emblem at 16/32/48/64/128/256 px plus the version block, so `dcsmanager.exe`
+  looks like an application rather than a generic binary. The `.syso` is
+  committed, so an ordinary `go build` embeds it with no extra tool; regenerate
+  it with `.\build.ps1 -Target winres` (or `make winres`) after changing the icon
+  or `winres/winres.json`, which needs `go install github.com/tc-hib/go-winres@latest`.
 - **The cockpit hardware side of the DCS Panel Manager is now part of the
   manager.** A Logitech/Saitek PZ55 Switch Panel and PZ70 Multi Panel can be
   driven directly, and DCS-BIOS is spoken rather than reimplemented, so a cockpit
@@ -211,8 +242,116 @@ to [semantic versioning](https://semver.org/).
   - The manager's wiring moved to `internal/app` so the window and the headless
     mode share one implementation and cannot drift apart.
 
+- **Cold War Germany now ships a bundled airfield dataset.** The manager already
+  reads every installed map's airfields from DCS's own files, and Cold War
+  Germany is no exception (119 fields, with Tower/TACAN/ILS/NDB). What was
+  missing was the offline fallback: with no DCS found, the binary fell back to
+  the Caucasus dataset alone. `internal/aerodrome/data/germanycw.json` now covers
+  this theatre too, so the Airfields tab stays useful without an installation.
+  - The file is **generated from DCS**, not typed by hand:
+    `go run ./cmd/gen-aerodrome <Mods/terrains> <Theatre> <out.json>` extracts
+    `radio.lua` and `beacons.lua` and writes the dataset for any theatre.
+  - DCS gives every field a Tower frequency but a position only when a navigation
+    aid exists, so **77 of the 119 fields carry coordinates and 42 do not.** The
+    UI now says "not positioned by DCS" instead of rendering `0.0000°` as if it
+    were a location, and an empty coalition reads "unknown".
+  - A dedicated test locks the dataset in (119 fields, Frankfurt's TACAN and
+    position, 70+ placed); the integrity test no longer demands coordinates from
+    every field, which DCS cannot provide.
+
 ### Fixed
 
+- **Career flight hours were wildly inflated.** The Career tab showed thousands
+  of hours for a handful of flights (5 477 h for 6 sorties), because DCS stores
+  the `flightHours`, `daytime` and `nighttime` fields in **seconds** despite
+  their name — a well-known DCS quirk (the game counts time in seconds, so a raw
+  value reads as thousands of "hours"). The manager displayed the raw number as
+  if it were hours.
+  - The logbook parser now divides those three fields by 3 600, for the
+    per-airframe rows and the flat career totals alike, so the whole payload is
+    consistently in hours. The same player now reads **1.5 h** (M-2000C 1.1 h),
+    which matches the flights.
+  - A test on the machine's real `logbook.lua` rejects any single airframe above
+    5 000 h (a tell-tale of unconverted seconds) and checks the total equals the
+    sum of the airframes; the synthetic fixture now uses seconds too.
+- **The Modules tab confused "owned" with "installed".** DCS's
+  `MissionEditor/modules.lua` is the store catalogue: its `have="1"` means the
+  player *bought* the module, not that it is present on disk. A map purchased and
+  then **uninstalled to free space keeps `have="1"` forever**, so the tab kept
+  showing it as installed — Kola and the Persian Gulf, for instance, after
+  uninstalling them to make room for Cold War Germany.
+  - The manager now also reads **`autoupdate.cfg`** at the game root, DCS's own
+    list of the modules present in the installation (`GERMANYCW_terrain`,
+    `CAUCASUS_terrain`…), and matches each module on all of its identifiers
+    (`modulId`, `update_id`, `code`). The two facts are shown separately:
+    **Owned** and **Installed**.
+  - Only content units (terrains, aircraft) carry an install state; a campaign or
+    a bundle ships with a module and shows "n/a" rather than a guessed value. When
+    no installation can be found, the state is left unknown instead of assumed.
+  - A new **"Installed only"** filter joins "Owned only"; `/api/modules?installed=1`
+    backs it. Covered by tests using this machine's own files.
+- **A bug hunt across the backend, the Lua scripts and the UI.** The most
+  consequential findings, all verified against DCS's own installed API
+  documentation (`API/Sim_ControlAPI.md`) or the real files on disk:
+  - **Every in-game chat message was dropped.** DCS passes `onChatMessage` a
+    *numeric* player id as `from`, but the backend decodes `from` as a string:
+    `json.Unmarshal` failed on the whole line and the message was discarded in
+    silence (live view and database). The hook now resolves the player's name
+    (falling back to the id as text), so chat is never lost.
+  - **The config file was never applied.** `dcsmanager.cfg` began with `#`
+    comments, but it is loaded with `loadfile()` and must be valid Lua; `#` is a
+    syntax error, so the whole chunk was rejected and *every* setting —
+    including `dcsmanager_host` and the ports — was silently ignored. Comments
+    are now `--`, `tools/check-lua.mjs` parses the config (a test locks it in),
+    and the embedded copy was regenerated.
+  - **Every periodic timer in the hook was stuck.** `LoGetModelTime` is not a
+    global in the Hooks Lua state (the export API lives in the `Export.`
+    namespace), so `t` was always 0 and the "players", "slot types" and
+    "read backend commands" timers never fired: `POST /api/chat` could not reach
+    DCS. The hook now calls `Export.LoGetModelTime`.
+  - **Weapon, victim and killer-type statistics were empty.** `onGameEvent` was
+    declared with four parameters, but DCS passes up to seven
+    (`kill` = killer ID/type/side, victim ID/type/side, weapon). The tail —
+    including the weapon name — was dropped. All arguments are now forwarded.
+  - **The mission's theatre was never sent,** so every mission was recorded as
+    "Caucasus" regardless of the map. The hook now reads it from
+    `Sim.getCurrentMission()`.
+  - **The command-channel chat only reached the server's own coalition.**
+    `net.send_chat` needs `(message, true)` to broadcast; without the second
+    argument it is side-limited.
+  - **The airframe charts were unreachable.** Nothing selected an airfield's
+    charts or opened the viewer, so the whole chart feature was dead UI. The
+    detail pane now loads the charts on selection and opens them in the viewer.
+  - **The bundled TACAN/VOR extraction could keep the wrong aid.** A field's VOR
+    was overwritten by a `world_*` one attached by name; it now keeps the first
+    (the field's own).
+  - **UI races and stale data:** selecting a debrief, switching the stats scope
+    or the heatmap source could land an older response last and show the wrong
+    data; these now drop stale responses. Changing theatre no longer keeps the
+    previous map's airfield selected, "Near me" refreshes the data-source badge,
+    missing HTTP statuses surface as errors instead of empty results, and the
+    i18n substitution no longer mangles values containing `$&`.
+  - **The test tools crashed on a bad argument.** `node send-telemetry.mjs host
+    abc` threw an uncaught `ERR_SOCKET_BAD_PORT`; an invalid port or duration is
+    now rejected with a clear message, and UDP errors are handled.
+  - Removed two dead declarations flagged by staticcheck; a test no longer
+    contains a "this value is never used" assignment. `staticcheck ./...` and
+    `go vet ./...` are now clean.
+- **Two kinds of TACAN were missing from the airfield data.** Both were found on
+  Cold War Germany, and both dropped the field's TACAN silently:
+  - DCS ships two TACAN flavours — `BEACON_TYPE_TACAN` (often paired with a VOR)
+    and `BEACON_TYPE_AIRPORT_TACAN`, the field's own facility. Only the first
+    was handled, so **Nordholz (118X NDO)** lost its TACAN, and was even shown as
+    an NDB because the unrecognised entry fell into a fallback.
+  - Some aids are modelled as a `world_*` beacon with **no airfield id**, naming
+    the field in `display_name` instead. The beacon reader discarded every
+    `world_*` entry, so the VORTACs of **Hamburg (78X HAM)** and **Fulda
+    (58X FUL)** never reached their airfield. A *named* world beacon is now kept
+    and attached to the airfield of the same name; a nameless one is still
+    ignored.
+  - Cold War Germany now reports **22 TACAN** airfields instead of 19, and the
+    bundled dataset was regenerated. The Caucasus is unchanged (6 TACAN, 5 VOR,
+    4 RSBN); covered by a test that feeds both quirks to the extractor.
 - **The native window could crash the whole manager on startup.** The WebView2
   control, its COM objects and its message loop all have to live on one OS
   thread, but the window was created from a goroutine Go is free to migrate
@@ -220,6 +359,13 @@ to [semantic versioning](https://semver.org/).
   dereferenced a half-initialised object, crashing the process with an access
   violation. The window goroutine is now locked to its thread
   (`runtime.LockOSThread`). Verified over five consecutive launches.
+- **The statistics endpoints panicked when there was no database.** With
+  persistence off (`DCSMANAGER_DB_ENABLED=false`, the test-tool mode),
+  `stats.New` still returns a service but with a nil database, and the guard
+  only checked `stats == nil` — never the database — so every stats route
+  dereferenced a nil `*db.DB`. They now answer `{"enabled": false}` with a 200,
+  and the tab shows a clear message instead of empty tables or an error. Covered
+  by a test over all five routes.
 - **`SouthEastAsia` was offered as a theatre, but DCS has no such terrain.** The
   theatre list carried an entry that is not one of the 14 terrains DCS sells, so
   the UI advertised a map that cannot be flown. The list is now exactly DCS's own
