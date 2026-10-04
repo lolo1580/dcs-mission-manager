@@ -29,6 +29,9 @@ type Service struct {
 	stop    chan struct{}
 	done    chan struct{}
 	started bool
+	// unsupported is set once the HID layer reports the platform has no support,
+	// so the scanner stops rather than erroring on every tick.
+	unsupported bool
 }
 
 // readWriter is the part of a HID device the service uses. It is an interface so
@@ -158,8 +161,25 @@ func (s *Service) loop() {
 // scan reconciles the connected panels with what the HID layer reports: open the
 // new ones, close the gone ones.
 func (s *Service) scan() {
+	s.mu.Lock()
+	unsupported := s.unsupported
+	s.mu.Unlock()
+	if unsupported {
+		return
+	}
+
 	found, err := s.enumerate()
 	if err != nil {
+		// A platform without Windows HID support (the stub) is not a failure:
+		// there are simply no panels to watch. Reporting it as an error every
+		// poll tick would spam the UI with "hid: only supported on Windows".
+		// Give up scanning entirely in that case.
+		if errors.Is(err, hid.ErrUnsupported) {
+			s.mu.Lock()
+			s.unsupported = true
+			s.mu.Unlock()
+			return
+		}
 		s.publish(Event{Kind: KindError, At: time.Now(), Err: err})
 		return
 	}

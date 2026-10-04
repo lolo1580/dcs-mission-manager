@@ -337,6 +337,14 @@ to [semantic versioning](https://semver.org/).
   - Removed two dead declarations flagged by staticcheck; a test no longer
     contains a "this value is never used" assignment. `staticcheck ./...` and
     `go vet ./...` are now clean.
+- **A non-Windows build spammed panel errors forever.** `hid.Enumerate` returns
+  `ErrUnsupported` on a platform without Windows HID support, and the panel
+  service published it as an error event on every poll tick — the UI would fill
+  with "hid: only supported on Windows". The scanner now treats that signal as
+  "no panels here", stops scanning, and never raises it as an error. This is what
+  made the Linux `go test -race ./...` fail: `TestServiceStartsAndStops` asserted
+  no error events. Covered by a platform-independent test that injects the
+  unsupported error.
 - **Two kinds of TACAN were missing from the airfield data.** Both were found on
   Cold War Germany, and both dropped the field's TACAN silently:
   - DCS ships two TACAN flavours — `BEACON_TYPE_TACAN` (often paired with a VOR)

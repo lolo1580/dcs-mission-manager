@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"dcsmanager/internal/hid"
 	"dcsmanager/internal/panel"
 )
 
@@ -52,6 +53,30 @@ func TestServiceStartsAndStops(t *testing.T) {
 	for _, e := range events {
 		if e.Kind == KindError {
 			t.Errorf("unexpected error event: %v", e.Err)
+		}
+	}
+}
+
+// TestServiceIgnoresUnsupportedPlatform guards the regression that broke CI:
+// outside Windows the HID stub returns ErrUnsupported from Enumerate, and the
+// scanner used to publish it as an error event on every tick. A platform without
+// panel support has no panels — it is not an error. The stub is injected so the
+// test runs everywhere, including a Windows developer machine.
+func TestServiceIgnoresUnsupportedPlatform(t *testing.T) {
+	c := &collector{}
+	opts := DefaultOptions()
+	opts.PollInterval = 20 * time.Millisecond
+	s := New(opts, c.emit)
+	s.enumerate = func() ([]hid.DeviceInfo, error) { return nil, hid.ErrUnsupported }
+
+	s.Start()
+	time.Sleep(150 * time.Millisecond)
+	s.Stop()
+
+	events, _, _ := c.snapshot()
+	for _, e := range events {
+		if e.Kind == KindError {
+			t.Errorf("an unsupported platform must not raise an error event: %v", e.Err)
 		}
 	}
 }

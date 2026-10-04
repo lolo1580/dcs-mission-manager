@@ -6,12 +6,8 @@
 package hid
 
 import (
-	"errors"
 	"time"
 )
-
-// ErrUnsupported is returned on platforms without Windows HID support.
-var ErrUnsupported = errors.New("hid: only supported on Windows")
 
 // Device is an opened HID collection.
 type Device struct {

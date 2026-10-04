@@ -14,6 +14,12 @@ import "errors"
 // as "nothing happened", not as a failure.
 var ErrTimeout = errors.New("hid: read timed out")
 
+// ErrUnsupported is returned by every call on a platform without Windows HID
+// support (the manager is Windows-only in practice; the stub keeps it building
+// elsewhere). It is a "nothing to see here" signal, not a failure, so callers
+// like panelservice must not turn it into an error the user sees.
+var ErrUnsupported = errors.New("hid: only supported on Windows")
+
 // DeviceInfo describes a HID collection found on the machine.
 type DeviceInfo struct {
 	// Path is the Windows device interface path (\\?\hid#...), the handle to open.

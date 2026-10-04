@@ -367,6 +367,15 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   - Suppression de deux déclarations mortes signalées par staticcheck ; un test
     ne contient plus d'affectation « valeur jamais utilisée ». `staticcheck ./...`
     et `go vet ./...` sont maintenant propres.
+- **Un build non-Windows inondait d'erreurs de panneaux.** `hid.Enumerate`
+  renvoie `ErrUnsupported` sur une plateforme sans support HID Windows, et le
+  service de panneaux le publiait comme événement d'erreur à chaque cycle — l'UI
+  se remplissait de « hid: only supported on Windows ». Le scanneur traite
+  désormais ce signal comme « aucun panneau ici », arrête de scanner, et ne le
+  remonte jamais comme erreur. C'est ce qui faisait échouer le `go test -race ./...`
+  sous Linux : `TestServiceStartsAndStops` exigeait l'absence d'événement
+  d'erreur. Couvert par un test indépendant de la plateforme qui injecte l'erreur
+  « non supporté ».
 - **Deux sortes de TACAN manquaient dans les données d'aérodrome.** Les deux ont
   été trouvées sur l'Allemagne Guerre froide, et les deux faisaient disparaître
   le TACAN silencieusement :
