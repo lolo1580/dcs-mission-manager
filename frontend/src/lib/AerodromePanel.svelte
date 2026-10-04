@@ -4,9 +4,14 @@
     filteredAerodromes,
     aerodromeError,
     aerodromeSource,
+    aerodromeCharts,
+    chartsError,
+    viewingChart,
+    chartURL,
     search,
     loadAerodromes,
     loadNearest,
+    loadAerodromeCharts,
     fmtMHz,
     fmtCoords,
   } from './aerodromes.js';
@@ -20,6 +25,21 @@
 
   async function useNearest() {
     nearestFirst = await loadNearest();
+  }
+
+  // Selecting an airfield also loads the charts that belong to it, so the
+  // viewer has something to open.
+  function select(a) {
+    selected = a;
+    loadAerodromeCharts(a);
+  }
+
+  function changeTheatre(id) {
+    setTheatre(id);
+    // The previous selection belongs to the previous theatre's list; keeping it
+    // would show frequencies and coordinates of an airfield not on this map.
+    selected = null;
+    loadAerodromes();
   }
 </script>
 
@@ -39,10 +59,7 @@
       <select
         class="theatre"
         value={$theatre}
-        on:change={(e) => {
-          setTheatre(e.currentTarget.value);
-          loadAerodromes();
-        }}
+        on:change={(e) => changeTheatre(e.currentTarget.value)}
         title={$t('app.theatreTitle')}
       >
         {#each $theatres as th (th.id)}
@@ -50,7 +67,7 @@
         {/each}
       </select>
     {/if}
-    <button class="refresh" on:click={loadAerodromes}>{$t('aerodromes.refresh')}</button>
+    <button class="refresh" on:click={() => { selected = null; loadAerodromes(); }}>{$t('aerodromes.refresh')}</button>
   </header>
 
   {#if $aerodromeError}
@@ -73,7 +90,7 @@
     <ul class="list">
       {#each $filteredAerodromes as a (a.id)}
         <li>
-          <button class:selected={selected?.id === a.id} on:click={() => (selected = a)}>
+          <button class:selected={selected?.id === a.id} on:click={() => select(a)}>
             <span class="name">{a.name}</span>
             <span class="sub">
               {a.id}
@@ -91,10 +108,10 @@
       {#if selected}
         <h3>{selected.name} <span class="icao">{selected.id}</span></h3>
         <dl>
-          <div><dt>{$t('aerodromes.coalition')}</dt><dd>{$t('coalition.' + selected.coalition)}</dd></div>
-          <div><dt>{$t('aerodromes.coordinates')}</dt><dd>{fmtCoords(selected)}</dd></div>
-          <div><dt>{$t('aerodromes.elevation')}</dt><dd>{selected.elevationM} m</dd></div>
-          <div><dt>{$t('aerodromes.runway')}</dt><dd>{selected.runway}</dd></div>
+          <div><dt>{$t('aerodromes.coalition')}</dt><dd>{selected.coalition ? $t('coalition.' + selected.coalition) : $t('aerodromes.unknown')}</dd></div>
+          <div><dt>{$t('aerodromes.coordinates')}</dt><dd>{selected.lat || selected.lng ? fmtCoords(selected) : $t('aerodromes.noCoordinates')}</dd></div>
+          <div><dt>{$t('aerodromes.elevation')}</dt><dd>{selected.elevationM ? selected.elevationM + ' m' : '—'}</dd></div>
+          <div><dt>{$t('aerodromes.runway')}</dt><dd>{selected.runway || '—'}</dd></div>
           <div class="hl"><dt>{$t('aerodromes.tower')}</dt><dd>{fmtMHz(selected.tower)}</dd></div>
           {#if selected.tacan}
             <div class="hl"><dt>TACAN</dt><dd>{selected.tacan}</dd></div>
@@ -106,11 +123,20 @@
           {/if}
         </dl>
 
-        {#if selected.charts?.length}
+        {#if $chartsError}
+          <p class="error">{$chartsError}</p>
+        {/if}
+        {#if $aerodromeCharts.length}
           <h4>{$t('aerodromes.charts')}</h4>
           <ul class="charts">
-            {#each selected.charts as c (c)}
-              <li>{c}</li>
+            {#each $aerodromeCharts as c (c.path)}
+              <li>
+                <button class="chart" on:click={() => viewingChart.set(c)}>
+                  <span class="kind">{$t('charts.kind.' + c.kind)}</span>
+                  <span class="chart-name">{c.name}</span>
+                  {#if c.runway}<span class="rwy">RWY {c.runway}</span>{/if}
+                </button>
+              </li>
             {/each}
           </ul>
           <p class="hint">
@@ -357,6 +383,47 @@
 
   .charts li {
     padding: 0.15rem 0;
+  }
+
+  .chart {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.3rem 0.45rem;
+    text-align: left;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .chart:hover {
+    border-color: var(--blue);
+  }
+
+  .chart .kind {
+    padding: 0.05rem 0.35rem;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+
+  .chart-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chart .rwy {
+    color: var(--blue);
+    font-variant-numeric: tabular-nums;
   }
 
   .hint {

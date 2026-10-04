@@ -15,6 +15,8 @@ export const statsEngines = writable([]);
 export const statsNetwork = writable([]);
 export const statsError = writable('');
 export const statsLoading = writable(false);
+/** False when the backend serves statistics without persistence (no database). */
+export const statsEnabled = writable(true);
 
 /** Statistics sub-views. Labels are resolved through i18n at render time. */
 export const STAT_TABS = [
@@ -26,6 +28,10 @@ export const STAT_TABS = [
 ];
 
 export const statTab = writable('pilots');
+
+// Monotonic counter identifying the newest loadStats call, so a slower response
+// for a scope the user already left cannot overwrite the current one.
+let statsReq = 0;
 
 /** Query string for the current scope. */
 function scopeQuery() {
@@ -41,6 +47,7 @@ async function getJSON(path) {
 }
 
 export async function loadStats() {
+  const req = ++statsReq;
   statsLoading.set(true);
   statsError.set('');
   try {
@@ -51,15 +58,29 @@ export async function loadStats() {
       getJSON('/api/stats/engines'),
       getJSON('/api/stats/network'),
     ]);
+    if (req !== statsReq) return;
+    // With persistence off every endpoint answers {enabled:false}; say so
+    // instead of showing empty tables as if there were no data.
+    if (overview?.enabled === false) {
+      statsEnabled.set(false);
+      statsOverview.set(null);
+      statsPilots.set([]);
+      statsWeapons.set([]);
+      statsEngines.set([]);
+      statsNetwork.set([]);
+      return;
+    }
+    statsEnabled.set(true);
     statsOverview.set(overview);
     statsPilots.set(pilots.pilots ?? []);
     statsWeapons.set(weapons.weapons ?? []);
     statsEngines.set(engines.engines ?? []);
     statsNetwork.set(network.network ?? []);
   } catch (e) {
+    if (req !== statsReq) return;
     statsError.set(tNow('error.stats', { detail: e.message }));
   } finally {
-    statsLoading.set(false);
+    if (req === statsReq) statsLoading.set(false);
   }
 }
 

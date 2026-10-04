@@ -35,33 +35,50 @@ export const heatTotal = derived(heatPoints, ($p) =>
   $p.reduce((sum, x) => sum + (x.weight ?? 0), 0)
 );
 
+// Monotonic counter identifying the newest heat request, so a slow response for
+// the previous source cannot overwrite the current one when the user switches
+// Traffic/Losses quickly.
+let heatReq = 0;
+
+async function getJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
+
 export async function loadAnalytics() {
   analyticsError.set('');
+  const req = ++heatReq;
   try {
     let source;
     heatSource.subscribe((s) => (source = s))();
     const [heat, track] = await Promise.all([
-      fetch(`/api/analytics/heatmap?source=${source}`).then((r) => r.json()),
-      fetch('/api/analytics/tracks').then((r) => r.json()),
+      getJSON(`/api/analytics/heatmap?source=${source}`),
+      getJSON('/api/analytics/tracks'),
     ]);
+    if (req !== heatReq) return;
     heatPoints.set(heat.points ?? []);
     if (typeof heat.grid === 'number' && heat.grid > 0) heatGrid.set(heat.grid);
     trails.set(track.trails ?? {});
     sortieStats.set(track.stats ?? []);
   } catch (e) {
+    if (req !== heatReq) return;
     analyticsError.set(tNow('error.analytics', { detail: e.message }));
   }
 }
 
 export async function reloadHeat() {
   analyticsError.set('');
+  const req = ++heatReq;
   try {
     let source;
     heatSource.subscribe((s) => (source = s))();
-    const heat = await fetch(`/api/analytics/heatmap?source=${source}`).then((r) => r.json());
+    const heat = await getJSON(`/api/analytics/heatmap?source=${source}`);
+    if (req !== heatReq) return;
     heatPoints.set(heat.points ?? []);
     if (typeof heat.grid === 'number' && heat.grid > 0) heatGrid.set(heat.grid);
   } catch (e) {
+    if (req !== heatReq) return;
     analyticsError.set(tNow('error.heatmap', { detail: e.message }));
   }
 }

@@ -1,46 +1,34 @@
 <script>
   import ChartViewer from './lib/ChartViewer.svelte';
-  import PlayerPanel from './lib/PlayerPanel.svelte';
-  import EventPanel from './lib/EventPanel.svelte';
-  import ChatPanel from './lib/ChatPanel.svelte';
+  import logo from './assets/logo.png';
   import DebriefPanel from './lib/DebriefPanel.svelte';
-  import StatsPanel from './lib/StatsPanel.svelte';
+  import CareerPanel from './lib/CareerPanel.svelte';
   import AnalyticsPanel from './lib/AnalyticsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
   import ModulesPanel from './lib/ModulesPanel.svelte';
-  import CareerPanel from './lib/CareerPanel.svelte';
   import MissionsPanel from './lib/MissionsPanel.svelte';
   import InstallPanel from './lib/InstallPanel.svelte';
   import ConfigPanel from './lib/ConfigPanel.svelte';
   import PanelsPanel from './lib/PanelsPanel.svelte';
-  import { connected, paused, fetchTheatres, connect } from './lib/units.js';
-  import { events, players, mission } from './lib/session.js';
+  import { connected, paused, mission, fetchTheatres, connect } from './lib/units.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
   import { onMount } from 'svelte';
 
-  let tab = 'session';
+  // The Session tab (players, events, chat) was removed: the manager now opens
+  // on the debriefs, which are the durable record of a flight.
+  let tab = 'debriefs';
 
   function goTo(id) {
     tab = id;
   }
 
-  // Open the live stream once, for the whole application. It used to be the map
-  // component that opened it; with the map gone, nothing did, and the session,
-  // events, chat and cockpit-hardware updates silently stopped arriving.
+  // Open the live stream once, for the whole application: the mission name in
+  // the header, the cockpit-hardware updates and the pause indicator all depend
+  // on it.
   onMount(() => {
     const stopStream = connect();
-    window.addEventListener('keydown', onKey);
-    return () => {
-      stopStream();
-      window.removeEventListener('keydown', onKey);
-    };
+    return stopStream;
   });
-
-  function onKey(e) {
-    if (e.key === 'Escape' && mapFullscreen) mapFullscreen = false;
-  }
-
-  let mapFullscreen = false;
 
   // Theatres drive the airfields tab: load them once at startup.
   fetchTheatres().catch(() => {});
@@ -48,21 +36,19 @@
 
 <div class="layout">
   <header>
-    <strong>{$t('app.title')}</strong>
+    <span class="brand">
+      <img class="logo" src={logo} alt="" aria-hidden="true" />
+      <strong>{$t('app.title')}</strong>
+    </span>
     <span class="live">
       <span class="dot" class:on={$connected}></span>
       {$connected ? $t('app.connected') : $t('app.offline')}
     </span>
 
     <nav class="tabs">
-      <button class:active={tab === 'session'} on:click={() => goTo('session')}>
-        {$t('tab.session')}
-        {#if $players.length}<span class="badge">{$players.length}</span>{/if}
-      </button>
       <button class:active={tab === 'debriefs'} on:click={() => goTo('debriefs')}>{$t('tab.debriefs')}</button>
       <button class:active={tab === 'missions'} on:click={() => goTo('missions')}>{$t('tab.library')}</button>
       <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
-      <button class:active={tab === 'career'} on:click={() => goTo('career')}>{$t('tab.career')}</button>
       <button class:active={tab === 'analytics'} on:click={() => goTo('analytics')}>{$t('tab.analytics')}</button>
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
       <button class:active={tab === 'modules'} on:click={() => goTo('modules')}>{$t('tab.modules')}</button>
@@ -77,12 +63,7 @@
       </span>
     {/if}
 
-    {#if tab === 'session'}
-      <span class="meta">
-        {$events.length}
-        {$events.length === 1 ? ($lang === 'fr' ? 'événement' : 'event') : ($lang === 'fr' ? 'événements' : 'events')}
-      </span>
-    {:else if tab === 'debriefs'}
+    {#if tab === 'debriefs'}
       <span class="meta">{$t('tab.missionHistory')}</span>
     {/if}
 
@@ -95,7 +76,7 @@
     </label>
   </header>
 
-  {#if $paused && tab === 'session'}
+  {#if $paused}
     <div class="pause-banner" title={$t('app.pausedNote')}>
       <span class="pause-icon">⏸</span>
       {$t('app.paused')} — <span class="pause-note">{$t('app.pausedNote')}</span>
@@ -103,23 +84,11 @@
   {/if}
 
   <main>
-    {#if tab === 'session'}
-      <div class="session">
-        <PlayerPanel />
-        <EventPanel />
-      </div>
-      <div class="session side">
-        <ChatPanel />
-      </div>
-    {:else if tab === 'debriefs'}
+    {#if tab === 'debriefs'}
       <div class="session wide">
         <DebriefPanel />
       </div>
     {:else if tab === 'stats'}
-      <div class="session wide">
-        <StatsPanel />
-      </div>
-    {:else if tab === 'career'}
       <div class="session wide">
         <CareerPanel />
       </div>
@@ -184,6 +153,21 @@
 
   header strong {
     white-space: nowrap;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .logo {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    /* The emblem is a circle on a transparent background, so it sits cleanly on
+       the header regardless of the theme. */
+    border-radius: 50%;
   }
 
   .live {

@@ -288,7 +288,10 @@
         <p class="empty">{$t('panels.noEvents')}</p>
       {:else}
         <ul class="events">
-          {#each $panelEvents as e (`${e.at}-${e.device}-${e.input?.control ?? e.kind}`)}
+          <!-- Unkeyed: the key was at+device+control, which can repeat for two
+               events on the same control within one millisecond and makes Svelte
+               throw on duplicate keys. The rows hold no local state. -->
+          {#each $panelEvents as e}
             <li class:error={e.kind === 'error'}>
               <span class="t">{timeOf(e.at)}</span>
               <span class="dev">{deviceLabel(e.device)}</span>

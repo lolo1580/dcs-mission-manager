@@ -17,9 +17,14 @@ export async function loadInstall() {
   installLoading.set(true);
   installError.set('');
   try {
+    const getJSON = async (url) => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${url}: ${r.status}`);
+      return r.json();
+    };
     const [modsRes, scriptsRes] = await Promise.all([
-      fetch('/api/mods').then((r) => r.json()),
-      fetch('/api/scripts').then((r) => r.json()),
+      getJSON('/api/mods'),
+      getJSON('/api/scripts'),
     ]);
     mods.set(modsRes.mods ?? []);
     scriptStatus.set(scriptsRes ?? null);

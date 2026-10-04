@@ -39,10 +39,11 @@ export const careerPlayer = derived(
 /** Total flight hours across all the player's airframes. */
 export const careerTotalHours = derived(careerPlayer, ($p) => $p?.totalFlightHours ?? 0);
 
-/** Formats flight hours as "1 234 h" or "12.5 h". */
+/** Formats flight hours as "420.8 h" or "1 234 h" for large values. */
 export function fmtHours(h) {
-  if (typeof h !== 'number') return '—';
-  return h >= 100 ? `${Math.round(h).toLocaleString()} h` : `${h.toFixed(1)} h`;
+  if (typeof h !== 'number' || !Number.isFinite(h)) return '—';
+  if (h >= 100) return `${Math.round(h).toLocaleString()} h`;
+  return `${h.toFixed(1)} h`;
 }
 
 /** A short, readable label for a DCS aircraft type. */

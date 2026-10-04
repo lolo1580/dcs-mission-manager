@@ -1,7 +1,10 @@
 <script>
   /**
-   * Installed modules: what DCS itself reports (MissionEditor/modules.lua) —
-   * terrains, aircraft, campaigns and tech packs, with what the player owns.
+   * Modules: what DCS itself reports (MissionEditor/modules.lua) — terrains,
+   * aircraft, campaigns and tech packs — with two distinct facts per row:
+   * "owned" (bought, the store's have="1") and "installed" (actually present in
+   * the installation, from autoupdate.cfg). They differ when a purchased module
+   * has been uninstalled.
    */
   import { onMount } from 'svelte';
   import {
@@ -11,6 +14,7 @@
     modulesLoading,
     moduleSearch,
     ownedOnly,
+    installedOnly,
     moduleCategory,
     moduleCategories,
     visibleModules,
@@ -46,6 +50,33 @@
   function typeLabel(type) {
     return TYPE_KEYS[type] ? $t(TYPE_KEYS[type]) : type || '—';
   }
+
+  /** Badge state for a module: installed / owned-not-installed / not owned. */
+  function installState(m) {
+    if (m.installKnown && m.installed) return 'installed';
+    if (!m.installKnown) return 'unknown';
+    return m.owned ? 'owned' : 'notOwned';
+  }
+
+  /**
+   * The version column is only useful when something is actually installed with
+   * a version; showing a column of "—" for a list of campaigns is noise.
+   */
+  $: hasVersions = $visibleModules.some(
+    (m) => m.installKnown && m.installed && m.versions?.length
+  );
+
+  function version(m) {
+    if (!m.installed || !m.versions?.length) return '—';
+    return m.versions[m.versions.length - 1];
+  }
+
+  const STATE_KEYS = {
+    installed: 'modules.state.installed',
+    owned: 'modules.state.owned',
+    notOwned: 'modules.state.notOwned',
+    unknown: 'modules.state.unknown',
+  };
 </script>
 
 <section class="modules">
@@ -55,6 +86,7 @@
       <span class="count">
         {$visibleModules.length} / {$moduleTotals.total}
         · {$moduleTotals.owned} {$t('modules.owned')}
+        · {$moduleTotals.installed} {$t('modules.installedCount')}
       </span>
     </h2>
     <button class="refresh" on:click={loadModules} disabled={$modulesLoading}>
@@ -73,13 +105,21 @@
       value={$moduleSearch}
       on:input={(e) => moduleSearch.set(e.currentTarget.value)}
     />
-    <label class="toggle">
+    <label class="toggle" title={$t('modules.ownedHint')}>
       <input
         type="checkbox"
         checked={$ownedOnly}
         on:change={(e) => ownedOnly.set(e.currentTarget.checked)}
       />
       {$t('modules.ownedOnly')}
+    </label>
+    <label class="toggle" title={$t('modules.installedHint')}>
+      <input
+        type="checkbox"
+        checked={$installedOnly}
+        on:change={(e) => installedOnly.set(e.currentTarget.checked)}
+      />
+      {$t('modules.installedOnly')}
     </label>
     <div class="cats">
       <button class:active={$moduleCategory === ''} on:click={() => moduleCategory.set('')}>
@@ -104,27 +144,41 @@
           <th>{$t('modules.col.module')}</th>
           <th>{$t('modules.col.type')}</th>
           <th>{$t('modules.col.developer')}</th>
-          <th>{$t('modules.col.installed')}</th>
+          <th class="badge-col">{$t('modules.col.owned')}</th>
+          <th class="badge-col">{$t('modules.col.installed')}</th>
+          {#if hasVersions}<th class="ver-col">{$t('modules.col.version')}</th>{/if}
         </tr>
       </thead>
       <tbody>
         {#each $visibleModules as m (m.category + '/' + (m.id || m.title))}
-          <tr class:owned={m.owned}>
+          {@const state = installState(m)}
+          <tr class:installed={state === 'installed'}>
             <td class="name">
-              <span class="dot" class:on={m.owned}></span>
+              <span class="dot" class:on={state === 'installed'}></span>
               <span class="label" title={m.title}>{m.title || m.id}</span>
               {#if m.id && m.id !== m.title}<span class="id">{m.id}</span>{/if}
             </td>
             <td>{typeLabel(m.type)}</td>
             <td class="dev">{m.developer || '—'}</td>
             <td class="ver">
-              {#if m.owned}
-                <span class="badge yes">{$t('modules.yes')}</span>
-                {#if m.versions?.length}<span class="v">{m.versions[m.versions.length - 1]}</span>{/if}
+              <span class="badge" class:yes={m.owned} class:no={!m.owned}
+                title={m.owned ? $t('modules.state.owned') : $t('modules.state.notOwned')}>
+                {m.owned ? $t('modules.yes') : $t('modules.no')}
+              </span>
+            </td>
+            <td class="ver">
+              {#if m.installKnown}
+                <span class="badge" class:yes={m.installed} class:no={!m.installed}
+                  title={m.installed ? $t('modules.state.installed') : $t('modules.state.owned')}>
+                  {m.installed ? $t('modules.yes') : $t('modules.no')}
+                </span>
               {:else}
-                <span class="badge no">{$t('modules.no')}</span>
+                <span class="badge unknown" title={$t('modules.state.unknown')}>{$t('modules.col.na')}</span>
               {/if}
             </td>
+            {#if hasVersions}
+              <td class="ver-col ver">{version(m)}</td>
+            {/if}
           </tr>
         {/each}
       </tbody>
@@ -259,13 +313,26 @@
     font-size: 0.7rem;
   }
 
+  /* The badge columns must line up with their right-aligned values. */
+  th.badge-col,
+  th.ver-col {
+    text-align: right;
+  }
+
+  .ver-col {
+    width: 7rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
   td {
     padding: 0.28rem 0.4rem;
     border-top: 1px solid var(--border);
     vertical-align: baseline;
   }
 
-  tr.owned .name .label {
+  tr.installed .name .label {
     color: var(--text);
   }
 
@@ -327,11 +394,10 @@
     color: var(--muted);
   }
 
-  .v {
-    margin-left: 0.4rem;
+  .badge.unknown {
     color: var(--muted);
-    font-size: 0.7rem;
-    font-variant-numeric: tabular-nums;
+    opacity: 0.6;
+    border-style: dashed;
   }
 
   .empty {

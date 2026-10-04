@@ -23,9 +23,14 @@ export async function loadPanels() {
   panelsLoading.set(true);
   panelsError.set('');
   try {
+    const getJSON = async (url) => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${url}: ${r.status}`);
+      return r.json();
+    };
     const [panelsRes, biosRes] = await Promise.all([
-      fetch('/api/panels').then((r) => r.json()),
-      fetch('/api/dcsbios').then((r) => r.json()),
+      getJSON('/api/panels'),
+      getJSON('/api/dcsbios'),
     ]);
     panels.set(panelsRes.devices ?? []);
     panelsSupported.set(panelsRes.supported ?? false);

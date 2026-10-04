@@ -88,6 +88,9 @@ export async function loadNearest() {
     if (!res.ok) throw new Error(`${res.status}`);
     const body = await res.json();
     aerodromes.set(body.aerodromes ?? []);
+    // The badge must reflect the same source as a plain load: the nearest-field
+    // query returns it too, and ignoring it left the badge stale or hidden.
+    aerodromeSource.set(body.source ?? '');
     return true;
   } catch (e) {
     aerodromeError.set(tNow('error.aerodromes', { detail: e.message }));
@@ -101,6 +104,7 @@ export function fmtMHz(v) {
 }
 
 export function fmtCoords(a) {
+  if (typeof a?.lat !== 'number' || typeof a?.lng !== 'number') return '—';
   const lat = a.lat >= 0 ? 'N' : 'S';
   const lng = a.lng >= 0 ? 'E' : 'W';
   return `${Math.abs(a.lat).toFixed(4)}°${lat} ${Math.abs(a.lng).toFixed(4)}°${lng}`;

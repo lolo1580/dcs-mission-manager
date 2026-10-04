@@ -1,9 +1,9 @@
 /**
- * Live session store: holds the state pushed by the backend over SSE, plus the
- * theatre selection shared by the airfields tab.
+ * Live store fed by the backend over SSE: unit state (for telemetry-derived
+ * views), connection/pause state and the current mission, plus the theatre
+ * selection shared by the airfields tab.
  */
 import { writable, get } from 'svelte/store';
-import { events, players, chat, mission, sessionRev } from './session.js';
 import { pushPanelEvent, biosState } from './panels.js';
 
 /** All units as received from the backend. */
@@ -11,6 +11,9 @@ export const units = writable([]);
 export const summary = writable({ byCategory: {}, byCoalition: {} });
 export const connected = writable(false);
 export const lastUpdate = writable(null);
+
+/** The current mission, shown in the header. */
+export const mission = writable(null);
 
 /**
  * True when DCS has stopped sending telemetry, which happens when the
@@ -48,14 +51,12 @@ export function connect() {
       }
 
       if (msg.type !== 'session') return;
-      if (msg.events) events.set(msg.events);
-      if (msg.players) players.set(msg.players);
-      if (msg.chat) chat.set(msg.chat);
+      // The Session tab (players, events, chat) was removed, so only the
+      // mission and the pause indicator are still consumed from the frame.
       mission.set(msg.mission ?? null);
       // A paused simulator sends nothing at all; say so rather than looking
       // like a broken app.
       paused.set(Boolean(msg.paused));
-      sessionRev.update((n) => n + 1);
     } catch {
       /* ignore malformed frames */
     }
@@ -71,7 +72,7 @@ export async function fetchTheatres() {
   if (Array.isArray(meta.theatres)) {
     theatres.set(meta.theatres);
     // With no stored preference, start on the backend's default theatre.
-    if (!storedTheatre() && meta.default && meta.theatres.some((t) => t.id === meta.default)) {
+    if (!hadStoredTheatre && meta.default && meta.theatres.some((t) => t.id === meta.default)) {
       theatre.set(meta.default);
     }
     validateTheatrePreference(meta.theatres);
@@ -83,6 +84,12 @@ export async function fetchTheatres() {
 function storedTheatre() {
   return typeof localStorage !== 'undefined' ? localStorage.getItem('dcsmanager.theatre') : null;
 }
+
+// Captured before the `theatre` store's subscribe writes its default below, so
+// "the user never chose a theatre" survives to fetchTheatres(). Checking
+// storedTheatre() later always finds the default that was just persisted, and
+// the backend default would then never be applied.
+const hadStoredTheatre = storedTheatre() !== null;
 
 /**
  * Corrects a stored theatre that is no longer in the list — a map the player

@@ -27,9 +27,14 @@ export async function loadMappings(aircraft) {
   mappingsError.set('');
   try {
     mappingAircraft.set(aircraft);
+    const getJSON = async (url) => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${url}: ${r.status}`);
+      return r.json();
+    };
     const [profileRes, controlsRes] = await Promise.all([
-      fetch(`/api/mappings?aircraft=${encodeURIComponent(aircraft)}`).then((r) => r.json()),
-      fetch(`/api/controls?aircraft=${encodeURIComponent(aircraft)}&writable=1`).then((r) => r.json()),
+      getJSON(`/api/mappings?aircraft=${encodeURIComponent(aircraft)}`),
+      getJSON(`/api/controls?aircraft=${encodeURIComponent(aircraft)}&writable=1`),
     ]);
     bindings.set(profileRes.profile?.bindings ?? []);
     sendingEnabled.set(Boolean(profileRes.enabled));

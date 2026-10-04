@@ -9,6 +9,10 @@ export const debrief = writable(null);
 export const debriefError = writable('');
 export const debriefLoading = writable(false);
 
+// Monotonic counter identifying the newest loadDebrief call, used to drop an
+// older response that resolves after a newer one.
+let debriefReq = 0;
+
 /** Events of the selected debrief, newest last. */
 export const debriefEvents = derived(debrief, ($d) => $d?.parsed?.events ?? []);
 
@@ -29,17 +33,24 @@ export async function loadDebriefList() {
 }
 
 export async function loadDebrief(id) {
+  // Guard against out-of-order responses: clicking two debriefs quickly can
+  // resolve the first after the second, and would otherwise leave the detail
+  // pane showing stats that belong to a different, earlier debrief.
+  const req = ++debriefReq;
   debriefLoading.set(true);
   debriefError.set('');
   try {
     const res = await fetch(`/api/debriefs/${id}`);
     if (!res.ok) throw new Error(`${res.status}`);
-    debrief.set(await res.json());
+    const body = await res.json();
+    if (req !== debriefReq) return;
+    debrief.set(body);
   } catch (e) {
+    if (req !== debriefReq) return;
     debriefError.set(tNow('error.debrief', { detail: e.message }));
     debrief.set(null);
   } finally {
-    debriefLoading.set(false);
+    if (req === debriefReq) debriefLoading.set(false);
   }
 }
 

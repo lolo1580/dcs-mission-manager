@@ -1,8 +1,17 @@
 <script>
   /**
-   * Career: the player's own logbook, as DCS records it — rank, squadron,
-   * awards, and a per-airframe breakdown of flight hours, landings, deaths
-   * and kills.
+   * Career & statistics, merged into one tab:
+   *
+   *  - on top, the player's own logbook as DCS records it (MissionEditor/
+   *    logbook.lua): rank, squadron, awards, flight hours and the per-airframe
+   *    breakdown;
+   *  - below, the statistics the manager aggregates from its recorded sessions:
+   *    overview, pilots, weapons, airframes, balance and network, scoped to the
+   *    whole career or a single mission.
+   *
+   * The two answer different questions — "what does DCS say I have done?" and
+   * "what did the manager record?" — so they are stacked rather than blended,
+   * the logbook first.
    */
   import { onMount } from 'svelte';
   import {
@@ -17,15 +26,54 @@
     fmtHours,
     aircraftLabel,
   } from './career.js';
+  import {
+    statsOverview,
+    statsPilots,
+    statsWeapons,
+    enginesByCategory,
+    engineCategory,
+    statTab,
+    STAT_TABS,
+    scopeMode,
+    statsError,
+    statsLoading,
+    statsNetwork,
+    statsEnabled,
+    loadStats,
+    fmtNum,
+  } from './stats.js';
   import { t } from './i18n.js';
 
-  onMount(loadCareer);
+  const STAT_TAB_KEYS = {
+    pilots: 'stats.pilots',
+    weapons: 'stats.weapons',
+    engines: 'stats.engines',
+    balance: 'stats.balance',
+    network: 'stats.network',
+  };
 
-  function fmtNum(v) {
-    return typeof v === 'number' ? v.toLocaleString() : '—';
+  function statTabKey(id) {
+    return STAT_TAB_KEYS[id] ?? id;
   }
 
-  /** Reads a raw aggregate value, which may be a number or a string. */
+  onMount(() => {
+    loadCareer();
+    loadStats();
+  });
+
+  // The header's Refresh reloads both halves: they come from different files
+  // (the logbook and the database) but belong to the same view.
+  function refresh() {
+    loadCareer();
+    loadStats();
+  }
+
+  function onScopeChange(mode) {
+    scopeMode.set(mode);
+    loadStats();
+  }
+
+  /** Reads a raw logbook aggregate value, which may be a number or a string. */
   function agg(key) {
     const v = $careerPlayer?.aggregate?.[key];
     if (v == null) return null;
@@ -35,14 +83,23 @@
 
   /** The largest flight-hours value, so a bar can be scaled to it. */
   $: maxHours = ($careerPlayer?.aircraft ?? []).reduce((m, a) => Math.max(m, a.flightHours ?? 0), 0) || 1;
+
+  function medal(i) {
+    return i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+  }
 </script>
 
 <section class="career">
   <header>
-    <h2>{$t('career.title')}</h2>
-    <button class="refresh" on:click={loadCareer} disabled={$careerLoading}>{$t('stats.refresh')}</button>
+    <h2>{$t('tab.stats')}</h2>
+    <button class="refresh" on:click={refresh} disabled={$careerLoading || $statsLoading}>
+      {$t('stats.refresh')}
+    </button>
   </header>
 
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Logbook (DCS's own record)                                          -->
+  <!-- ------------------------------------------------------------------ -->
   {#if $careerError}
     <p class="error">{$careerError}</p>
   {/if}
@@ -70,9 +127,9 @@
         {#if $careerPlayer.rank}<div><dt>{$t('career.rank')}</dt><dd>{$careerPlayer.rank}</dd></div>{/if}
         {#if $careerPlayer.squadron}<div><dt>{$t('career.squadron')}</dt><dd>{$careerPlayer.squadron}</dd></div>{/if}
         <div><dt>{$t('career.flightHours')}</dt><dd>{fmtHours($careerTotalHours)}</dd></div>
-        {#if agg('missionsCount') != null}<div><dt>{$t('career.missions')}</dt><dd>{fmtNum(agg('missionsCount'))}</dd></div>{/if}
-        {#if agg('landings') != null}<div><dt>{$t('career.landings')}</dt><dd>{fmtNum(agg('landings'))}</dd></div>{/if}
-        {#if agg('totalScore') != null}<div><dt>{$t('career.score')}</dt><dd>{fmtNum(agg('totalScore'))}</dd></div>{/if}
+        {#if agg('missionsCount') != null}<div><dt>{$t('career.missions')}</dt><dd>{fmtNum(agg('missionsCount'), 0)}</dd></div>{/if}
+        {#if agg('landings') != null}<div><dt>{$t('career.landings')}</dt><dd>{fmtNum(agg('landings'), 0)}</dd></div>{/if}
+        {#if agg('totalScore') != null}<div><dt>{$t('career.score')}</dt><dd>{fmtNum(agg('totalScore'), 0)}</dd></div>{/if}
         {#if $careerPlayer.awards?.length}
           <div><dt>{$t('career.awards')}</dt><dd>{$careerPlayer.awards.length}</dd></div>
         {/if}
@@ -88,7 +145,7 @@
       {#if $careerPlayer.aircraft.length === 0}
         <p class="empty">{$t('career.noAirframe')}</p>
       {:else}
-        <table>
+        <table class="airframes">
           <thead>
             <tr>
               <th>{$t('career.col.aircraft')}</th>
@@ -103,16 +160,16 @@
           <tbody>
             {#each $careerPlayer.aircraft as a (a.type)}
               <tr>
-                <td class="name">{aircraftLabel(a.type)}</td>
+                <td class="name" title={a.type}>{aircraftLabel(a.type)}</td>
                 <td class="num hours">
                   <span class="bar" style="width:{Math.max(2, Math.round((a.flightHours / maxHours) * 100))}%"></span>
                   <span class="val">{fmtHours(a.flightHours)}</span>
                 </td>
-                <td class="num">{fmtNum(a.landings)}</td>
-                <td class="num">{fmtNum(a.deaths)}</td>
-                <td class="num">{fmtNum(a.ejections)}</td>
-                <td class="num">{fmtNum(a.aaKills)}</td>
-                <td class="num">{fmtNum(a.agKills)}</td>
+                <td class="num">{fmtNum(a.landings, 0)}</td>
+                <td class="num">{fmtNum(a.deaths, 0)}</td>
+                <td class="num">{fmtNum(a.ejections, 0)}</td>
+                <td class="num">{fmtNum(a.aaKills, 0)}</td>
+                <td class="num">{fmtNum(a.agKills, 0)}</td>
               </tr>
             {/each}
           </tbody>
@@ -120,6 +177,176 @@
       {/if}
     </div>
   {/if}
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Statistics (the manager's own record)                               -->
+  <!-- ------------------------------------------------------------------ -->
+  <div class="stats">
+    <div class="stats-head">
+      <h3>{$t('stats.title')}</h3>
+      <div class="scope">
+        <button class:active={$scopeMode === 'career'} on:click={() => onScopeChange('career')}>
+          {$t('stats.career')}
+        </button>
+        <button class:active={$scopeMode === 'mission'} on:click={() => onScopeChange('mission')}>
+          {$t('stats.mission')}
+        </button>
+      </div>
+    </div>
+
+    {#if $statsError}
+      <p class="error">{$statsError}</p>
+    {/if}
+
+    {#if !$statsEnabled}
+      <p class="empty">{$t('stats.disabled')}</p>
+    {:else}
+      {#if $statsOverview}
+        {@const o = $statsOverview}
+        <div class="cards">
+          <div><span>{o.missions}</span>{$t('stats.missions')}</div>
+          <div><span>{o.players}</span>{$t('stats.pilots')}</div>
+          <div><span>{o.kills}</span>{$t('events.kills')}</div>
+          <div><span>{o.deaths}</span>{$t('stats.deaths')}</div>
+          <div><span>{o.crashes}</span>{$t('stats.crashes')}</div>
+          <div><span>{o.ejections}</span>{$t('stats.ejections')}</div>
+          <div class:warn={o.friendlyFire > 0}><span>{o.friendlyFire}</span>{$t('events.friendlyFire')}</div>
+        </div>
+      {/if}
+
+      <nav class="subtabs">
+        {#each STAT_TABS as tab (tab.id)}
+          <button class:active={$statTab === tab.id} on:click={() => statTab.set(tab.id)}>{$t(statTabKey(tab.id))}</button>
+        {/each}
+      </nav>
+
+      <div class="panel">
+      {#if $statTab === 'pilots'}
+        {#if $statsPilots.length === 0}
+          <p class="empty">{$t('stats.noPilot')}</p>
+        {:else}
+          <table>
+            <thead>
+              <tr>
+                <th></th><th>{$t('players.pilot')}</th><th>{$t('players.score')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.deaths')}</th>
+                <th>K/D</th><th>{$t('stats.landings')}</th><th>{$t('stats.ejections')}</th><th>{$t('stats.crashes')}</th><th>{$t('stats.friendlyFire')}</th><th>{$t('stats.ping')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each $statsPilots as p, i}
+                <tr>
+                  <td class="medal">{medal(i)}</td>
+                  <td class="name" title={p.ucid}>{p.name}</td>
+                  <td class="num">{p.score}</td>
+                  <td class="num">{p.killsAir}/{p.killsCar}/{p.killsShip}</td>
+                  <td class="num">{p.deaths}</td>
+                  <td class="num">{fmtNum(p.kd, 2)}</td>
+                  <td class="num">{p.landings}</td>
+                  <td class="num">{p.ejections}</td>
+                  <td class="num">{p.crashes}</td>
+                  <td class="num" class:warn={p.friendlyFire > 0}>{p.friendlyFire}</td>
+                  <td class="num">{Math.round(p.avgPing)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      {:else if $statTab === 'weapons'}
+        {#if $statsWeapons.length === 0}
+          <p class="empty">{$t('stats.noWeapon')}</p>
+        {:else}
+          <table>
+            <thead>
+              <tr><th>{$t('stats.weapon')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.friendlyFire')}</th><th>{$t('stats.targets')}</th></tr>
+            </thead>
+            <tbody>
+              {#each $statsWeapons as w (w.weapon)}
+                <tr>
+                  <td class="name">{w.weapon}</td>
+                  <td class="num">{w.kills}</td>
+                  <td class="num" class:warn={w.friendlyFire > 0}>{w.friendlyFire}</td>
+                  <td class="targets">
+                    {#each Object.entries(w.victimsByType ?? {}).slice(0, 4) as [type, n] (type)}
+                      <span class="tag">{type} ×{n}</span>
+                    {/each}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      {:else if $statTab === 'engines'}
+        <div class="cats">
+          {#each ['plane', 'heli', 'ground', 'ship', 'structure', 'other'] as c (c)}
+            <button class:active={$engineCategory === c} on:click={() => engineCategory.set(c)}>
+              {$t('category.' + c)}
+            </button>
+          {/each}
+        </div>
+        {#if $enginesByCategory.length === 0}
+          <p class="empty">{$t('stats.noEngine')}</p>
+        {:else}
+          <table>
+            <thead>
+              <tr><th>{$t('stats.type')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.losses')}</th><th>{$t('stats.sorties')}</th><th>K/D</th></tr>
+            </thead>
+            <tbody>
+              {#each $enginesByCategory as e (e.typeId)}
+                <tr>
+                  <td class="name">{e.typeId}</td>
+                  <td class="num">{e.kills}</td>
+                  <td class="num">{e.deaths}</td>
+                  <td class="num">{e.sorties}</td>
+                  <td class="num">{fmtNum(e.kd, 2)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      {:else if $statTab === 'balance'}
+        {#if !$statsOverview?.coalitions?.length}
+          <p class="empty">{$t('stats.noCoalition')}</p>
+        {:else}
+          {#each $statsOverview.coalitions as c (c.coalition)}
+            {@const total = Math.max(...$statsOverview.coalitions.map((x) => x.score), 1)}
+            <div class="balance-row">
+              <span class="side {c.coalition}">{$t('coalition.' + c.coalition)}</span>
+              <div class="bar">
+                <div
+                  class="fill {c.coalition}"
+                  style="width:{(c.score / total) * 100}%"
+                ></div>
+              </div>
+              <span class="num">{c.score} {$t('stats.points')}</span>
+              <span class="num">{c.kills} {$t('stats.killsCol')}</span>
+              <span class="num">{c.players} {$t('players.title')}</span>
+            </div>
+          {/each}
+        {/if}
+      {:else if $statTab === 'network'}
+        {#if $statsNetwork.length === 0}
+          <p class="empty">{$t('stats.noNetwork')}</p>
+        {:else}
+          <table>
+            <thead>
+              <tr><th>{$t('players.pilot')}</th><th>{$t('stats.samples')}</th><th>{$t('stats.avgPing')}</th><th>{$t('stats.maxPing')}</th></tr>
+            </thead>
+            <tbody>
+              {#each $statsNetwork as n (n.name)}
+                <tr>
+                  <td class="name">{n.name}</td>
+                  <td class="num">{n.samples}</td>
+                  <td class="num" class:warn={n.avgPing > 250}>{Math.round(n.avgPing)} ms</td>
+                  <td class="num" class:warn={n.maxPing > 400}>{n.maxPing} ms</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      {/if}
+      </div>
+    {/if}
+  </div>
 </section>
 
 <style>
@@ -129,6 +356,8 @@
     min-height: 0;
     height: 100%;
     padding: 0.9rem 1rem;
+    /* A single scroll for the whole view: the logbook grows to its content and
+       the statistics tables follow, instead of each half scrolling on its own. */
     overflow-y: auto;
   }
 
@@ -136,6 +365,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.6rem;
     margin-bottom: 0.7rem;
   }
 
@@ -145,6 +375,15 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
+  }
+
+  h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text);
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
   }
 
   .refresh {
@@ -161,6 +400,12 @@
     color: var(--text);
     border-color: var(--blue);
   }
+
+  .refresh:disabled {
+    opacity: 0.5;
+  }
+
+  /* ---- Logbook ---- */
 
   .profiles {
     display: flex;
@@ -243,15 +488,6 @@
     margin-bottom: 1rem;
   }
 
-  .block h3 {
-    margin: 0 0 0.4rem;
-    font-size: 0.78rem;
-    color: var(--text);
-    display: flex;
-    gap: 0.5rem;
-    align-items: baseline;
-  }
-
   .count {
     color: var(--muted);
     font-weight: 400;
@@ -288,6 +524,12 @@
     text-align: right;
   }
 
+  .name {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   /* Hours column: a bar behind the value, scaled to the player's top airframe. */
   td.hours {
     position: relative;
@@ -306,6 +548,218 @@
 
   td.hours .val {
     position: relative;
+  }
+
+  /* ---- Statistics ---- */
+
+  .stats {
+    border-top: 1px solid var(--border);
+    padding-top: 0.9rem;
+  }
+
+  .stats-head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .stats-head h3 {
+    margin: 0;
+  }
+
+  .scope {
+    display: inline-flex;
+    gap: 0.15rem;
+    padding: 0.12rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+  }
+
+  .scope button {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.76rem;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .scope button.active {
+    color: var(--text);
+    background: var(--panel);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .cards div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .cards span {
+    font-size: 1.15rem;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cards div.warn span {
+    color: #f0b429;
+  }
+
+  .subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .subtabs button {
+    padding: 0.28rem 0.65rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .subtabs button:hover {
+    color: var(--text);
+  }
+
+  .subtabs button.active {
+    color: var(--text);
+    background: var(--bg);
+    border-color: var(--border);
+  }
+
+  .panel {
+    min-height: 0;
+  }
+
+  .panel th:not(:nth-child(1)):not(:nth-child(2)),
+  .panel td.num {
+    text-align: right;
+  }
+
+  .panel th:nth-child(1),
+  .panel th:nth-child(2),
+  .panel td:nth-child(1),
+  .panel td:nth-child(2) {
+    text-align: left;
+  }
+
+  .panel td.warn {
+    color: #f0b429;
+  }
+
+  .medal {
+    width: 22px;
+  }
+
+  .targets {
+    text-align: left;
+  }
+
+  .tag-chip {
+    display: inline-block;
+  }
+
+  .panel .tag {
+    display: inline-block;
+    margin: 0 0.2rem 0.15rem 0;
+    padding: 0.05rem 0.35rem;
+    font-size: 0.68rem;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .cats button {
+    padding: 0.22rem 0.55rem;
+    font-size: 0.74rem;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .cats button.active {
+    color: var(--text);
+    border-color: var(--blue);
+    background: color-mix(in srgb, var(--blue) 18%, var(--bg));
+  }
+
+  .balance-row {
+    display: grid;
+    grid-template-columns: 70px 1fr auto auto auto;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.45rem 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+  }
+
+  .side {
+    font-weight: 600;
+  }
+
+  .side.red {
+    color: #ff4d4d;
+  }
+
+  .side.blue {
+    color: #3d7dff;
+  }
+
+  .bar {
+    height: 10px;
+    background: var(--bg);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .fill {
+    height: 100%;
+    border-radius: 999px;
+  }
+
+  .fill.red {
+    background: #ff4d4d;
+  }
+
+  .fill.blue {
+    background: #3d7dff;
+  }
+
+  .fill.spectator {
+    background: #9aa4b2;
   }
 
   .empty {
