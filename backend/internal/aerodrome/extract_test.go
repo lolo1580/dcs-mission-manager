@@ -119,10 +119,11 @@ func TestLoadTerrain(t *testing.T) {
 	if terrain.RadioAirfields != 2 {
 		t.Errorf("radio airfields = %d", terrain.RadioAirfields)
 	}
-	// The world_0 VOR is not tied to an airfield and must be ignored: only the
-	// four beacons carrying an "airfield" id are counted.
-	if terrain.BeaconTotal != 4 {
-		t.Errorf("beacon total = %d, want 4", terrain.BeaconTotal)
+	// The kept beacons: the four carrying an "airfield" id, plus the named
+	// stand-alone world_0 (it could serve a field by name). A world beacon with
+	// no display_name is dropped, so the count is not inflated by desert VORs.
+	if terrain.BeaconTotal != 5 {
+		t.Errorf("beacon total = %d, want 5", terrain.BeaconTotal)
 	}
 
 	byName := map[string]Aerodrome{}
@@ -232,6 +233,14 @@ beacons = {
 		channel = 96;
 		positionGeo = { latitude = 24.24, longitude = 54.54 };
 	};
+	{
+		display_name = _('Nordholz');
+		beaconId = 'airfield5_1';
+		type = BEACON_TYPE_AIRPORT_TACAN;
+		callsign = 'NDO';
+		channel = 118;
+		positionGeo = { latitude = 53.76, longitude = 8.65 };
+	};
 }
 `
 	if err := os.WriteFile(filepath.Join(dir, "beacons.lua"), []byte(beacons), 0o644); err != nil {
@@ -276,6 +285,17 @@ beacons = {
 	}
 	if aldhafra.TACAN != "96X MA" {
 		t.Errorf("a VORTAC should also provide the TACAN, got %q", aldhafra.TACAN)
+	}
+
+	// BEACON_TYPE_AIRPORT_TACAN is a TACAN installed as the field's own
+	// facility (Cold War Germany's Nordholz). It must fill TACAN and must not
+	// be mistaken for anything else.
+	nordholz, ok := byID["A5"]
+	if !ok {
+		t.Fatalf("airfield 5 missing, got %+v", byID)
+	}
+	if nordholz.TACAN != "118X NDO" {
+		t.Errorf("an AIRPORT_TACAN should provide the TACAN, got %q", nordholz.TACAN)
 	}
 }
 
@@ -487,5 +507,102 @@ func TestLoadWithDCSOverlaysEmbedded(t *testing.T) {
 	// Lookup by id must find the overlaid entry.
 	if _, ok := c.ByID(batumi.ID); !ok {
 		t.Errorf("ByID(%q) should find the overlaid airfield", batumi.ID)
+	}
+}
+
+// TestOrphanNamedBeaconAttachment covers a real Cold War Germany quirk: DCS
+// models Hamburg's and Fulda's VORTAC as a "world_*" beacon (no airfield id)
+// that names the field in its display_name instead. It must still reach the
+// airfield, or the field loses its TACAN/VOR entirely.
+func TestOrphanNamedBeaconAttachment(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "map"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	radio := `
+radio = {
+	{
+		radioId = 'airfield17_0';
+		callsign = {{["common"] = {_("Hamburg"), "Hamburg"}}};
+		frequency = {[VHF_HI] = {MODULATIONTYPE_AM, 126850000.000000}};
+	};
+	{
+		radioId = 'airfield166_0';
+		callsign = {{["common"] = {_("Fulda"), "Fulda"}}};
+		frequency = {[VHF_HI] = {MODULATIONTYPE_AM, 126000000.000000}};
+	};
+}
+`
+	beacons := `
+beacons = {
+	{
+		display_name = _('Hamburg');
+		beaconId = 'world_1';
+		type = BEACON_TYPE_VORTAC;
+		callsign = 'HAM';
+		frequency = 113100000.000000;
+		channel = 78;
+		positionGeo = { latitude = 53.685493, longitude = 10.205137 };
+	};
+	{
+		display_name = _('Fulda');
+		beaconId = 'world_10';
+		type = BEACON_TYPE_TACAN;
+		callsign = 'FUL';
+		channel = 58;
+		positionGeo = { latitude = 50.55, longitude = 9.63 };
+	};
+	{
+		display_name = _('');
+		beaconId = 'world_13';
+		type = BEACON_TYPE_TACAN;
+		callsign = 'WRB';
+		channel = 84;
+		positionGeo = { latitude = 51.5, longitude = 9.1 };
+	};
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "radio.lua"), []byte(radio), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "beacons.lua"), []byte(beacons), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	terrain, err := LoadTerrain(dir, "GermanyCW")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(terrain.Airfields) != 2 {
+		t.Fatalf("want 2 airfields, got %d: %+v", len(terrain.Airfields), terrain.Airfields)
+	}
+
+	byName := map[string]Aerodrome{}
+	for _, a := range terrain.Airfields {
+		byName[a.Name] = a
+	}
+
+	hamburg, ok := byName["Hamburg"]
+	if !ok {
+		t.Fatal("Hamburg missing")
+	}
+	if hamburg.TACAN != "78X HAM" || hamburg.VOR != "78X HAM" || hamburg.VORMHz != 113.1 {
+		t.Errorf("Hamburg VORTAC not attached: TACAN=%q VOR=%q %v MHz",
+			hamburg.TACAN, hamburg.VOR, hamburg.VORMHz)
+	}
+
+	fulda, ok := byName["Fulda"]
+	if !ok {
+		t.Fatal("Fulda missing")
+	}
+	if fulda.TACAN != "58X FUL" {
+		t.Errorf("Fulda TACAN = %q, want 58X FUL", fulda.TACAN)
+	}
+
+	// A nameless world beacon must not be attached to anything.
+	for _, a := range terrain.Airfields {
+		if a.TACAN == "84X WRB" {
+			t.Errorf("a nameless world TACAN must not be attached, got it on %s", a.Name)
+		}
 	}
 }

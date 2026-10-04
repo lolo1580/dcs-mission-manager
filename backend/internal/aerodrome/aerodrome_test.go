@@ -44,6 +44,7 @@ func TestEveryAirfieldHasMinimumData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	withPosition := 0
 	for _, th := range c.Theatres() {
 		for _, a := range c.ByTheatre(th) {
 			if a.ID == "" || a.Name == "" {
@@ -52,13 +53,70 @@ func TestEveryAirfieldHasMinimumData(t *testing.T) {
 			if a.Theatre == "" {
 				t.Errorf("%s: theatre missing", a.ID)
 			}
-			if a.Lat == 0 || a.Lng == 0 {
-				t.Errorf("%s: coordinates missing", a.ID)
+			// Coordinates are not guaranteed: DCS only records a position for an
+			// airfield that carries a navigation aid, so a field may have a
+			// tower frequency but no beacon and therefore no position. It is
+			// still listed, and the UI says it cannot be placed.
+			if a.Lat != 0 || a.Lng != 0 {
+				withPosition++
 			}
 			if a.Tower == 0 {
 				t.Errorf("%s: tower frequency missing", a.ID)
 			}
 		}
+	}
+	if withPosition == 0 {
+		t.Error("no airfield has a position; the dataset looks broken")
+	}
+}
+
+// TestColdWarGermanyAirfields locks in the embedded Cold War Germany dataset.
+// DCS gives every field a radio frequency but only positions those that carry a
+// beacon, so the dataset must keep both kinds: the placed fields and the ones
+// that are listed without coordinates.
+func TestColdWarGermanyAirfields(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := c.ByTheatre("GermanyCW")
+	if len(list) < 100 {
+		t.Fatalf("expected the Cold War Germany dataset (100+ airfields), got %d", len(list))
+	}
+
+	var frankfurt, adelsheim *Aerodrome
+	withPosition := 0
+	for i := range list {
+		switch list[i].Name {
+		case "FRANKFURT":
+			frankfurt = &list[i]
+		case "Adelsheim":
+			adelsheim = &list[i]
+		}
+		if list[i].Lat != 0 || list[i].Lng != 0 {
+			withPosition++
+		}
+	}
+
+	if frankfurt == nil {
+		t.Fatal("Frankfurt should be in the dataset")
+	}
+	if frankfurt.Tower != 127.3 || frankfurt.TACAN != "89X FFM" {
+		t.Errorf("Frankfurt = tower %v, TACAN %q", frankfurt.Tower, frankfurt.TACAN)
+	}
+	if frankfurt.Lat == 0 || frankfurt.Lng == 0 {
+		t.Error("Frankfurt should have coordinates")
+	}
+
+	if adelsheim == nil {
+		t.Fatal("Adelsheim should be in the dataset")
+	}
+	if adelsheim.Tower != 118.0 {
+		t.Errorf("Adelsheim tower = %v, want 118.0", adelsheim.Tower)
+	}
+
+	if withPosition < 70 {
+		t.Errorf("only %d Cold War Germany airfields have a position", withPosition)
 	}
 }
 

@@ -1,0 +1,2491 @@
+[
+  {
+    "id": "ANTRAKT",
+    "name": "ANTRAKT",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.93904,
+    "lng": 14.446962,
+    "elevationM": 53.745568,
+    "runway": "",
+    "tower": 118,
+    "rsbn": "AT",
+    "ndb": [
+      {
+        "name": "OJ",
+        "khz": 975
+      },
+      {
+        "name": "AT",
+        "khz": 975
+      },
+      {
+        "name": "O",
+        "khz": 480
+      },
+      {
+        "name": "A",
+        "khz": 480
+      }
+    ]
+  },
+  {
+    "id": "ADELSHEIM",
+    "name": "Adelsheim",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118
+  },
+  {
+    "id": "AIRRACINGFRANKFURT",
+    "name": "AirracingFrankfurt",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118.4
+  },
+  {
+    "id": "AIRRACINGKOBLENZ",
+    "name": "AirracingKoblenz",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118.25
+  },
+  {
+    "id": "AIRRACINGLUBECK",
+    "name": "AirracingLubeck",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118.35
+  },
+  {
+    "id": "BAATH",
+    "name": "BAATH",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.879475,
+    "lng": 13.232258,
+    "elevationM": 16.463235,
+    "runway": "",
+    "tower": 125.5,
+    "ndb": [
+      {
+        "name": "Y",
+        "khz": 398
+      },
+      {
+        "name": "YC",
+        "khz": 803
+      }
+    ]
+  },
+  {
+    "id": "BAIKAL",
+    "name": "BAIKAL",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.551358,
+    "lng": 13.231059,
+    "elevationM": 86.727069,
+    "runway": "",
+    "tower": 118.4,
+    "rsbn": "BL",
+    "ndb": [
+      {
+        "name": "BL",
+        "khz": 462
+      },
+      {
+        "name": "B",
+        "khz": 938
+      },
+      {
+        "name": "BL",
+        "khz": 462
+      },
+      {
+        "name": "S",
+        "khz": 938
+      }
+    ]
+  },
+  {
+    "id": "BERGBAU",
+    "name": "BERGBAU",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.61179,
+    "lng": 14.222338,
+    "elevationM": 15.000015,
+    "runway": "",
+    "tower": 120.5,
+    "rsbn": "BU",
+    "ndb": [
+      {
+        "name": "BU",
+        "khz": 472
+      },
+      {
+        "name": "U",
+        "khz": 958
+      },
+      {
+        "name": "UB",
+        "khz": 472
+      },
+      {
+        "name": "B",
+        "khz": 958
+      }
+    ]
+  },
+  {
+    "id": "BUCHEL",
+    "name": "BUCHEL",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.178211,
+    "lng": 7.070576,
+    "elevationM": 459.906283,
+    "runway": "",
+    "tower": 122.1,
+    "tacan": "118X BUE"
+  },
+  {
+    "id": "BADDURKHEIM",
+    "name": "BadDurkheim",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.5
+  },
+  {
+    "id": "BARTH",
+    "name": "Barth",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 124.1
+  },
+  {
+    "id": "BIENENFARM",
+    "name": "Bienenfarm",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.7
+  },
+  {
+    "id": "BITBURG",
+    "name": "Bitburg",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.9356,
+    "lng": 6.544243,
+    "elevationM": 366.947724,
+    "runway": "",
+    "tower": 118.7,
+    "tacan": "56X BIT",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 111.9
+      }
+    ]
+  },
+  {
+    "id": "BRAUNSCHWEIG",
+    "name": "Braunschweig",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.318368,
+    "lng": 10.54111,
+    "elevationM": 83.225402,
+    "runway": "",
+    "tower": 120.05,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 111.1
+      }
+    ],
+    "ndb": [
+      {
+        "name": "BRU",
+        "khz": 427
+      },
+      {
+        "name": "HLI",
+        "khz": 403.5
+      }
+    ]
+  },
+  {
+    "id": "BREMEN",
+    "name": "Bremen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.047466,
+    "lng": 8.812903,
+    "elevationM": 12.41253,
+    "runway": "",
+    "tower": 118.45,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.3
+      },
+      {
+        "runway": "",
+        "mhz": 110.9
+      }
+    ],
+    "vor": "121X BMN",
+    "vorMhz": 117.45,
+    "ndb": [
+      {
+        "name": "BMN",
+        "khz": 346.5
+      },
+      {
+        "name": "BW",
+        "khz": 276.5
+      }
+    ]
+  },
+  {
+    "id": "BUCKEBURG",
+    "name": "Buckeburg",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.291743,
+    "lng": 9.091797,
+    "elevationM": 58.687444,
+    "runway": "",
+    "tower": 118.05,
+    "ndb": [
+      {
+        "name": "BYC",
+        "khz": 368
+      }
+    ]
+  },
+  {
+    "id": "CELLE",
+    "name": "Celle",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.600161,
+    "lng": 10.116684,
+    "elevationM": 40.103212,
+    "runway": "",
+    "tower": 122.1,
+    "ndb": [
+      {
+        "name": "CEL",
+        "khz": 311
+      }
+    ]
+  },
+  {
+    "id": "COLOGNE",
+    "name": "Cologne",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.859067,
+    "lng": 7.120216,
+    "elevationM": 71.929744,
+    "runway": "",
+    "tower": 119.7,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.1
+      },
+      {
+        "runway": "",
+        "mhz": 111.1
+      },
+      {
+        "runway": "",
+        "mhz": 110.9
+      }
+    ],
+    "vor": "KBO",
+    "vorMhz": 112.15,
+    "ndb": [
+      {
+        "name": "LV",
+        "khz": 327
+      },
+      {
+        "name": "LW",
+        "khz": 467
+      },
+      {
+        "name": "LJ",
+        "khz": 365
+      }
+    ]
+  },
+  {
+    "id": "CORAL",
+    "name": "Coral",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.571527,
+    "lng": 14.927902,
+    "elevationM": 43.886648,
+    "runway": "",
+    "tower": 121.25,
+    "ndb": [
+      {
+        "name": "C",
+        "khz": 285
+      },
+      {
+        "name": "C",
+        "khz": 285
+      },
+      {
+        "name": "CL",
+        "khz": 589
+      },
+      {
+        "name": "CL",
+        "khz": 589
+      }
+    ]
+  },
+  {
+    "id": "DEFEKT",
+    "name": "DEFEKT",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.600722,
+    "lng": 13.232318,
+    "elevationM": 30.317367,
+    "runway": "",
+    "tower": 124.5,
+    "ndb": [
+      {
+        "name": "T",
+        "khz": 950
+      },
+      {
+        "name": "DT",
+        "khz": 950
+      },
+      {
+        "name": "T",
+        "khz": 460
+      },
+      {
+        "name": "D",
+        "khz": 460
+      }
+    ]
+  },
+  {
+    "id": "DEDELOW",
+    "name": "Dedelow",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "DUSSELDORF",
+    "name": "Dusseldorf",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.277852,
+    "lng": 6.748636,
+    "elevationM": 36.920451,
+    "runway": "",
+    "tower": 118.3,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.9
+      },
+      {
+        "runway": "",
+        "mhz": 111.5
+      }
+    ],
+    "vor": "DUS",
+    "vorMhz": 115.15,
+    "ndb": [
+      {
+        "name": "LI",
+        "khz": 417
+      },
+      {
+        "name": "DY",
+        "khz": 284.5
+      }
+    ]
+  },
+  {
+    "id": "FRANKFURT",
+    "name": "FRANKFURT",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.047996,
+    "lng": 8.598907,
+    "elevationM": 100.0001,
+    "runway": "",
+    "tower": 127.3,
+    "tacan": "89X FFM",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.7
+      },
+      {
+        "runway": "",
+        "mhz": 109.5
+      },
+      {
+        "runway": "",
+        "mhz": 110.1
+      },
+      {
+        "runway": "",
+        "mhz": 111.1
+      }
+    ],
+    "vor": "89X FFM",
+    "vorMhz": 114.2,
+    "ndb": [
+      {
+        "name": "FR",
+        "khz": 297
+      },
+      {
+        "name": "FW",
+        "khz": 382
+      },
+      {
+        "name": "FFM",
+        "khz": 320
+      }
+    ]
+  },
+  {
+    "id": "FASSBERG",
+    "name": "Fassberg",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.917979,
+    "lng": 10.183958,
+    "elevationM": 77.417749,
+    "runway": "",
+    "tower": 122.1,
+    "tacan": "95X FSB",
+    "vor": "95X FSB",
+    "vorMhz": 110,
+    "ndb": [
+      {
+        "name": "FSB",
+        "khz": 284
+      }
+    ]
+  },
+  {
+    "id": "FRITZLAR",
+    "name": "Fritzlar",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.112502,
+    "lng": 9.282108,
+    "elevationM": 171.01604,
+    "runway": "",
+    "tower": 126.5,
+    "ndb": [
+      {
+        "name": "FTZ",
+        "khz": 468
+      }
+    ]
+  },
+  {
+    "id": "FULDA",
+    "name": "Fulda",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.541545,
+    "lng": 9.635033,
+    "elevationM": 285.720989,
+    "runway": "",
+    "tower": 126,
+    "tacan": "58X FUL",
+    "vor": "58X FUL",
+    "vorMhz": 112.1,
+    "ndb": [
+      {
+        "name": "FDA",
+        "khz": 441
+      }
+    ]
+  },
+  {
+    "id": "GAZOVIJ",
+    "name": "GAZOVIJ",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.205627,
+    "lng": 12.543043,
+    "elevationM": 67.418456,
+    "runway": "",
+    "tower": 118.5,
+    "rsbn": "GJ",
+    "ndb": [
+      {
+        "name": "G",
+        "khz": 205
+      },
+      {
+        "name": "GJ",
+        "khz": 421
+      },
+      {
+        "name": "O",
+        "khz": 205
+      },
+      {
+        "name": "OR",
+        "khz": 421
+      }
+    ]
+  },
+  {
+    "id": "GESETZ",
+    "name": "GESETZ",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.882283,
+    "lng": 14.130466,
+    "elevationM": 19.351868,
+    "runway": "",
+    "tower": 132.8,
+    "ndb": [
+      {
+        "name": "GZ",
+        "khz": 679.5
+      },
+      {
+        "name": "G",
+        "khz": 330
+      },
+      {
+        "name": "ZG",
+        "khz": 679.5
+      },
+      {
+        "name": "G",
+        "khz": 330
+      }
+    ]
+  },
+  {
+    "id": "GIDROSTAT",
+    "name": "GIDROSTAT",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.94779,
+    "lng": 12.710109,
+    "elevationM": 42.828797,
+    "runway": "",
+    "tower": 123.5,
+    "ndb": [
+      {
+        "name": "GK",
+        "khz": 842
+      },
+      {
+        "name": "WO",
+        "khz": 842
+      },
+      {
+        "name": "W",
+        "khz": 412
+      },
+      {
+        "name": "G",
+        "khz": 412
+      }
+    ]
+  },
+  {
+    "id": "GREIF",
+    "name": "GREIF",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 127
+  },
+  {
+    "id": "GUSAR",
+    "name": "GUSAR",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.302987,
+    "lng": 12.731579,
+    "elevationM": 61.741597,
+    "runway": "",
+    "tower": 129.9,
+    "rsbn": "LZ",
+    "ndb": [
+      {
+        "name": "U",
+        "khz": 476
+      },
+      {
+        "name": "BA",
+        "khz": 965
+      },
+      {
+        "name": "B",
+        "khz": 476
+      },
+      {
+        "name": "UK",
+        "khz": 965
+      }
+    ]
+  },
+  {
+    "id": "GARDELEGEN",
+    "name": "Gardelegen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.53274,
+    "lng": 11.353838,
+    "elevationM": 55.785243,
+    "runway": "",
+    "tower": 119,
+    "rsbn": "GN"
+  },
+  {
+    "id": "GATOW",
+    "name": "Gatow",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.47367,
+    "lng": 13.123815,
+    "elevationM": 41.599109,
+    "runway": "",
+    "tower": 122.1,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 108.9
+      }
+    ],
+    "vor": "HVL",
+    "vorMhz": 113.3,
+    "ndb": [
+      {
+        "name": "GW",
+        "khz": 370.5
+      }
+    ]
+  },
+  {
+    "id": "GELNHAUSEN",
+    "name": "Gelnhausen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "GIEBELSTADT",
+    "name": "Giebelstadt",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.643663,
+    "lng": 9.950428,
+    "elevationM": 290.41005,
+    "runway": "",
+    "tower": 135.9,
+    "tacan": "47X GBL",
+    "ndb": [
+      {
+        "name": "GBL",
+        "khz": 507
+      }
+    ]
+  },
+  {
+    "id": "GLINDBRUCHKIPPE",
+    "name": "Glindbruchkippe",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "GROSSEWIESE",
+    "name": "GrosseWiese",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.6
+  },
+  {
+    "id": "GUTERSLOH",
+    "name": "Gutersloh",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.922912,
+    "lng": 8.284748,
+    "elevationM": 65.000065,
+    "runway": "",
+    "tower": 122.1,
+    "tacan": "108X GSO",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.7
+      }
+    ],
+    "ndb": [
+      {
+        "name": "GS",
+        "khz": 412
+      }
+    ]
+  },
+  {
+    "id": "HALIFAX",
+    "name": "HALIFAX",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.768805,
+    "lng": 13.142153,
+    "elevationM": 74.549254,
+    "runway": "",
+    "tower": 118.2,
+    "rsbn": "HX",
+    "ndb": [
+      {
+        "name": "XH",
+        "khz": 609.5
+      },
+      {
+        "name": "HX",
+        "khz": 609.5
+      },
+      {
+        "name": "X",
+        "khz": 295
+      },
+      {
+        "name": "H",
+        "khz": 295
+      }
+    ]
+  },
+  {
+    "id": "HAHN",
+    "name": "Hahn",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.935547,
+    "lng": 7.251175,
+    "elevationM": 494.13703,
+    "runway": "",
+    "tower": 119.5,
+    "tacan": "24X HAH",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 111.3
+      },
+      {
+        "runway": "",
+        "mhz": 109.3
+      }
+    ],
+    "vor": "HAH",
+    "vorMhz": 113,
+    "ndb": [
+      {
+        "name": "HAH",
+        "khz": 482
+      }
+    ]
+  },
+  {
+    "id": "HAINA",
+    "name": "Haina",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119.75
+  },
+  {
+    "id": "HAMBURG",
+    "name": "Hamburg",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.623165,
+    "lng": 10.002267,
+    "elevationM": 22.186412,
+    "runway": "",
+    "tower": 126.85,
+    "tacan": "78X HAM",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 111.35
+      },
+      {
+        "runway": "",
+        "mhz": 109.9
+      },
+      {
+        "runway": "",
+        "mhz": 110.5
+      },
+      {
+        "runway": "",
+        "mhz": 111.5
+      }
+    ],
+    "vor": "105X ALF",
+    "vorMhz": 115.8,
+    "ndb": [
+      {
+        "name": "FU",
+        "khz": 350.5
+      },
+      {
+        "name": "GT",
+        "khz": 323
+      },
+      {
+        "name": "HAM",
+        "khz": 339
+      }
+    ]
+  },
+  {
+    "id": "HAMBURGFINKENWERDER",
+    "name": "HamburgFinkenwerder",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.528088,
+    "lng": 9.820044,
+    "elevationM": 3.15411,
+    "runway": "",
+    "tower": 123.2,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.7
+      },
+      {
+        "runway": "",
+        "mhz": 108.5
+      }
+    ]
+  },
+  {
+    "id": "HANNOVER",
+    "name": "Hannover",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.453909,
+    "lng": 9.715167,
+    "elevationM": 51.180936,
+    "runway": "",
+    "tower": 120.2,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.5
+      },
+      {
+        "runway": "",
+        "mhz": 108.9
+      },
+      {
+        "runway": "",
+        "mhz": 108.7
+      },
+      {
+        "runway": "",
+        "mhz": 108.3
+      }
+    ],
+    "ndb": [
+      {
+        "name": "HW",
+        "khz": 358
+      },
+      {
+        "name": "HA",
+        "khz": 320
+      },
+      {
+        "name": "HAE",
+        "khz": 332
+      }
+    ]
+  },
+  {
+    "id": "HASSELFELDE",
+    "name": "Hasselfelde",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "HEIDELBERG",
+    "name": "Heidelberg",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.390014,
+    "lng": 8.619924,
+    "elevationM": 106.056174,
+    "runway": "",
+    "tower": 142.2,
+    "ndb": [
+      {
+        "name": "HDL",
+        "khz": 417
+      }
+    ]
+  },
+  {
+    "id": "HERRENTEICH",
+    "name": "Herrenteich",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 127.4
+  },
+  {
+    "id": "HILDESHEIM",
+    "name": "HildesHeim",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118.3
+  },
+  {
+    "id": "HOCKENHEIM",
+    "name": "Hockenheim",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.6
+  },
+  {
+    "id": "KLEJONKA",
+    "name": "KLEJONKA",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.432656,
+    "lng": 11.784527,
+    "elevationM": 52.000052,
+    "runway": "",
+    "tower": 129,
+    "rsbn": "PM",
+    "ndb": [
+      {
+        "name": "UU",
+        "khz": 376
+      },
+      {
+        "name": "A",
+        "khz": 766
+      },
+      {
+        "name": "AS",
+        "khz": 376
+      },
+      {
+        "name": "U",
+        "khz": 766
+      }
+    ]
+  },
+  {
+    "id": "KUKAN",
+    "name": "KUKAN",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.631769,
+    "lng": 11.848996,
+    "elevationM": 37.214759,
+    "runway": "",
+    "tower": 122,
+    "ndb": [
+      {
+        "name": "U",
+        "khz": 449
+      },
+      {
+        "name": "UK",
+        "khz": 910
+      }
+    ]
+  },
+  {
+    "id": "KAMMERMARK",
+    "name": "Kammermark",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "KASTRUP",
+    "name": "Kastrup",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 55.618072,
+    "lng": 12.643565,
+    "elevationM": 7.751138,
+    "runway": "",
+    "tower": 118.1,
+    "tacan": "72X KAS",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.5
+      },
+      {
+        "runway": "",
+        "mhz": 110.9
+      },
+      {
+        "runway": "",
+        "mhz": 108.9
+      },
+      {
+        "runway": "",
+        "mhz": 109.9
+      },
+      {
+        "runway": "",
+        "mhz": 109.5
+      },
+      {
+        "runway": "",
+        "mhz": 109.3
+      }
+    ],
+    "vor": "KAS",
+    "vorMhz": 112.5,
+    "ndb": [
+      {
+        "name": "KAS",
+        "khz": 340
+      }
+    ]
+  },
+  {
+    "id": "KIEL",
+    "name": "Kiel",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 54.380683,
+    "lng": 10.159997,
+    "elevationM": 3.000003,
+    "runway": "",
+    "tower": 119.9,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.5
+      },
+      {
+        "runway": "",
+        "mhz": 109.55
+      }
+    ],
+    "ndb": [
+      {
+        "name": "KIL",
+        "khz": 383.5
+      }
+    ]
+  },
+  {
+    "id": "LATEX",
+    "name": "LATEX",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.41898,
+    "lng": 12.204437,
+    "elevationM": 128.346518,
+    "runway": "",
+    "tower": 129,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.3
+      }
+    ],
+    "ndb": [
+      {
+        "name": "SK",
+        "khz": 446
+      },
+      {
+        "name": "M",
+        "khz": 425
+      },
+      {
+        "name": "S",
+        "khz": 425
+      },
+      {
+        "name": "MA",
+        "khz": 357
+      }
+    ]
+  },
+  {
+    "id": "LEKTORSTART",
+    "name": "LEKTORSTART",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.91589,
+    "lng": 12.30635,
+    "elevationM": 35.000035,
+    "runway": "",
+    "tower": 129.5,
+    "rsbn": "LR",
+    "ndb": [
+      {
+        "name": "R",
+        "khz": 976
+      },
+      {
+        "name": "RL",
+        "khz": 1247
+      },
+      {
+        "name": "L",
+        "khz": 976
+      },
+      {
+        "name": "LR",
+        "khz": 1247
+      }
+    ]
+  },
+  {
+    "id": "LEOPARD",
+    "name": "LEOPARD",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.031627,
+    "lng": 13.512076,
+    "elevationM": 73.755643,
+    "runway": "",
+    "tower": 128,
+    "rsbn": "LD",
+    "ndb": [
+      {
+        "name": "P",
+        "khz": 219
+      },
+      {
+        "name": "PG",
+        "khz": 451
+      },
+      {
+        "name": "IK",
+        "khz": 451
+      },
+      {
+        "name": "I",
+        "khz": 219
+      }
+    ]
+  },
+  {
+    "id": "LEXIJA",
+    "name": "LEXIJA",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.994426,
+    "lng": 12.977758,
+    "elevationM": 95.000095,
+    "runway": "",
+    "tower": 122.5,
+    "rsbn": "AR",
+    "ndb": [
+      {
+        "name": "L",
+        "khz": 645
+      },
+      {
+        "name": "B",
+        "khz": 645
+      },
+      {
+        "name": "LG",
+        "khz": 313
+      },
+      {
+        "name": "BM",
+        "khz": 313
+      }
+    ]
+  },
+  {
+    "id": "LANDSTUHL",
+    "name": "Landstuhl",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 138.6
+  },
+  {
+    "id": "LANGENSELBOLD",
+    "name": "Langenselbold",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 126.1
+  },
+  {
+    "id": "LUBECK",
+    "name": "Lubeck",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.800833,
+    "lng": 10.695843,
+    "elevationM": 21.926553,
+    "runway": "",
+    "tower": 128.7,
+    "ndb": [
+      {
+        "name": "LYE",
+        "khz": 394
+      }
+    ]
+  },
+  {
+    "id": "LUNEBURG",
+    "name": "Luneburg",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 136.5
+  },
+  {
+    "id": "MELODRAMA",
+    "name": "MELODRAMA",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 54.268152,
+    "lng": 12.465464,
+    "elevationM": 8.148032,
+    "runway": "",
+    "tower": 127.1,
+    "rsbn": "MA",
+    "ndb": [
+      {
+        "name": "MA",
+        "khz": 668
+      },
+      {
+        "name": "N",
+        "khz": 325
+      },
+      {
+        "name": "M",
+        "khz": 325
+      },
+      {
+        "name": "NW",
+        "khz": 668
+      }
+    ]
+  },
+  {
+    "id": "MOCKAU",
+    "name": "MOCKAU",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.405097,
+    "lng": 12.44275,
+    "elevationM": 132.845226,
+    "runway": "",
+    "tower": 119.75,
+    "ndb": [
+      {
+        "name": "LG",
+        "khz": 335
+      },
+      {
+        "name": "G",
+        "khz": 426
+      },
+      {
+        "name": "L",
+        "khz": 426
+      }
+    ]
+  },
+  {
+    "id": "MUSKAT",
+    "name": "MUSKAT",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.36088,
+    "lng": 11.930464,
+    "elevationM": 103.550046,
+    "runway": "",
+    "tower": 127.2,
+    "rsbn": "DK",
+    "ndb": [
+      {
+        "name": "DK",
+        "khz": 398
+      },
+      {
+        "name": "K",
+        "khz": 810
+      },
+      {
+        "name": "D",
+        "khz": 810
+      },
+      {
+        "name": "KD",
+        "khz": 398
+      }
+    ]
+  },
+  {
+    "id": "MAINZFINTHEN",
+    "name": "Mainz Finthen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.969275,
+    "lng": 8.151811,
+    "elevationM": 220.486854,
+    "runway": "",
+    "tower": 124,
+    "ndb": [
+      {
+        "name": "FY",
+        "khz": 470
+      }
+    ]
+  },
+  {
+    "id": "MENDIG",
+    "name": "Mendig",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.367624,
+    "lng": 7.314332,
+    "elevationM": 183.051285,
+    "runway": "",
+    "tower": 122.1,
+    "ndb": [
+      {
+        "name": "NMN",
+        "khz": 331
+      }
+    ]
+  },
+  {
+    "id": "NARSAN",
+    "name": "NARSAN",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.83059,
+    "lng": 13.662013,
+    "elevationM": 34.417309,
+    "runway": "",
+    "tower": 125.8,
+    "ndb": [
+      {
+        "name": "R",
+        "khz": 895
+      },
+      {
+        "name": "OM",
+        "khz": 442
+      },
+      {
+        "name": "RG",
+        "khz": 442
+      },
+      {
+        "name": "O",
+        "khz": 895
+      }
+    ]
+  },
+  {
+    "id": "NARCOZE",
+    "name": "Narcoze",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 54.158549,
+    "lng": 13.758682,
+    "elevationM": 7.000007,
+    "runway": "",
+    "tower": 124,
+    "rsbn": "NE",
+    "ndb": [
+      {
+        "name": "N",
+        "khz": 867
+      },
+      {
+        "name": "E",
+        "khz": 867
+      },
+      {
+        "name": "NE",
+        "khz": 423
+      },
+      {
+        "name": "EN",
+        "khz": 423
+      }
+    ]
+  },
+  {
+    "id": "NORDHOLZ",
+    "name": "Nordholz",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 53.764624,
+    "lng": 8.633729,
+    "elevationM": 12.000012,
+    "runway": "",
+    "tower": 142.9,
+    "tacan": "118X NDO",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 111.9
+      }
+    ],
+    "ndb": [
+      {
+        "name": "NDO",
+        "khz": 372
+      }
+    ]
+  },
+  {
+    "id": "NORTHEIM",
+    "name": "Northeim",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.6
+  },
+  {
+    "id": "NORVENICH",
+    "name": "Norvenich",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.831069,
+    "lng": 6.662962,
+    "elevationM": 90.198393,
+    "runway": "",
+    "tower": 123,
+    "tacan": "77X NOR",
+    "vor": "77X NOR",
+    "vorMhz": 116.2
+  },
+  {
+    "id": "OSENNIY",
+    "name": "OSENNIY",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.388343,
+    "lng": 11.806188,
+    "elevationM": 46.373223,
+    "runway": "",
+    "tower": 126.1,
+    "rsbn": "MK",
+    "ndb": [
+      {
+        "name": "NU",
+        "khz": 620
+      },
+      {
+        "name": "ZW",
+        "khz": 620
+      },
+      {
+        "name": "Z",
+        "khz": 300
+      },
+      {
+        "name": "Z",
+        "khz": 300
+      }
+    ]
+  },
+  {
+    "id": "OBERMORLEN",
+    "name": "Ober-Morlen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.6
+  },
+  {
+    "id": "PESTRIJ",
+    "name": "PESTRIJ",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.252276,
+    "lng": 10.703495,
+    "elevationM": 304.082274,
+    "runway": "",
+    "tower": 122.9,
+    "ndb": [
+      {
+        "name": "QI",
+        "khz": 445
+      },
+      {
+        "name": "Q",
+        "khz": 217
+      }
+    ]
+  },
+  {
+    "id": "PROIMA",
+    "name": "PROIMA",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.980995,
+    "lng": 10.943123,
+    "elevationM": 310.096868,
+    "runway": "",
+    "tower": 122.1,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.9
+      }
+    ],
+    "ndb": [
+      {
+        "name": "RF",
+        "khz": 410
+      },
+      {
+        "name": "R",
+        "khz": 330
+      },
+      {
+        "name": "F",
+        "khz": 330
+      },
+      {
+        "name": "FR",
+        "khz": 306
+      }
+    ]
+  },
+  {
+    "id": "PERWENITZ",
+    "name": "Perwenitz",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118
+  },
+  {
+    "id": "PFERDSFELD",
+    "name": "Pferdsfeld",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.858278,
+    "lng": 7.600243,
+    "elevationM": 400.050449,
+    "runway": "",
+    "tower": 132.65,
+    "tacan": "77X PFF",
+    "ndb": [
+      {
+        "name": "PFF",
+        "khz": 394
+      }
+    ]
+  },
+  {
+    "id": "PINNOW",
+    "name": "Pinnow",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "POTTSCHUTTHOHE",
+    "name": "Pottschutthohe",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.6
+  },
+  {
+    "id": "RAMSTEIN",
+    "name": "RAMSTEIN",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.435961,
+    "lng": 7.5777,
+    "elevationM": 245.303041,
+    "runway": "",
+    "tower": 133.2,
+    "tacan": "81X RMS",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.75
+      },
+      {
+        "runway": "",
+        "mhz": 111.5
+      }
+    ]
+  },
+  {
+    "id": "REVINGE",
+    "name": "Revinge",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 142.9
+  },
+  {
+    "id": "RINTELN",
+    "name": "Rinteln",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.8
+  },
+  {
+    "id": "RONNE",
+    "name": "Ronne",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 55.058193,
+    "lng": 14.779682,
+    "elevationM": 15.000015,
+    "runway": "",
+    "tower": 118.35,
+    "tacan": "57X ROE",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.35
+      },
+      {
+        "runway": "",
+        "mhz": 110.3
+      }
+    ],
+    "vor": "ROE",
+    "vorMhz": 112,
+    "ndb": [
+      {
+        "name": "FAU",
+        "khz": 334
+      }
+    ]
+  },
+  {
+    "id": "SADOVIJ",
+    "name": "SADOVIJ",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.865313,
+    "lng": 11.486367,
+    "elevationM": 136.412047,
+    "runway": "",
+    "tower": 126,
+    "ndb": [
+      {
+        "name": "S",
+        "khz": 950
+      },
+      {
+        "name": "SL",
+        "khz": 470
+      }
+    ]
+  },
+  {
+    "id": "SEMBACH",
+    "name": "SEMBACH",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.506848,
+    "lng": 7.869962,
+    "elevationM": 311.434638,
+    "runway": "",
+    "tower": 121.5,
+    "tacan": "28X SEM",
+    "ndb": [
+      {
+        "name": "SEX",
+        "khz": 428
+      }
+    ]
+  },
+  {
+    "id": "SEMELNI",
+    "name": "SEMELNI",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.720732,
+    "lng": 11.975168,
+    "elevationM": 86.643336,
+    "runway": "",
+    "tower": 125.9,
+    "rsbn": "KT",
+    "ndb": [
+      {
+        "name": "GX",
+        "khz": 350
+      },
+      {
+        "name": "RC",
+        "khz": 350
+      },
+      {
+        "name": "R",
+        "khz": 718
+      },
+      {
+        "name": "G",
+        "khz": 718
+      }
+    ]
+  },
+  {
+    "id": "SOUVENIR",
+    "name": "SOUVENIR",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.134881,
+    "lng": 13.319215,
+    "elevationM": 56.448482,
+    "runway": "",
+    "tower": 123.1,
+    "rsbn": "SR",
+    "ndb": [
+      {
+        "name": "ChC",
+        "khz": 221
+      },
+      {
+        "name": "CH",
+        "khz": 254
+      },
+      {
+        "name": "N",
+        "khz": 254
+      },
+      {
+        "name": "NZ",
+        "khz": 221
+      }
+    ]
+  },
+  {
+    "id": "SCHONEFELD",
+    "name": "Schonefeld",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.378521,
+    "lng": 13.510343,
+    "elevationM": 45.265899,
+    "runway": "",
+    "tower": 121.3,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 110.3
+      },
+      {
+        "runway": "",
+        "mhz": 110.7
+      },
+      {
+        "runway": "",
+        "mhz": 109.9
+      }
+    ],
+    "ndb": [
+      {
+        "name": "M",
+        "khz": 430
+      },
+      {
+        "name": "MV",
+        "khz": 309
+      },
+      {
+        "name": "SL",
+        "khz": 299
+      },
+      {
+        "name": "S",
+        "khz": 430
+      }
+    ]
+  },
+  {
+    "id": "SCHWEINFURT",
+    "name": "Schweinfurt",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.051586,
+    "lng": 10.177669,
+    "elevationM": 228.767105,
+    "runway": "",
+    "tower": 119.95,
+    "ndb": [
+      {
+        "name": "SCF",
+        "khz": 363
+      }
+    ]
+  },
+  {
+    "id": "SITTENSEN",
+    "name": "Sittensen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118
+  },
+  {
+    "id": "SPANGDAHLEM",
+    "name": "Spangdahlem",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.988554,
+    "lng": 6.717135,
+    "elevationM": 300.0003,
+    "runway": "",
+    "tower": 122.2,
+    "tacan": "32X SPA",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.15
+      },
+      {
+        "runway": "",
+        "mhz": 108.1
+      }
+    ]
+  },
+  {
+    "id": "SPRENDLINGEN",
+    "name": "Sprendlingen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118
+  },
+  {
+    "id": "STURUP",
+    "name": "Sturup",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 55.520645,
+    "lng": 13.379406,
+    "elevationM": 66.16142,
+    "runway": "",
+    "tower": 118.8,
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 111.9
+      },
+      {
+        "runway": "",
+        "mhz": 108.1
+      }
+    ],
+    "vor": "77X SUP",
+    "vorMhz": 113,
+    "ndb": [
+      {
+        "name": "NS",
+        "khz": 351
+      },
+      {
+        "name": "SS",
+        "khz": 420
+      }
+    ]
+  },
+  {
+    "id": "TAGRA",
+    "name": "Tagra",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118
+  },
+  {
+    "id": "TEGEL",
+    "name": "Tegel",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.560578,
+    "lng": 13.314592,
+    "elevationM": 34.910763,
+    "runway": "",
+    "tower": 124.5,
+    "tacan": "70X TGL",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 108.5
+      },
+      {
+        "runway": "",
+        "mhz": 109.1
+      },
+      {
+        "runway": "",
+        "mhz": 110.1
+      },
+      {
+        "runway": "",
+        "mhz": 109.3
+      }
+    ],
+    "vor": "70X TGL",
+    "vorMhz": 112.3,
+    "ndb": [
+      {
+        "name": "RW",
+        "khz": 392
+      },
+      {
+        "name": "GL",
+        "khz": 321.5
+      },
+      {
+        "name": "DLS",
+        "khz": 413.5
+      }
+    ]
+  },
+  {
+    "id": "TEMPELHOF",
+    "name": "Tempelhof",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.471471,
+    "lng": 13.420701,
+    "elevationM": 47.000047,
+    "runway": "",
+    "tower": 119.5,
+    "tacan": "88X TOF",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.7
+      },
+      {
+        "runway": "",
+        "mhz": 109.5
+      }
+    ],
+    "vor": "88X TOF",
+    "vorMhz": 114.1,
+    "ndb": [
+      {
+        "name": "DBR",
+        "khz": 347
+      },
+      {
+        "name": "DIP",
+        "khz": 327
+      }
+    ]
+  },
+  {
+    "id": "THURLAND",
+    "name": "Thurland",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118
+  },
+  {
+    "id": "UNRECHT",
+    "name": "UNRECHT",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.436038,
+    "lng": 12.458448,
+    "elevationM": 35.102937,
+    "runway": "",
+    "tower": 135.55,
+    "rsbn": "UT"
+  },
+  {
+    "id": "UELZEN",
+    "name": "Uelzen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119.1
+  },
+  {
+    "id": "UETERSEN",
+    "name": "Uetersen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "UMMERN",
+    "name": "Ummern",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.2
+  },
+  {
+    "id": "VERDENSCHARNHORST",
+    "name": "Verden-Scharnhorst",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 127.7
+  },
+  {
+    "id": "WADAJOM",
+    "name": "WADAJOM",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.379075,
+    "lng": 11.445329,
+    "elevationM": 284.80836,
+    "runway": "",
+    "tower": 132.5,
+    "rsbn": "AL",
+    "ndb": [
+      {
+        "name": "L",
+        "khz": 740
+      },
+      {
+        "name": "LU",
+        "khz": 365
+      },
+      {
+        "name": "BZ",
+        "khz": 365
+      },
+      {
+        "name": "B",
+        "khz": 740
+      },
+      {
+        "name": "CLH",
+        "khz": 419
+      }
+    ]
+  },
+  {
+    "id": "WALLDORF",
+    "name": "Walldorf",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.6
+  },
+  {
+    "id": "WARENVIELIST",
+    "name": "Waren_Vielist",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.8
+  },
+  {
+    "id": "WERNEUCHEN",
+    "name": "Werneuchen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.629948,
+    "lng": 13.767737,
+    "elevationM": 78.798251,
+    "runway": "",
+    "tower": 122.6,
+    "rsbn": "WC"
+  },
+  {
+    "id": "WESERWUMME",
+    "name": "WeserWumme",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 119
+  },
+  {
+    "id": "WIESBADEN",
+    "name": "Wiesbaden",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 50.04609,
+    "lng": 8.310909,
+    "elevationM": 138.09575,
+    "runway": "",
+    "tower": 118.1,
+    "tacan": "88X WBD",
+    "ndb": [
+      {
+        "name": "WIB",
+        "khz": 399
+      }
+    ]
+  },
+  {
+    "id": "WISMAR",
+    "name": "Wismar",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 134.3
+  },
+  {
+    "id": "WORMS",
+    "name": "Worms",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 127.1
+  },
+  {
+    "id": "WUNSTORF",
+    "name": "Wunstorf",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.455804,
+    "lng": 9.410402,
+    "elevationM": 47.260755,
+    "runway": "",
+    "tower": 121.1,
+    "tacan": "116X WUN",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 109.7
+      }
+    ],
+    "ndb": [
+      {
+        "name": "WUN",
+        "khz": 419
+      }
+    ]
+  },
+  {
+    "id": "WURZEN",
+    "name": "Wurzen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.83113,
+    "lng": 12.258546,
+    "elevationM": 65.735211,
+    "runway": "",
+    "tower": 127.5,
+    "ndb": [
+      {
+        "name": "W",
+        "khz": 668
+      },
+      {
+        "name": "WN",
+        "khz": 765
+      }
+    ]
+  },
+  {
+    "id": "ZADAR",
+    "name": "ZADAR",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.7444,
+    "lng": 13.203958,
+    "elevationM": 33.363181,
+    "runway": "",
+    "tower": 124,
+    "ndb": [
+      {
+        "name": "H",
+        "khz": 286
+      },
+      {
+        "name": "HL",
+        "khz": 589
+      }
+    ]
+  },
+  {
+    "id": "ZAPAIKA",
+    "name": "ZAPAIKA",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 51.333062,
+    "lng": 12.684809,
+    "elevationM": 155.043185,
+    "runway": "",
+    "tower": 118.15,
+    "ndb": [
+      {
+        "name": "C",
+        "khz": 483
+      },
+      {
+        "name": "CZ",
+        "khz": 980
+      }
+    ]
+  },
+  {
+    "id": "ZWEROBOJ",
+    "name": "ZWEROBOJ",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.038279,
+    "lng": 13.747754,
+    "elevationM": 50.000042,
+    "runway": "",
+    "tower": 122.3,
+    "rsbn": "ZB",
+    "ndb": [
+      {
+        "name": "ZP",
+        "khz": 360
+      },
+      {
+        "name": "Z",
+        "khz": 735
+      },
+      {
+        "name": "D",
+        "khz": 735
+      },
+      {
+        "name": "DW",
+        "khz": 360
+      }
+    ]
+  },
+  {
+    "id": "ZERBST",
+    "name": "Zerbst",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 52.005305,
+    "lng": 12.163706,
+    "elevationM": 76.196983,
+    "runway": "",
+    "tower": 119.8,
+    "rsbn": "KJ",
+    "ndb": [
+      {
+        "name": "Z",
+        "khz": 345
+      },
+      {
+        "name": "KJ",
+        "khz": 708
+      },
+      {
+        "name": "K",
+        "khz": 345
+      },
+      {
+        "name": "ZB",
+        "khz": 708
+      }
+    ]
+  },
+  {
+    "id": "ZOLLSCHEN",
+    "name": "Zollschen",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 0,
+    "lng": 0,
+    "elevationM": 0,
+    "runway": "",
+    "tower": 118
+  },
+  {
+    "id": "ZWEIBRUCKEN",
+    "name": "Zweibrucken",
+    "theatre": "GermanyCW",
+    "coalition": "",
+    "lat": 49.221555,
+    "lng": 7.411411,
+    "elevationM": 330.219477,
+    "runway": "",
+    "tower": 123,
+    "tacan": "48X ZBU",
+    "ils": [
+      {
+        "runway": "",
+        "mhz": 111.1
+      }
+    ]
+  }
+]

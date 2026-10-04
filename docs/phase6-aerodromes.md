@@ -22,6 +22,12 @@ Soganlug, Vaziani, Gudauta, Sukhumi, Anapa, Gelendzhik, Maykop, Krasnodar
 Pashkovsky and Center, Novorossiysk, Krymsk, Mineralnye Vody, Nalchik, Beslan,
 Sochi-Adler, Mozdok).
 
+**Cold War Germany** (`GermanyCW`): 119 airfields, extracted from DCS's own
+terrain files. DCS gives every field a Tower frequency but a position only when
+a navigation aid exists, so 77 carry coordinates and 42 are listed without one.
+Regenerate the dataset with
+`go run ./cmd/gen-aerodrome "<DCS>/Mods/terrains" GermanyCW internal/aerodrome/data/germanycw.json`.
+
 The format is **generic**: adding a theatre = dropping a
 `internal/aerodrome/data/<theatre>.json` following the same model, nothing else to
 change.
@@ -76,7 +82,11 @@ light and not redistribute documents potentially under copyright.
 - The coordinates come from the `RWY` line of the charts and were converted
   to decimal degrees; the **CRP** (reference point) may differ slightly from the
   visual centre of the airfield.
-- Only the **Caucasus** is populated for now.
+- Only the **Caucasus** and **Cold War Germany** are populated in the bundled
+  dataset; every other map is read live from DCS when it is installed.
+- **42 of the 119 Cold War Germany airfields have no coordinates**: DCS records a
+  position only for a field that carries a navigation aid, and those fields have
+  a tower frequency but no beacon.
 
 ## Tests
 

@@ -14,15 +14,20 @@ import (
 // Beacon type constants, as written in DCS's beacons.lua. Only the ones we
 // surface are listed; anything else is ignored rather than guessed at.
 const (
-	beaconTACAN   = "BEACON_TYPE_TACAN"
-	beaconVOR     = "BEACON_TYPE_VOR"
-	beaconVORDME  = "BEACON_TYPE_VOR_DME"
-	beaconVORTAC  = "BEACON_TYPE_VORTAC"
-	beaconRSBN    = "BEACON_TYPE_RSBN"
-	beaconILS     = "BEACON_TYPE_ILS_LOCALIZER"
-	beaconPRMG    = "BEACON_TYPE_PRMG_LOCALIZER"
-	beaconNDB     = "BEACON_TYPE_AIRPORT_HOMER"
-	beaconNDBMark = "BEACON_TYPE_AIRPORT_HOMER_WITH_MARKER"
+	beaconTACAN = "BEACON_TYPE_TACAN"
+	// beaconAirportTACAN is a TACAN installed as the airfield's own facility
+	// rather than one paired with a VOR. DCS uses it on the Cold War Germany
+	// map (Nordholz, channel 118); without this case it fell through the switch
+	// and the airfield lost its TACAN entirely.
+	beaconAirportTACAN = "BEACON_TYPE_AIRPORT_TACAN"
+	beaconVOR          = "BEACON_TYPE_VOR"
+	beaconVORDME       = "BEACON_TYPE_VOR_DME"
+	beaconVORTAC       = "BEACON_TYPE_VORTAC"
+	beaconRSBN         = "BEACON_TYPE_RSBN"
+	beaconILS          = "BEACON_TYPE_ILS_LOCALIZER"
+	beaconPRMG         = "BEACON_TYPE_PRMG_LOCALIZER"
+	beaconNDB          = "BEACON_TYPE_AIRPORT_HOMER"
+	beaconNDBMark      = "BEACON_TYPE_AIRPORT_HOMER_WITH_MARKER"
 	// A plain homer is a stand-alone non-directional beacon (an ADF the pilot can
 	// tune), and the far/near homers are the outer/inner markers of an ILS. All
 	// three carry an LF frequency and are shown as NDBs.
@@ -283,11 +288,20 @@ func loadBeacons(path string) ([]beaconEntry, error) {
 			continue
 		}
 		id, _ := e["beaconId"].(string)
-		if !strings.HasPrefix(id, "airfield") {
+		// Most "world_*" beacons belong to no airfield and are ignored. A few,
+		// however, name the field they serve in display_name instead of carrying
+		// an airfield id — Cold War Germany models Hamburg's and Fulda's VORTAC
+		// this way. Those are kept and attached by name during the merge; a
+		// nameless one is dropped there. Anything that is neither is skipped.
+		_, isWorld := strings.CutPrefix(id, "world_")
+		if !strings.HasPrefix(id, "airfield") && !isWorld {
 			continue
 		}
 		b := beaconEntry{id: id}
 		b.name, _ = e["display_name"].(string)
+		if isWorld && b.name == "" {
+			continue
+		}
 		b.kind, _ = e["type"].(string)
 		b.callsign, _ = e["callsign"].(string)
 		b.hz, _ = e["frequency"].(float64) // 0 when the beacon has no frequency
@@ -344,13 +358,43 @@ func loadTowns(path string) ([]Town, error) {
 func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre string) ([]Aerodrome, []string) {
 	// Group beacons by airfield number, so both files can be matched even when
 	// their identifiers differ in suffix.
+	//
+	// A beacon whose id is not an airfield (a "world_*" beacon) usually belongs
+	// to no field and is ignored. Some, however, name the field they serve in
+	// their display_name instead of carrying an airfield id — Cold War Germany
+	// models Hamburg's and Fulda's VORTAC that way. Those are kept aside and
+	// attached below, by name.
 	byAirfield := map[int][]beaconEntry{}
+	var orphanNamed []beaconEntry
 	for _, b := range beacons {
 		n := airfieldNumber(b.id)
 		if n < 0 {
+			if b.name != "" {
+				orphanNamed = append(orphanNamed, b)
+			}
 			continue
 		}
 		byAirfield[n] = append(byAirfield[n], b)
+	}
+
+	// Attach a stand-alone named beacon to the airfield of the same name, so it
+	// keeps its TACAN/VOR. It is appended after the field's own beacons, and the
+	// aid fields are filled only when still empty, so a beacon DCS already
+	// attached to the airfield wins over the stand-alone one.
+	if len(orphanNamed) > 0 {
+		byName := map[string][]beaconEntry{}
+		for _, b := range orphanNamed {
+			k := normaliseName(b.name)
+			byName[k] = append(byName[k], b)
+		}
+		for _, r := range radio {
+			if r.callsign == "" || r.airfieldN < 0 {
+				continue
+			}
+			if extra := byName[normaliseName(r.callsign)]; len(extra) > 0 {
+				byAirfield[r.airfieldN] = append(byAirfield[r.airfieldN], extra...)
+			}
+		}
 	}
 
 	// The union of airfield numbers seen in either file.
@@ -408,12 +452,20 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 
 		for _, b := range list {
 			switch b.kind {
-			case beaconTACAN:
-				a.TACAN = formatTACAN(b.callsign, b.channel)
+			case beaconTACAN, beaconAirportTACAN:
+				// Keep the first TACAN found: the airfield's own beacons are
+				// listed before any stand-alone one attached by name.
+				if a.TACAN == "" {
+					a.TACAN = formatTACAN(b.callsign, b.channel)
+				}
 			case beaconVOR, beaconVORDME, beaconVORTAC:
 				mhz := roundMHz(b.hz)
 				if !hasFrequency(b.hz) || inVORband(mhz) {
-					a.VOR = formatTACAN(b.callsign, b.channel)
+					// Keep the first VOR found: the airfield's own beacons are
+					// listed before any stand-alone one attached by name.
+					if a.VOR == "" {
+						a.VOR = formatTACAN(b.callsign, b.channel)
+					}
 					if a.VORMHz == 0 {
 						a.VORMHz = mhz
 					}
@@ -466,7 +518,7 @@ func mergeAirfields(radio map[string]radioEntry, beacons []beaconEntry, theatre 
 // its altitude in metres.
 func airfieldPosition(beacons []beaconEntry) (lat, lng, alt float64, ok bool) {
 	// Priority: a localizer (runway), then TACAN, then VOR, then anything.
-	for _, want := range []string{beaconILS, beaconPRMG, beaconTACAN, beaconVORDME, beaconVOR, beaconRSBN} {
+	for _, want := range []string{beaconILS, beaconPRMG, beaconTACAN, beaconAirportTACAN, beaconVORDME, beaconVOR, beaconRSBN} {
 		for _, b := range beacons {
 			if b.kind == want && (b.lat != 0 || b.lng != 0) {
 				return b.lat, b.lng, b.alt, true
@@ -514,6 +566,19 @@ func airfieldID(beacons []beaconEntry, icao, theatre string, n int) string {
 	_ = beacons
 	_ = theatre
 	return fmt.Sprintf("A%d", n)
+}
+
+// normaliseName lowercases a name and drops the separators DCS sprinkles into
+// display names ("Altes Lager" vs "AltesLager"), so a stand-alone beacon can be
+// matched to the airfield of the same name.
+func normaliseName(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // airfieldNumber extracts the N from "airfield12_0". Returns -1 when absent.
