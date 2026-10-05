@@ -1,140 +1,209 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DCS Manager — Statistics plugin</title>
+    <title>DCS Manager — Plugin de statistiques</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header>
-      <h1>Statistics plugin</h1>
-      <span class="muted" id="meta">loading…</span>
-      <span class="spacer"></span>
-      <button id="refresh" type="button">Refresh</button>
-    </header>
-
-    <nav class="tabs" id="tabs">
-      <button data-tab="overview" class="active">Overview</button>
-      <button data-tab="pilots">Pilots</button>
-      <button data-tab="weapons">Weapons</button>
-      <button data-tab="engines">Aircraft &amp; vehicles</button>
-      <button data-tab="network">Network</button>
-      <button data-tab="missions">Missions</button>
-      <button data-tab="trends">Trends</button>
-      <button data-tab="export">Export</button>
-    </nav>
-
-    <main>
-      <section class="view" data-view="overview">
-        <div class="cards" id="cards"></div>
-        <div class="panel">
-          <h2>Coalitions</h2>
-          <table id="coalitions"></table>
+    <div class="app">
+      <aside>
+        <div class="brand">
+          <span class="mark">Σ</span>
+          <span><b>Stats Plugin</b><small>DCS Manager</small></span>
         </div>
-      </section>
 
-      <section class="view hidden" data-view="pilots">
-        <div class="panel">
-          <div class="row">
-            <h2 style="flex:1">Pilots</h2>
-            <input id="pilots-filter" type="search" placeholder="filter name…" />
+        <nav id="nav">
+          <div class="group">Tableau de bord</div>
+          <button class="nav-item active" data-view="overview">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+            Vue d'ensemble
+          </button>
+          <button class="nav-item" data-view="trends">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-6 4 3 6-8"/><path d="M3 21h18"/></svg>
+            Tendances
+          </button>
+
+          <div class="group">Analyse</div>
+          <button class="nav-item" data-view="pilots">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 3v4M15 5h4"/></svg>
+            Pilotes
+          </button>
+          <button class="nav-item" data-view="weapons">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l9-9 9 9-9 9z"/><path d="M7 12h10"/></svg>
+            Armes
+          </button>
+          <button class="nav-item" data-view="engines">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h5l2-7 4 14 2-7h7"/></svg>
+            Machines
+          </button>
+          <button class="nav-item" data-view="network">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18a10 10 0 0116 0M7 15a6 6 0 0110 0M12 14v.01"/></svg>
+            Réseau
+          </button>
+
+          <div class="group">Données</div>
+          <button class="nav-item" data-view="missions">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+            Missions
+          </button>
+          <button class="nav-item" data-view="export">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+            Export
+          </button>
+        </nav>
+
+        <div class="side-foot">
+          <div class="row"><span class="dot" id="pg-dot"></span><span id="pg-status">connexion…</span></div>
+          <div class="row"><span class="k">Missions</span><span class="v" id="foot-missions">—</span></div>
+          <div class="row"><span class="k">Pilotes</span><span class="v" id="foot-players">—</span></div>
+          <div class="row"><span class="k">Événements</span><span class="v" id="foot-events">—</span></div>
+        </div>
+      </aside>
+
+      <main>
+        <div class="topbar">
+          <div>
+            <h1 id="title">Vue d'ensemble</h1>
+            <div class="sub" id="subtitle">Instantané le plus récent · carrière</div>
           </div>
-          <table id="pilots" class="sortable"></table>
+          <span class="spacer"></span>
+          <span class="faint" id="updated"></span>
+          <button class="btn" id="refresh" type="button" title="Rafraîchir">⟳ Rafraîchir</button>
         </div>
-      </section>
 
-      <section class="view hidden" data-view="weapons">
-        <div class="panel">
-          <div class="row">
-            <h2 style="flex:1">Weapons</h2>
-            <input id="weapons-filter" type="search" placeholder="filter weapon…" />
-          </div>
-          <table id="weapons" class="sortable"></table>
-        </div>
-      </section>
+        <div class="scroll">
+          <!-- VUE D'ENSEMBLE -->
+          <section data-pane="overview">
+            <div class="kpis" id="cards"></div>
+            <div class="grid cols-2">
+              <div class="panel">
+                <h2>Évolution des kills<span class="more">30 derniers jours</span></h2>
+                <svg class="chart" id="chart-overview" viewBox="0 0 620 220" preserveAspectRatio="none"></svg>
+                <div class="legend">
+                  <span><i style="background:#39d0d8"></i>Kills par jour</span>
+                  <span class="faint" id="overview-chart-info"></span>
+                </div>
+              </div>
+              <div class="panel">
+                <h2>Répartition par coalition</h2>
+                <div id="coalition-bars"></div>
+                <div class="faint" id="coalition-note" style="margin-top:1rem"></div>
+              </div>
+            </div>
+          </section>
 
-      <section class="view hidden" data-view="engines">
-        <div class="panel">
-          <div class="row">
-            <h2 style="flex:1">Aircraft &amp; vehicles (exact DCS type)</h2>
-            <input id="engines-filter" type="search" placeholder="filter type…" />
-          </div>
-          <table id="engines" class="sortable"></table>
-        </div>
-      </section>
+          <!-- TENDANCES -->
+          <section data-pane="trends" class="hidden">
+            <div class="panel">
+              <div class="row">
+                <h2 style="flex:none;margin:0">Événements par jour</h2>
+                <span class="spacer"></span>
+                <label class="muted" style="font-size:12px">événement
+                  <select id="event">
+                    <option value="kill">kill</option>
+                    <option value="friendly_fire">friendly_fire</option>
+                    <option value="pilot_death">pilot_death</option>
+                    <option value="crash">crash</option>
+                    <option value="eject">eject</option>
+                    <option value="">tous</option>
+                  </select>
+                </label>
+                <label class="muted" style="font-size:12px">jours
+                  <select id="days">
+                    <option>7</option>
+                    <option selected>30</option>
+                    <option>90</option>
+                    <option>365</option>
+                  </select>
+                </label>
+                <a class="btn" id="series-json" href="#" download>Export JSON</a>
+              </div>
+              <svg class="chart" id="chart-trends" viewBox="0 0 900 240" preserveAspectRatio="none"></svg>
+              <p class="faint" id="chart-info"></p>
+            </div>
+          </section>
 
-      <section class="view hidden" data-view="network">
-        <div class="panel">
-          <h2>Connection quality</h2>
-          <table id="network" class="sortable"></table>
-        </div>
-      </section>
+          <!-- PILOTES -->
+          <section data-pane="pilots" class="hidden">
+            <div class="panel">
+              <div class="row">
+                <h2 style="flex:1;margin:0">Pilotes<span class="more">tri par colonne</span></h2>
+                <input id="pilots-filter" type="search" placeholder="filtrer un pilote…" />
+              </div>
+              <div class="table-wrap"><table id="pilots" class="sortable"></table></div>
+            </div>
+          </section>
 
-      <section class="view hidden" data-view="missions">
-        <div class="panel">
-          <div class="row">
-            <h2 style="flex:1">Missions</h2>
-            <input id="missions-filter" type="search" placeholder="filter name…" />
-            <a class="btn" id="missions-csv" href="#" download>Export CSV</a>
-          </div>
-          <table id="missions" class="sortable"></table>
-        </div>
-      </section>
+          <!-- ARMES -->
+          <section data-pane="weapons" class="hidden">
+            <div class="panel">
+              <div class="row">
+                <h2 style="flex:1;margin:0">Armes</h2>
+                <input id="weapons-filter" type="search" placeholder="filtrer une arme…" />
+              </div>
+              <div class="table-wrap"><table id="weapons" class="sortable"></table></div>
+            </div>
+          </section>
 
-      <section class="view hidden" data-view="trends">
-        <div class="panel">
-          <div class="row">
-            <h2 style="flex:1">Events per day</h2>
-            <label class="muted">event
-              <select id="event">
-                <option>kill</option>
-                <option>friendly_fire</option>
-                <option>pilot_death</option>
-                <option>crash</option>
-                <option>eject</option>
-                <option>takeoff</option>
-                <option>landing</option>
-              </select>
-            </label>
-            <label class="muted">days
-              <select id="days">
-                <option>7</option>
-                <option selected>30</option>
-                <option>90</option>
-                <option>365</option>
-              </select>
-            </label>
-            <a class="btn" id="series-json" href="#" download>Export JSON</a>
-          </div>
-          <svg id="chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
-          <p class="muted" id="chart-info"></p>
-        </div>
-      </section>
+          <!-- MACHINES -->
+          <section data-pane="engines" class="hidden">
+            <div class="panel">
+              <div class="row">
+                <h2 style="flex:1;margin:0">Machines<span class="more">type DCS exact</span></h2>
+                <input id="engines-filter" type="search" placeholder="filtrer un type…" />
+              </div>
+              <div class="table-wrap"><table id="engines" class="sortable"></table></div>
+            </div>
+          </section>
 
-      <section class="view hidden" data-view="export">
-        <div class="panel">
-          <h2>Export</h2>
-          <div class="row">
-            <label class="muted">type
-              <select id="export-type">
-                <option value="missions">missions</option>
-                <option value="pilots">pilots</option>
-                <option value="series">event series</option>
-              </select>
-            </label>
-            <label class="muted">format
-              <select id="export-format">
-                <option value="csv">CSV</option>
-                <option value="json">JSON</option>
-              </select>
-            </label>
-            <button id="export-run" type="button">Download</button>
-          </div>
-          <p class="muted">Reads the manager's PostgreSQL database directly; nothing is copied.</p>
+          <!-- RÉSEAU -->
+          <section data-pane="network" class="hidden">
+            <div class="panel">
+              <h2>Qualité réseau</h2>
+              <div class="table-wrap"><table id="network" class="sortable"></table></div>
+            </div>
+          </section>
+
+          <!-- MISSIONS -->
+          <section data-pane="missions" class="hidden">
+            <div class="panel">
+              <div class="row">
+                <h2 style="flex:1;margin:0">Missions</h2>
+                <input id="missions-filter" type="search" placeholder="filtrer une mission…" />
+                <a class="btn" id="missions-csv" href="#" download>Export CSV</a>
+              </div>
+              <div class="table-wrap"><table id="missions" class="sortable"></table></div>
+            </div>
+          </section>
+
+          <!-- EXPORT -->
+          <section data-pane="export" class="hidden">
+            <div class="panel">
+              <h2>Export</h2>
+              <p class="muted" style="font-size:12.5px">Lit directement la base PostgreSQL du manager ; rien n'est copié.</p>
+              <div class="row" style="margin-top:.8rem">
+                <label class="muted" style="font-size:12px">type
+                  <select id="export-type">
+                    <option value="missions">missions</option>
+                    <option value="pilots">pilotes</option>
+                    <option value="series">série d'événements</option>
+                  </select>
+                </label>
+                <label class="muted" style="font-size:12px">format
+                  <select id="export-format">
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                  </select>
+                </label>
+                <button class="btn primary" id="export-run" type="button">Télécharger</button>
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
 
     <script src="/app.js"></script>
   </body>

@@ -14,7 +14,7 @@ function fmtNum(v) {
   if (v == null || v === "") return "—";
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v);
-  return Number.isInteger(n) ? n.toLocaleString() : (Math.round(n * 100) / 100).toLocaleString();
+  return Number.isInteger(n) ? n.toLocaleString("fr-FR") : (Math.round(n * 100) / 100).toLocaleString("fr-FR");
 }
 
 function objCount(o) {
@@ -22,25 +22,27 @@ function objCount(o) {
   return Object.values(o).reduce((a, b) => a + (Number(b) || 0), 0);
 }
 
+function fmtDate(ms) {
+  if (!ms) return "—";
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" }).format(new Date(ms));
+}
+
+function escapeHTML(v) {
+  return String(v).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 // ---- state -----------------------------------------------------------------
 
 const state = {
   summary: {},
   missions: [],
-  sort: {}, // tableId -> { key, dir }
+  sort: {},   // tableId -> { key, dir }
   filter: {}, // tableId -> string
 };
 
-// The plugin reads the manager's PostgreSQL database directly, so there is no
-// instance/scope selector and no query parameter to add.
-function api(path) {
-  return path;
-}
-
-// ---- API mapping -----------------------------------------------------------
-
-// Aggregates arrive under their key: pilots, weapons, engines, network; overview
-// is a flat object.
+// The plugin reads the manager's PostgreSQL database directly: no instance
+// selector, no scope, no query parameter to add.
 function rowsFor(kind) {
   const d = state.summary[kind];
   if (!d) return [];
@@ -53,13 +55,9 @@ function rowsFor(kind) {
   }
 }
 
-function dataFor(kind) {
-  return state.summary[kind];
-}
-
 // ---- generic sortable/filterable table -------------------------------------
 
-// cols: [{ key, label, num?, get?, filterText? }]
+// cols: [{ key, label, num?, fmt?, html?, get? }]
 function renderTable(tableId, rows, cols) {
   const table = document.getElementById(tableId);
   if (!table) return;
@@ -82,10 +80,11 @@ function renderTable(tableId, rows, cols) {
   const tbody = sorted.map((r) =>
     "<tr>" + cols.map((c) => {
       const v = c.get ? c.get(r) : r[c.key];
+      if (c.html) return `<td class="${c.num ? "num" : ""}">${c.fmt ? c.fmt(r) : ""}</td>`;
       const text = c.fmt ? c.fmt(r) : fmtNum(v);
       return `<td class="${c.num ? "num" : ""}">${escapeHTML(text)}</td>`;
     }).join("") + "</tr>").join("") ||
-    `<tr><td colspan="${cols.length}" class="muted">no data</td></tr>`;
+    `<tr><td colspan="${cols.length}" class="faint">aucune donnée</td></tr>`;
 
   table.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
 
@@ -110,111 +109,193 @@ function cmp(a, b, cols, s) {
   return r * s.dir;
 }
 
-function escapeHTML(v) {
-  return String(v).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 // ---- column definitions ----------------------------------------------------
 
 const pilotCols = [
-  { key: "name", label: "Pilot" },
+  { key: "name", label: "Pilote" },
+  { key: "ucid", label: "UCID", fmt: (r) => r.ucid || "—" },
   { key: "missions", label: "Missions", num: true },
   { key: "score", label: "Score", num: true },
   { key: "kills", label: "Kills", num: true },
   { key: "killsAir", label: "Air", num: true },
-  { key: "killsCar", label: "Ground", num: true },
-  { key: "killsShip", label: "Ship", num: true },
-  { key: "deaths", label: "Deaths", num: true },
+  { key: "killsCar", label: "Sol", num: true },
+  { key: "killsShip", label: "Navire", num: true },
+  { key: "deaths", label: "Morts", num: true },
   { key: "kd", label: "K/D", num: true },
-  { key: "crashes", label: "Crashes", num: true },
-  { key: "ejections", label: "Ejections", num: true },
-  { key: "landings", label: "Landings", num: true },
+  { key: "crashes", label: "Crashs", num: true },
+  { key: "ejections", label: "Éjections", num: true },
+  { key: "landings", label: "Atterrissages", num: true },
   { key: "friendlyFire", label: "FF", num: true },
-  { key: "avgPing", label: "Avg ping", num: true },
+  { key: "avgPing", label: "Ping moy.", num: true },
 ];
 
 const weaponCols = [
-  { key: "weapon", label: "Weapon" },
+  { key: "weapon", label: "Arme" },
   { key: "kills", label: "Kills", num: true },
-  { key: "friendlyFire", label: "Friendly fire", num: true },
-  { key: "victims", label: "Victims", num: true, get: (r) => objCount(r.victimsByType) },
-  { key: "killers", label: "Platforms", num: true, get: (r) => objCount(r.killersByType) },
+  { key: "friendlyFire", label: "Fratricide", num: true },
+  { key: "victims", label: "Types ciblés", num: true, get: (r) => objCount(r.victimsByType) },
+  { key: "killers", label: "Plateformes", num: true, get: (r) => objCount(r.killersByType) },
 ];
 
 const engineCols = [
-  { key: "typeId", label: "DCS type" },
-  { key: "category", label: "Category" },
+  { key: "typeId", label: "Type DCS" },
+  { key: "category", label: "Catégorie", html: true, fmt: (r) => `<span class="pill">${escapeHTML(r.category)}</span>` },
   { key: "kills", label: "Kills", num: true },
-  { key: "deaths", label: "Losses", num: true },
+  { key: "deaths", label: "Pertes", num: true },
   { key: "sorties", label: "Sorties", num: true },
   { key: "kd", label: "K/D", num: true },
 ];
 
 const networkCols = [
-  { key: "name", label: "Pilot" },
-  { key: "samples", label: "Samples", num: true },
-  { key: "avgPing", label: "Avg ping", num: true },
-  { key: "maxPing", label: "Max ping", num: true },
+  { key: "name", label: "Pilote" },
+  { key: "samples", label: "Échantillons", num: true },
+  { key: "avgPing", label: "Ping moy.", num: true },
+  { key: "maxPing", label: "Ping max", num: true },
 ];
 
 const missionCols = [
   { key: "name", label: "Mission" },
-  { key: "theatre", label: "Theatre" },
-  { key: "source", label: "Source" },
-  { key: "startedAt", label: "Started", fmt: (r) => new Date(r.startedAt).toLocaleString() },
-  { key: "endedAt", label: "Ended", fmt: (r) => (r.endedAt ? new Date(r.endedAt).toLocaleString() : "—") },
-  { key: "winner", label: "Winner" },
+  { key: "theatre", label: "Carte", fmt: (r) => r.theatre || "—" },
+  { key: "source", label: "Source", html: true, fmt: (r) =>
+      r.source === "test" ? `<span class="pill amber">test</span>` : `<span class="pill green">live</span>` },
+  { key: "startedAt", label: "Début", fmt: (r) => fmtDate(r.startedAt) },
+  { key: "endedAt", label: "Fin", fmt: (r) => (r.endedAt ? fmtDate(r.endedAt) : "—") },
+  { key: "winner", label: "Vainqueur", html: true, fmt: (r) =>
+      r.winner ? `<span class="pill cyan">${escapeHTML(r.winner)}</span>` : `<span class="faint">—</span>` },
 ];
 
-// ---- views -----------------------------------------------------------------
+// ---- overview --------------------------------------------------------------
+
+function renderKpis(o) {
+  const cards = [
+    ["Missions", o.missions, "sessions enregistrées"],
+    ["Pilotes", o.players, "identités UCID"],
+    ["Kills", o.kills, "toutes coalitions"],
+    ["Événements", o.events, "dans la base du manager"],
+  ];
+  $("#cards").innerHTML = cards.map(([k, v, d], i) =>
+    `<div class="kpi k${i + 1}"><div class="k">${k}</div><div class="v">${fmtNum(v)}</div><div class="d">${d}</div></div>`
+  ).join("");
+}
+
+function renderCoalitions(o) {
+  const rows = o.coalitions || [];
+  const total = rows.reduce((a, c) => a + (c.kills || 0), 0) || 1;
+  const el = $("#coalition-bars");
+  el.innerHTML = rows.length
+    ? rows.map((c) => {
+        const pct = Math.round((100 * (c.kills || 0)) / total);
+        const red = c.coalition === "red";
+        const label = c.coalition === "blue" ? "Bleu" : red ? "Rouge" : (c.coalition || "—");
+        return `<div class="barrow"><span class="pill ${red ? "red" : "cyan"}">${escapeHTML(label)}</span>` +
+          `<span class="bar ${red ? "red" : ""}"><i style="width:${pct}%"></i></span>` +
+          `<span class="num">${pct} %</span></div>`;
+      }).join("")
+    : `<div class="faint">aucune donnée</div>`;
+  const kills = rows.reduce((a, c) => a + (c.kills || 0), 0);
+  const score = rows.reduce((a, c) => a + (c.score || 0), 0);
+  $("#coalition-note").textContent = `${fmtNum(kills)} kills · score ${fmtNum(score)}`;
+}
 
 function renderOverview() {
-  const o = dataFor("overview") || {};
-  const cards = [
-    ["Missions", o.missions], ["Players", o.players], ["Events", o.events],
-    ["Kills", o.kills], ["Deaths", o.deaths], ["Crashes", o.crashes],
-    ["Ejections", o.ejections], ["Friendly fire", o.friendlyFire],
-  ];
-  $("#cards").innerHTML = cards.map(([k, v]) =>
-    `<div class="card"><div class="k">${k}</div><div class="v">${fmtNum(v)}</div></div>`).join("");
-
-  const cols = [
-    { key: "coalition", label: "Coalition" },
-    { key: "score", label: "Score", num: true },
-    { key: "kills", label: "Kills", num: true },
-    { key: "players", label: "Players", num: true },
-  ];
-  const rows = o.coalitions || [];
-  const t = $("#coalitions");
-  t.innerHTML =
-    "<thead><tr>" + cols.map((c) => `<th class="${c.num ? "num" : ""}">${c.label}</th>`).join("") + "</tr></thead>" +
-    "<tbody>" + (rows.map((r) =>
-      "<tr>" + cols.map((c) => `<td class="${c.num ? "num" : ""}">${escapeHTML(fmtNum(r[c.key]))}</td>`).join("") + "</tr>"
-    ).join("") || `<tr><td colspan="${cols.length}" class="muted">no data</td></tr>`) + "</tbody>";
+  const o = state.summary.overview || {};
+  renderKpis(o);
+  renderCoalitions(o);
 }
 
-function renderAll() {
-  renderOverview();
-  renderTable("pilots", rowsFor("pilots"), pilotCols);
-  renderTable("weapons", rowsFor("weapons"), weaponCols);
-  renderTable("engines", rowsFor("engines"), engineCols);
-  renderTable("network", rowsFor("network"), networkCols);
-  renderTable("missions", state.missions, missionCols);
+// ---- chart -----------------------------------------------------------------
+
+function drawChart(svg, points) {
+  if (!svg) return;
+  const vb = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+  const W = vb[2] || 620;
+  const H = vb[3] || 220;
+  const padL = 46, padR = 14, padT = 16, padB = 30;
+
+  if (!points || points.length < 2) {
+    svg.innerHTML = `<text x="${padL}" y="${H / 2}" class="axis-label">aucun événement sur la fenêtre</text>`;
+    return;
+  }
+
+  const ys = points.map((p) => Number(p.value) || 0);
+  const max = Math.max(1, ...ys);
+  const X = (i) => padL + (W - padL - padR) * (i / (points.length - 1));
+  const Y = (v) => H - padB - (H - padT - padB) * (v / max);
+
+  let g = "";
+  for (let j = 0; j <= 4; j++) {
+    const v = (max * j) / 4, y = Y(v);
+    g += `<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}"/>`;
+    g += `<text class="axis-label" x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+
+  const line = points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join(" ");
+  const area = `${line} L${X(points.length - 1).toFixed(1)},${(H - padB).toFixed(1)} L${X(0).toFixed(1)},${(H - padB).toFixed(1)} Z`;
+
+  const fmtDay = (t) => {
+    const d = new Date(t);
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  let xl = "";
+  [0, Math.floor((points.length - 1) / 2), points.length - 1].forEach((idx, j) => {
+    const anchor = j === 0 ? "start" : j === 2 ? "end" : "middle";
+    xl += `<text class="axis-label" x="${X(idx).toFixed(1)}" y="${H - 8}" text-anchor="${anchor}">${fmtDay(points[idx].at)}</text>`;
+  });
+
+  const grad = "gain";
+  svg.innerHTML =
+    `<defs><linearGradient id="${grad}" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="#39d0d8" stop-opacity=".30"/>` +
+    `<stop offset="1" stop-color="#39d0d8" stop-opacity="0"/></linearGradient></defs>` +
+    g +
+    `<path d="${area}" fill="url(#${grad})"/>` +
+    `<path d="${line}" fill="none" stroke="#39d0d8" stroke-width="2.2"/>` +
+    xl;
 }
 
-// ---- health & header -------------------------------------------------------
+async function loadOverviewSeries() {
+  const s = await getJSON("/api/plugin/series?event=kill&days=30");
+  const points = s.points || [];
+  drawChart($("#chart-overview"), points);
+  const total = points.reduce((a, p) => a + p.value, 0);
+  const last7 = points.slice(-7).reduce((a, p) => a + p.value, 0);
+  $("#overview-chart-info").textContent = `${fmtNum(total)} kills sur 30 jours · ${fmtNum(last7)} sur 7 jours`;
+}
+
+// ---- trends ----------------------------------------------------------------
+
+async function loadSeries() {
+  const event = $("#event").value;
+  const days = $("#days").value;
+  const s = await getJSON(`/api/plugin/series?event=${encodeURIComponent(event)}&days=${days}`);
+  const points = s.points || [];
+  drawChart($("#chart-trends"), points);
+  const total = points.reduce((a, p) => a + p.value, 0);
+  const label = event || "tous événements";
+  $("#chart-info").textContent = points.length
+    ? `${label} · ${fmtNum(total)} événements sur ${days} jours`
+    : `${label} · aucun événement sur ${days} jours`;
+  syncExportLinks();
+}
+
+// ---- health & footer -------------------------------------------------------
 
 async function loadHealth() {
+  const dot = $("#pg-dot");
   try {
     const h = await getJSON("/api/plugin/health");
     const c = h.counts || {};
-    $("#meta").innerHTML =
-      `postgres <span class="status ok">read-only</span>` +
-      ` · <span class="muted">${fmtNum(c.missions)} missions, ${fmtNum(c.players)} players, ` +
-      `${fmtNum(c.events)} events${h.includeTest ? ", incl. test" : ""}</span>`;
+    dot.classList.add("on");
+    $("#pg-status").textContent = `PostgreSQL · lecture seule${h.includeTest ? " · test inclus" : ""}`;
+    $("#foot-missions").textContent = fmtNum(c.missions);
+    $("#foot-players").textContent = fmtNum(c.players);
+    $("#foot-events").textContent = fmtNum(c.events);
   } catch (e) {
-    $("#meta").innerHTML = `<span class="status ko">database error</span> <span class="muted">${escapeHTML(e.message)}</span>`;
+    dot.classList.remove("on");
+    $("#pg-status").textContent = "base inaccessible";
+    $("#foot-missions").textContent = "—";
+    $("#foot-players").textContent = "—";
+    $("#foot-events").textContent = "—";
   }
 }
 
@@ -229,20 +310,43 @@ async function loadMissions() {
   renderTable("missions", state.missions, missionCols);
 }
 
-// ---- chart -----------------------------------------------------------------
+// ---- render / views --------------------------------------------------------
 
-let series = [];
-
-async function loadSeries() {
-  const event = $("#event").value;
-  const days = $("#days").value;
-  const s = await getJSON(`/api/plugin/series?event=${encodeURIComponent(event)}&days=${days}`);
-  series = s.points || [];
-  drawChart(series, event, days);
-  syncExportLinks();
+function renderAll() {
+  renderOverview();
+  renderTable("pilots", rowsFor("pilots"), pilotCols);
+  renderTable("weapons", rowsFor("weapons"), weaponCols);
+  renderTable("engines", rowsFor("engines"), engineCols);
+  renderTable("network", rowsFor("network"), networkCols);
+  renderTable("missions", state.missions, missionCols);
 }
 
-// syncExportLinks keeps the export links pointing at the current selection.
+const TITLES = {
+  overview: ["Vue d'ensemble", "Instantané le plus récent · carrière"],
+  trends: ["Tendances", "Séries temporelles sur les événements du manager"],
+  pilots: ["Pilotes", "Classement de carrière, par UCID"],
+  weapons: ["Armes", "Efficacité par arme"],
+  engines: ["Machines", "Type DCS exact"],
+  network: ["Réseau", "Qualité de connexion"],
+  missions: ["Missions", "Historique des sessions"],
+  export: ["Export", "CSV / JSON"],
+};
+
+function selectView(name) {
+  document.querySelectorAll("#nav .nav-item").forEach((b) =>
+    b.classList.toggle("active", b.dataset.view === name));
+  document.querySelectorAll("[data-pane]").forEach((p) =>
+    p.classList.toggle("hidden", p.dataset.pane !== name));
+  const t = TITLES[name] || ["", ""];
+  $("#title").textContent = t[0];
+  $("#subtitle").textContent = t[1];
+  if (name === "trends") loadSeries().catch(() => {});
+  if (name === "missions") loadMissions().catch(() => {});
+  if (name === "export") syncExportLinks();
+}
+
+// ---- export ----------------------------------------------------------------
+
 function syncExportLinks() {
   const m = $("#missions-csv");
   if (m) m.href = "/api/plugin/export?type=missions&format=csv";
@@ -250,41 +354,12 @@ function syncExportLinks() {
   if (s) s.href = `/api/plugin/export?type=series&event=${encodeURIComponent($("#event").value)}&format=json`;
 }
 
-function drawChart(points, event, days) {
-  const svg = $("#chart");
-  const W = 800, H = 220, pad = 28;
-  $("#chart-info").textContent = points.length
-    ? `${event} per day over the last ${days} days`
-    : "";
-  if (points.length < 2) {
-    svg.innerHTML = `<text x="20" y="120" fill="#8b95a7" font-size="13">no events in this window</text>`;
-    return;
-  }
-  const ys = points.map((p) => p.value);
-  const min = Math.min(...ys), max = Math.max(...ys);
-  const span = max - min || 1;
-  const X = (i) => pad + (W - 2 * pad) * (i / (points.length - 1));
-  const Y = (v) => H - pad - (H - 2 * pad) * ((v - min) / span);
-  const path = points.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(p.value).toFixed(1)}`).join(" ");
-  const area = `${path} L${X(points.length - 1).toFixed(1)},${H - pad} L${X(0).toFixed(1)},${H - pad} Z`;
-  svg.innerHTML = `
-    <path d="${area}" fill="rgba(98,183,255,0.12)" />
-    <path d="${path}" fill="none" stroke="#62b7ff" stroke-width="2" />
-    <text x="${pad}" y="16" fill="#8b95a7" font-size="12">max ${max}</text>
-    <text x="${pad}" y="${H - 6}" fill="#8b95a7" font-size="12">min ${min}</text>
-    <text x="${W - pad}" y="16" fill="#8b95a7" font-size="12" text-anchor="end">${new Date(points[points.length - 1].at).toLocaleDateString()}</text>`;
-}
-
-// ---- tabs ------------------------------------------------------------------
-
-function selectTab(name) {
-  document.querySelectorAll("#tabs button").forEach((b) =>
-    b.classList.toggle("active", b.dataset.tab === name));
-  document.querySelectorAll(".view").forEach((v) =>
-    v.classList.toggle("hidden", v.dataset.view !== name));
-  if (name === "trends") loadSeries().catch(() => {});
-  if (name === "missions") loadMissions().catch(() => {});
-  if (name === "export") syncExportLinks();
+function runExport() {
+  const type = $("#export-type").value;
+  const format = $("#export-format").value;
+  let url = `/api/plugin/export?type=${type}&format=${format}`;
+  if (type === "series") url += `&event=${encodeURIComponent($("#event").value)}`;
+  window.location.href = url;
 }
 
 // ---- wiring ----------------------------------------------------------------
@@ -292,25 +367,17 @@ function selectTab(name) {
 function reload() {
   loadHealth();
   loadSummary().catch(() => {});
-  if (!$('[data-view="missions"]').classList.contains("hidden")) loadMissions().catch(() => {});
-  if (!$('[data-view="trends"]').classList.contains("hidden")) loadSeries().catch(() => {});
+  loadOverviewSeries().catch(() => {});
+  if (!$('[data-pane="missions"]').classList.contains("hidden")) loadMissions().catch(() => {});
+  if (!$('[data-pane="trends"]').classList.contains("hidden")) loadSeries().catch(() => {});
   syncExportLinks();
-}
-
-function runExport() {
-  const type = $("#export-type").value;
-  const format = $("#export-format").value;
-  let url = `/api/plugin/export?type=${type}&format=${format}`;
-  if (type === "series") {
-    url += `&event=${encodeURIComponent($("#event").value)}`;
-  }
-  window.location.href = url;
+  $("#updated").textContent = "maj " + new Date().toLocaleTimeString("fr-FR");
 }
 
 function bind() {
-  $("#tabs").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-tab]");
-    if (b) selectTab(b.dataset.tab);
+  $("#nav").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]");
+    if (b) selectView(b.dataset.view);
   });
   $("#refresh").addEventListener("click", reload);
   $("#event").addEventListener("change", () => loadSeries().catch(() => {}));
