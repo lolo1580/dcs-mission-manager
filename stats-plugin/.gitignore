@@ -1,6 +1,8 @@
 # Build artifacts and local configuration.
 stats-web
 stats-web.exe
+dcsmanager-stats
+dcsmanager-stats.exe
 .env
 
 # Go
