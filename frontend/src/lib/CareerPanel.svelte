@@ -204,13 +204,13 @@
       {#if $statsOverview}
         {@const o = $statsOverview}
         <div class="cards">
-          <div><span>{o.missions}</span>{$t('stats.missions')}</div>
-          <div><span>{o.players}</span>{$t('stats.pilots')}</div>
-          <div><span>{o.kills}</span>{$t('events.kills')}</div>
-          <div><span>{o.deaths}</span>{$t('stats.deaths')}</div>
-          <div><span>{o.crashes}</span>{$t('stats.crashes')}</div>
-          <div><span>{o.ejections}</span>{$t('stats.ejections')}</div>
-          <div class:warn={o.friendlyFire > 0}><span>{o.friendlyFire}</span>{$t('events.friendlyFire')}</div>
+          <div class="kpi k-missions"><span class="v">{o.missions}</span><span class="k">{$t('stats.missions')}</span></div>
+          <div class="kpi k-pilots"><span class="v">{o.players}</span><span class="k">{$t('stats.pilots')}</span></div>
+          <div class="kpi k-kills"><span class="v">{o.kills}</span><span class="k">{$t('events.kills')}</span></div>
+          <div class="kpi k-deaths"><span class="v">{o.deaths}</span><span class="k">{$t('stats.deaths')}</span></div>
+          <div class="kpi k-crash"><span class="v">{o.crashes}</span><span class="k">{$t('stats.crashes')}</span></div>
+          <div class="kpi k-eject"><span class="v">{o.ejections}</span><span class="k">{$t('stats.ejections')}</span></div>
+          <div class="kpi k-ff" class:warn={o.friendlyFire > 0}><span class="v">{o.friendlyFire}</span><span class="k">{$t('events.friendlyFire')}</span></div>
         </div>
       {/if}
 
@@ -594,30 +594,63 @@
 
   .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
-    gap: 0.5rem;
-    margin-bottom: 0.8rem;
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 0.55rem;
+    margin-bottom: 0.85rem;
   }
 
-  .cards div {
+  /* KPI cards, per the redesign mockup: a coloured accent stripe, a large value
+     and a small uppercase label. The stripe colour distinguishes the metrics at a
+     glance (missions, pilots, kills…) without a legend. */
+  .cards .kpi {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
-    padding: 0.5rem 0.6rem;
+    gap: 0.15rem;
+    padding: 0.55rem 0.7rem 0.55rem 0.85rem;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.68rem;
+    border-radius: 9px;
+    overflow: hidden;
+  }
+
+  .cards .kpi::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent, var(--blue));
+  }
+
+  .cards .kpi .k {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--muted);
   }
 
-  .cards span {
-    font-size: 1.15rem;
+  .cards .kpi .v {
+    font-size: 1.35rem;
+    font-weight: 650;
     color: var(--text);
     font-variant-numeric: tabular-nums;
   }
 
-  .cards div.warn span {
+  .cards .k-missions { --accent: var(--blue); }
+  .cards .k-pilots { --accent: #a371f7; }
+  .cards .k-kills { --accent: var(--green); }
+  .cards .k-deaths { --accent: #f0883e; }
+  .cards .k-crash { --accent: #db6d28; }
+  .cards .k-eject { --accent: #58a6ff; }
+  .cards .k-ff { --accent: #f0b429; }
+
+  .cards .kpi.warn {
+    border-color: color-mix(in srgb, #f0b429 55%, var(--border));
+  }
+
+  .cards .kpi.warn .v {
     color: #f0b429;
   }
 
