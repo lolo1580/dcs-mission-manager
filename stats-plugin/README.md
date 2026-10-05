@@ -4,7 +4,9 @@ An **optional**, separate statistics dashboard for DCS Manager. It reads the
 manager's **PostgreSQL** database directly and serves its own read-only web app.
 
 The manager is the single writer; the plugin is a reader. There is no HTTP call
-between them, no mirror, no polling: **PostgreSQL is the shared library**.
+between them, no mirror, no polling: **PostgreSQL is the shared library**. The
+plugin reads the manager's read-only views (`v_stats_*`), not its tables, so the
+internal schema can evolve without breaking the plugin.
 
 ```
 dcsmanager.exe (DCSMANAGER_DB_DRIVER=postgres) ──► PostgreSQL ◄── stats-web (read-only)
@@ -56,6 +58,12 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO stats_reader
 ```
 
 Then use `postgres://stats_reader:change-me@host:5432/dcsmanager?sslmode=disable`.
+Grant SELECT only on the views, if you prefer the reader not to see the raw
+tables at all:
+
+```sql
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO stats_reader; -- includes views
+```
 
 ## Quick start
 
