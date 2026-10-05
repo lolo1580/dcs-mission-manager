@@ -55,6 +55,16 @@ const en = {
   'tab.panels': 'Panels',
   'tab.missionHistory': 'Mission history',
 
+  'nav.analysis': 'Analysis',
+  'nav.reference': 'Reference',
+  'nav.config': 'Configuration',
+  'nav.status': 'Status',
+
+  'sub.stats': 'Pilot career and mission statistics',
+  'sub.debriefs': 'Mission debriefings',
+  'sub.aerodromes': 'Airfields, frequencies and charts',
+  'sub.settings': 'Modules, DCS install and cockpit panels',
+
   'coalition.blue': 'Blue',
   'coalition.red': 'Red',
   'coalition.neutral': 'Neutral',
@@ -321,6 +331,16 @@ const fr = {
   'tab.install': 'Installation DCS',
   'tab.panels': 'Panneaux',
   'tab.missionHistory': 'Historique des missions',
+
+  'nav.analysis': 'Analyse',
+  'nav.reference': 'Référence',
+  'nav.config': 'Configuration',
+  'nav.status': 'État',
+
+  'sub.stats': 'Carrière du pilote et statistiques de mission',
+  'sub.debriefs': 'Débriefings de mission',
+  'sub.aerodromes': 'Aérodromes, fréquences et cartes',
+  'sub.settings': 'Modules, installation DCS et panneaux de cockpit',
 
   'coalition.blue': 'Bleu',
   'coalition.red': 'Rouge',
