@@ -413,9 +413,13 @@ func (d *DB) Heatmap(missionID int64, source string, grid float64, limit int) ([
 	}
 
 	filter := ""
-	args := []any{grid, grid, grid, grid}
+	// Only two grid parameters: the query references $1 and $2. Passing four
+	// (as the SQLite version did with its repeated `?`) leaves $3/$4 unreferenced
+	// and PostgreSQL cannot infer their type ("could not determine data type of
+	// parameter $3").
+	args := []any{grid, grid}
 	if missionID > 0 {
-		filter = " WHERE mission_id = $5"
+		filter = " WHERE mission_id = $3"
 		args = append(args, missionID)
 	}
 	args = append(args, limit)
