@@ -48,7 +48,15 @@ func Parse(data []byte) (map[string]any, error) {
 type parser struct {
 	src string
 	pos int
+	// depth bounds table nesting. A malformed or hostile file (millions of
+	// nested `{`) would otherwise blow the goroutine stack, which Go turns into
+	// a fatal, unrecoverable crash — no recover() can save the process. DCS data
+	// is nowhere near this deep.
+	depth int
 }
+
+// maxNesting is the deepest table nesting the parser accepts.
+const maxNesting = 200
 
 func (p *parser) eof() bool { return p.pos >= len(p.src) }
 
@@ -184,6 +192,13 @@ func isIdentChar(c rune) bool {
 }
 
 func (p *parser) parseTable() (any, error) {
+	p.depth++
+	if p.depth > maxNesting {
+		p.depth--
+		return nil, p.errorf("table nesting too deep")
+	}
+	defer func() { p.depth-- }()
+
 	p.pos++ // consume '{'
 
 	object := map[string]any{}
@@ -333,7 +348,7 @@ func (p *parser) parseNumber() (any, error) {
 		return float64(n), nil
 	}
 	f, err := strconv.ParseFloat(text, 64)
-	if err != nil || math.IsNaN(f) {
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 		return nil, p.errorf("invalid number %q", text)
 	}
 	return f, nil

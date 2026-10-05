@@ -143,6 +143,14 @@ type Archive struct {
 const manifestName = "manifest.json"
 const filesPrefix = "files/"
 
+// Restore size ceilings, to bound a zip bomb: a small archive that inflates
+// without limit. Well above a real profile (bindings and scripts are kilobytes;
+// kneeboard/mods are the large categories).
+const (
+	maxEntryBytes   = 2 << 30 // 2 GiB per entry
+	maxRestoreBytes = 8 << 30 // 8 GiB total
+)
+
 // Create writes a new archive of the selected categories under outDir and returns
 // its metadata. The archive name is timestamped, so repeated calls never clash.
 func Create(savedGames, outDir string, ids []string, appVersion string) (Archive, error) {
@@ -208,6 +216,9 @@ func createTo(savedGames, path string, cats []Category, appVersion string) (err 
 				if wErr != nil {
 					return wErr
 				}
+				if n < 0 {
+					return nil // skipped (e.g. a symlink or non-regular file)
+				}
 				entries++
 				bytes += n
 				return nil
@@ -218,6 +229,14 @@ func createTo(savedGames, path string, cats []Category, appVersion string) (err 
 						return walkErr
 					}
 					if d.IsDir() {
+						return nil
+					}
+					// Never archive a symlink: os.Open follows it, so a link
+					// planted under Saved Games (by a mod, a mission pack) could
+					// pull any readable file on the machine into the archive.
+					// WalkDir does not descend into directory symlinks, but a
+					// file symlink is a leaf and would be read through.
+					if d.Type()&os.ModeSymlink != 0 {
 						return nil
 					}
 					return add(p)
@@ -272,6 +291,12 @@ func addFile(zw *zip.Writer, src, zipName string) (int64, error) {
 	info, err := in.Stat()
 	if err != nil {
 		return 0, err
+	}
+	// Belt and braces with the walker: os.Open already followed any symlink, so
+	// check the opened descriptor's mode too. A skipped file returns -1 so the
+	// caller does not count a bogus empty entry.
+	if !info.Mode().IsRegular() {
+		return -1, nil
 	}
 	hdr, err := zip.FileInfoHeader(info)
 	if err != nil {
@@ -390,6 +415,7 @@ func Restore(archivePath, savedGames string, dryRun bool) (RestoreResult, error)
 	}
 	var targets []target
 	root := filepath.Clean(savedGames)
+	var totalUncompressed int64
 
 	for _, f := range zr.File {
 		if f.Name == manifestName {
@@ -403,6 +429,15 @@ func Restore(archivePath, savedGames string, dryRun bool) (RestoreResult, error)
 		if !strings.HasPrefix(f.Name, filesPrefix) {
 			continue // ignore anything unexpected at the archive root
 		}
+		// A symlink entry must never be written: extracting it would create a
+		// link inside Saved Games that a later restore (or DCS) follows outside
+		// it. A directory entry is skipped — directories are created as needed.
+		if f.Mode()&os.ModeSymlink != 0 {
+			return RestoreResult{}, fmt.Errorf("refusing symlink entry %q", f.Name)
+		}
+		if f.FileInfo().IsDir() {
+			continue
+		}
 		rest := strings.TrimPrefix(f.Name, filesPrefix)
 		slash := strings.IndexByte(rest, '/')
 		if slash <= 0 || slash == len(rest)-1 {
@@ -413,6 +448,15 @@ func Restore(archivePath, savedGames string, dryRun bool) (RestoreResult, error)
 		// Path-traversal guard: the resolved target must stay under Saved Games.
 		if dest != root && !strings.HasPrefix(dest, root+string(os.PathSeparator)) {
 			return RestoreResult{}, fmt.Errorf("refusing entry outside Saved Games: %q", f.Name)
+		}
+		// A zip bomb is a small archive that inflates without bound. Refuse an
+		// entry, or a total, past a generous ceiling well above a real profile.
+		if f.UncompressedSize64 > maxEntryBytes {
+			return RestoreResult{}, fmt.Errorf("refusing oversized entry %q (%d bytes)", f.Name, f.UncompressedSize64)
+		}
+		totalUncompressed += int64(f.UncompressedSize64)
+		if totalUncompressed > maxRestoreBytes {
+			return RestoreResult{}, fmt.Errorf("archive expands past the %d byte limit", int64(maxRestoreBytes))
 		}
 		targets = append(targets, target{src: f, dest: dest})
 	}
@@ -450,15 +494,15 @@ func extractFile(f *zip.File, dest string) error {
 	}
 	defer rc.Close()
 
-	mode := f.Mode()
-	if mode == 0 {
-		mode = 0o644
-	}
-	out, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode.Perm())
+	// Ignore the archive's mode on purpose: it is attacker-controlled, and a
+	// restore has no reason to make anything inside Saved Games setuid or
+	// executable. A fixed 0o644 keeps the extracted profile ordinary.
+	out, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, rc); err != nil {
+	// Bound the copy as well, in case the declared size lied.
+	if _, err := io.Copy(out, io.LimitReader(rc, maxEntryBytes+1)); err != nil {
 		out.Close()
 		return err
 	}

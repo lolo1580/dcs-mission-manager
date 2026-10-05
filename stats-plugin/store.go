@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,8 +27,9 @@ type Store struct {
 	includeTest bool
 }
 
-// OpenStore connects read-only to the manager's PostgreSQL database.
-func OpenStore(ctx context.Context, dsn string, includeTest bool) (*Store, error) {
+// OpenStore connects read-only to the manager's PostgreSQL database. timeout
+// bounds every statement so a slow query cannot hold a connection forever.
+func OpenStore(ctx context.Context, dsn string, includeTest bool, timeout time.Duration) (*Store, error) {
 	if dsn == "" {
 		return nil, errors.New("MANAGER_DATABASE_URL is required (the manager must run with DCSMANAGER_DB_DRIVER=postgres)")
 	}
@@ -35,11 +37,17 @@ func OpenStore(ctx context.Context, dsn string, includeTest bool) (*Store, error
 	if err != nil {
 		return nil, err
 	}
-	// Enforce read-only at the session level. Combined with a SELECT-only
-	// database role, the plugin physically cannot write.
 	if cfg.ConnConfig.RuntimeParams == nil {
 		cfg.ConnConfig.RuntimeParams = map[string]string{}
 	}
+	// A statement deadline, so a heavy aggregation cannot pin a pool connection
+	// indefinitely. pgx sends this as the statement_timeout GUC.
+	if timeout > 0 {
+		cfg.ConnConfig.RuntimeParams["statement_timeout"] = strconv.FormatInt(timeout.Milliseconds(), 10)
+	}
+	// Read-only at the session level. This is a defence in depth, not the whole
+	// story: a role with write grants can SET it off, so a SELECT-only database
+	// role is the real guarantee (see the README).
 	cfg.ConnConfig.RuntimeParams["default_transaction_read_only"] = "on"
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
@@ -411,18 +419,23 @@ func (s *Store) Engines(ctx context.Context) ([]EngineStats, error) {
 		return nil, err
 	}
 
+	// Sorties: how many snapshots a player occupied each type. GROUP BY counts
+	// them; SELECT DISTINCT would have made every type exactly 1.
 	rows2, err := s.pool.Query(ctx,
-		`SELECT DISTINCT unit_type FROM v_stats_player_stats WHERE unit_type IS NOT NULL AND unit_type <> ''`+where)
+		`SELECT unit_type, COUNT(*) FROM v_stats_player_stats
+		 WHERE unit_type IS NOT NULL AND unit_type <> ''`+where+`
+		 GROUP BY unit_type`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows2.Close()
 	for rows2.Next() {
 		var unitType string
-		if err := rows2.Scan(&unitType); err != nil {
+		var n int
+		if err := rows2.Scan(&unitType, &n); err != nil {
 			return nil, err
 		}
-		ensure(unitType).Sorties++
+		ensure(unitType).Sorties = n
 	}
 	if err := rows2.Err(); err != nil {
 		return nil, err

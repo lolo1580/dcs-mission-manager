@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,10 @@ type transfer struct {
 	size    int
 	theatre string
 	mission string
+	// received is the running total of stored chunk bytes. It is kept up to date
+	// on every insert so the size guard is O(1) instead of rescanning every chunk
+	// on every message (which was O(n²) and a CPU DoS with many tiny chunks).
+	received int
 	// lastSeen is when a chunk last arrived, used to expire a transfer whose
 	// connection dropped mid-stream.
 	lastSeen time.Time
@@ -53,6 +58,10 @@ const (
 	transferTTL     = 10 * time.Minute
 	maxInFlight     = 16
 	maxTransferSize = 64 << 20 // 64 MiB, well above any real debrief.log
+	// maxChunks bounds the number of chunks, independently of their total size:
+	// without it a sender could add near-empty chunks forever and burn CPU even
+	// under the byte cap.
+	maxChunks = 4096
 )
 
 // New creates an assembler writing to database.
@@ -124,7 +133,13 @@ func (a *Assembler) Handle(m model.Message) bool {
 		return true
 	}
 	tr.lastSeen = now
+	// Track the running size without a full rescan: subtract the old value when a
+	// chunk index is overwritten (a resent chunk), then add the new one.
+	if old, ok := tr.chunks[m.Chunk]; ok {
+		tr.received -= len(old)
+	}
 	tr.chunks[m.Chunk] = raw
+	tr.received += len(raw)
 	if m.Chunks > 0 {
 		tr.total = m.Chunks
 	}
@@ -139,12 +154,9 @@ func (a *Assembler) Handle(m model.Message) bool {
 	}
 
 	// Guard against a transfer that never completes but keeps growing.
-	received := 0
-	for _, c := range tr.chunks {
-		received += len(c)
-	}
-	if received > maxTransferSize {
-		log.Printf("debrief: dropping transfer %s, %d bytes exceeds the cap", m.TransferID, received)
+	if tr.received > maxTransferSize || len(tr.chunks) > maxChunks {
+		log.Printf("debrief: dropping transfer %s, %d bytes / %d chunks exceeds the cap",
+			m.TransferID, tr.received, len(tr.chunks))
 		delete(a.transfers, m.TransferID)
 		a.mu.Unlock()
 		return true
@@ -248,7 +260,7 @@ func (a *Assembler) dump(content []byte, tag string) {
 	if a.DumpDir == "" {
 		return
 	}
-	name := filepath.Join(a.DumpDir, "debrief-failed-"+tag+"-"+time.Now().Format("20060102-150405")+".bin")
+	name := filepath.Join(a.DumpDir, "debrief-failed-"+sanitizeTag(tag)+"-"+time.Now().Format("20060102-150405")+".bin")
 	if err := os.MkdirAll(a.DumpDir, 0o755); err != nil {
 		log.Printf("debrief: could not create dump dir: %v", err)
 		return
@@ -258,6 +270,30 @@ func (a *Assembler) dump(content []byte, tag string) {
 		return
 	}
 	log.Printf("debrief: dumped failed transfer to %s", name)
+}
+
+// sanitizeTag makes a transfer id safe to use as a filename component. The id
+// comes from the DCS hook over the network, so it is untrusted: a value like
+// "a/../../../Users/x/Startup/pwn" would otherwise escape DumpDir through
+// filepath.Join and let a caller drop a file anywhere the backend can write.
+func sanitizeTag(tag string) string {
+	if tag == "" {
+		return "unknown"
+	}
+	var b strings.Builder
+	for _, r := range tag {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
+			r == '-', r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+		if b.Len() >= 64 {
+			break
+		}
+	}
+	return b.String()
 }
 
 // InFlight returns the number of transfers currently being assembled (useful

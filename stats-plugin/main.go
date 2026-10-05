@@ -35,7 +35,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	store, err := OpenStore(ctx, cfg.ManagerDSN, cfg.IncludeTest)
+	store, err := OpenStore(ctx, cfg.ManagerDSN, cfg.IncludeTest, cfg.RequestTimeout)
 	if err != nil {
 		log.Fatalf("postgres: %v", err)
 	}
@@ -48,7 +48,14 @@ func main() {
 	}
 	srv := NewServer(cfg, store, web)
 
-	httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: srv.Handler()}
+	httpSrv := &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           srv.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	go func() {
 		log.Printf("http: dashboard on http://%s", cfg.ListenAddr)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

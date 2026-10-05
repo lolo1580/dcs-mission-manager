@@ -129,12 +129,28 @@ func (s *Store) Profile(aircraft string) Profile {
 
 // SetProfile replaces an aircraft's bindings and persists them.
 func (s *Store) SetProfile(p Profile) error {
+	if p.Aircraft == "" {
+		return fmt.Errorf("mapping: a profile needs an aircraft")
+	}
+	if !validToken(p.Aircraft, 64) {
+		return fmt.Errorf("mapping: invalid aircraft name")
+	}
 	// Reject two bindings on the same control: the second would silently shadow
 	// the first, and the panel would look broken.
 	seen := map[string]bool{}
-	for _, b := range p.Bindings {
+	for i, b := range p.Bindings {
 		if b.Control == "" || b.Command == "" {
 			return fmt.Errorf("mapping: a binding needs both a control and a command")
+		}
+		// The profile comes from the (unauthenticated on loopback) API and is
+		// both persisted to disk and forwarded to DCS-BIOS, so its fields are
+		// bounded and restricted to a conservative charset: a caller cannot grow
+		// the file unboundedly nor push arbitrary bytes at the command channel.
+		if i >= maxBindings {
+			return fmt.Errorf("mapping: too many bindings (max %d)", maxBindings)
+		}
+		if !validToken(b.Control, 64) || !validToken(b.Command, 96) || !validToken(b.Interface, 32) {
+			return fmt.Errorf("mapping: invalid characters in binding %q", b.Control)
 		}
 		k := b.Key()
 		if seen[k] {
@@ -148,9 +164,6 @@ func (s *Store) SetProfile(p Profile) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if p.Aircraft == "" {
-		return fmt.Errorf("mapping: a profile needs an aircraft")
-	}
 	// Persist first, then publish: a failed write must not leave the in-memory
 	// state changed, or the UI would report an error while the manager behaves as
 	// if the save had succeeded (and a panel could act on the unsaved profile).
@@ -165,6 +178,29 @@ func (s *Store) SetProfile(p Profile) error {
 		return err
 	}
 	return nil
+}
+
+// Binding/profile limits, so the persisted file and the DCS-BIOS command channel
+// stay bounded whatever the API is fed.
+const maxBindings = 512
+
+// validToken reports whether s is non-empty, no longer than max, and made only
+// of characters safe in an identifier-like token. It is deliberately strict:
+// these strings are persisted and some reach DCS-BIOS.
+func validToken(s string, max int) bool {
+	if s == "" || len(s) > max {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '_', c == '-', c == '.', c == '/', c == ':':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // DeleteProfile removes an aircraft's bindings.

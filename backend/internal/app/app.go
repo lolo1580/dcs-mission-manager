@@ -389,14 +389,28 @@ func Run(onReady func(addr string)) error {
 		log.Fatalf("http: listen on %s: %v", cfg.HTTPAddr, err)
 	}
 	defer ln.Close()
+	httpAddr := ln.Addr().String()
 
-	httpSrv := &http.Server{Handler: srv.Handler()}
+	// Trust the socket, not the configured string: re-derive "local only" from
+	// the address actually bound. If a firewall redirect or a port proxy makes a
+	// nominally-loopback config reachable remotely, the Host check and the token
+	// requirement must reflect the real exposure, not the intent. The server was
+	// built before the listen, so correct it now.
+	srv.SetLocalOnly(api.IsLoopbackAddr(httpAddr))
+	if !api.IsLoopbackAddr(httpAddr) && cfg.APIToken == "" {
+		log.Printf("http: warning: listening on %s without DCSMANAGER_API_TOKEN — the API, including purge, is reachable by anyone who can reach this address", httpAddr)
+	}
+
+	httpSrv := &http.Server{
+		Handler:           srv.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	go func() {
 		if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("http: %v", err)
 		}
 	}()
-	httpAddr := ln.Addr().String()
 	log.Printf("http: web ui on http://%s", httpAddr)
 
 	if onReady != nil {

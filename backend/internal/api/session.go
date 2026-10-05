@@ -185,9 +185,16 @@ func (s *Server) handleHistoryMissions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"count": len(missions), "missions": missions})
 }
 
+// limitParam reads ?limit=N, defaulting and clamping. The upper bound is
+// enforced here as well as in every store, so a future store that trusts its
+// caller still cannot be driven into an unbounded query from the HTTP edge.
 func limitParam(r *http.Request, def int) int {
+	const maxLimit = 10000
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			if n > maxLimit {
+				return maxLimit
+			}
 			return n
 		}
 	}

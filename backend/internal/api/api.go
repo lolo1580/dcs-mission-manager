@@ -134,6 +134,13 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 	}
 }
 
+// SetLocalOnly overrides the loopback decision after the real listen address is
+// known. The server is built before `net.Listen`, so `New` can only guess from
+// the configured string; this corrects it to match the socket actually bound.
+func (s *Server) SetLocalOnly(local bool) {
+	s.localOnly = local
+}
+
 // SetModules installs the DCS module inventory read from the installation. It is
 // a setter rather than a constructor argument: the inventory is optional data,
 // and the constructor already carries the optional collaborators.
@@ -234,6 +241,13 @@ func loopbackHost(host string) bool {
 // isLoopbackAddr reports whether a listen address only accepts local traffic.
 func isLoopbackAddr(addr string) bool {
 	return loopbackHost(addr)
+}
+
+// IsLoopbackAddr exposes the loopback decision so the app can re-derive
+// "local only" from the address actually bound, rather than from the configured
+// string the server was built with.
+func IsLoopbackAddr(addr string) bool {
+	return isLoopbackAddr(addr)
 }
 
 func (s *Server) routes() *http.ServeMux {
@@ -372,10 +386,14 @@ func (s *Server) stateJSON() ([]byte, error) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	units := 0
+	if s.store != nil {
+		units = s.store.Count()
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"service": "dcsmanager",
-		"units":   s.store.Count(),
+		"units":   units,
 	})
 }
 

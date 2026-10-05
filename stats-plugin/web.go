@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/csv"
 	"encoding/json"
 	"io/fs"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -80,16 +82,10 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) bool {
 }
 
 // subtleEqual compares two secrets without leaking their length or prefix
-// through timing on the common path.
+// through timing. It delegates to crypto/subtle, matching the manager's own
+// token guard.
 func subtleEqual(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	var diff byte
-	for i := 0; i < len(a); i++ {
-		diff |= a[i] ^ b[i]
-	}
-	return diff == 0
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 // --- handlers ----------------------------------------------------------------
@@ -118,7 +114,7 @@ func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
 
 	overview, err := s.store.Overview(ctx)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		s.fail(w, "query", err)
 		return
 	}
 	out["overview"] = overview
@@ -126,7 +122,7 @@ func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
 	if pilots, err := s.store.Pilots(ctx); err == nil {
 		out["pilots"] = map[string]any{"count": len(pilots), "pilots": pilots}
 	} else {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		s.fail(w, "query", err)
 		return
 	}
 	if weapons, err := s.store.Weapons(ctx); err == nil {
@@ -145,7 +141,7 @@ func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	o, err := s.store.Overview(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		s.fail(w, "query", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, o)
@@ -186,7 +182,7 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	}
 	points, err := s.store.EventSeries(r.Context(), eventKind, days)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		s.fail(w, "query", err)
 		return
 	}
 	if points == nil {
@@ -199,7 +195,7 @@ func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleMissions(w http.ResponseWriter, r *http.Request) {
 	missions, err := s.store.Missions(r.Context(), limitParam(r, 200))
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		s.fail(w, "query", err)
 		return
 	}
 	if missions == nil {
@@ -223,7 +219,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	case "missions":
 		rows, err := s.store.Missions(r.Context(), limitParam(r, 10000))
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			s.fail(w, "query", err)
 			return
 		}
 		if csvOut {
@@ -243,7 +239,15 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		eventKind := q.Get("event")
 		points, err := s.store.EventSeries(r.Context(), eventKind, 90)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			s.fail(w, "series", err)
+			return
+		}
+		if csvOut {
+			writeCSV(w, "series.csv",
+				[]string{"date", "count"},
+				toRows(points, func(p Point) []string {
+					return []string{p.At.Format("2006-01-02"), strconv.FormatFloat(p.Value, 'f', 0, 64)}
+				}))
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"event": eventKind, "points": points})
@@ -251,7 +255,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	case "pilots":
 		rows, err := s.store.Pilots(r.Context())
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			s.fail(w, "query", err)
 			return
 		}
 		if csvOut {
@@ -275,17 +279,30 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 
 // --- helpers -----------------------------------------------------------------
 
+// fail logs the real error server-side and returns a generic message to the
+// caller: raw PostgreSQL errors name views and constraints, and there is no
+// reason to hand that to a client.
+func (s *Server) fail(w http.ResponseWriter, what string, err error) {
+	log.Printf("plugin: %s: %v", what, err)
+	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+}
+
 func respond(w http.ResponseWriter, err error, key string, v any) {
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		log.Printf("plugin: query failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{key: v})
 }
 
 func limitParam(r *http.Request, def int) int {
+	const maxLimit = 10000
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			if n > maxLimit {
+				return maxLimit
+			}
 			return n
 		}
 	}
@@ -305,10 +322,28 @@ func writeCSV(w http.ResponseWriter, filename string, header []string, rows [][]
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
-	_ = cw.Write(header)
+	_ = cw.Write(sanitizeCSVRow(header))
 	for _, row := range rows {
-		_ = cw.Write(row)
+		_ = cw.Write(sanitizeCSVRow(row))
 	}
+}
+
+// sanitizeCSVRow neutralises CSV formula injection: a cell beginning with
+// = + - @ (or a tab/CR) is executed as a formula by Excel/Sheets. Names, UCIDs
+// and theatre strings come from DCS/pilot input, so a player literally called
+// "=cmd…" must not become a live formula when the export is opened.
+func sanitizeCSVRow(row []string) []string {
+	out := make([]string, len(row))
+	for i, cell := range row {
+		if cell != "" {
+			switch cell[0] {
+			case '=', '+', '-', '@', '\t', '\r':
+				cell = "'" + cell
+			}
+		}
+		out[i] = cell
+	}
+	return out
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

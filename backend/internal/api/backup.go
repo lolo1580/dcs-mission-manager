@@ -135,14 +135,20 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 //
 //	GET /api/backup/download/{name}
 func (s *Server) handleBackupDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use GET"})
+		return
+	}
 	name := strings.TrimPrefix(r.URL.Path, "/api/backup/download/")
 	path, err := safeJoin(s.backupDir(), name)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	info, err := os.Stat(path)
-	if err != nil || info.IsDir() {
+	// Lstat, not Stat: a symlink planted in the backup directory must not be
+	// followed and served.
+	info, err := os.Lstat(path)
+	if err != nil || info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "archive not found"})
 		return
 	}

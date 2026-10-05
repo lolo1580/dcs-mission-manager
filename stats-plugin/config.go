@@ -34,11 +34,14 @@ type Config struct {
 // LoadConfig reads the configuration from the environment, applying defaults.
 func LoadConfig() Config {
 	cfg := Config{
-		ListenAddr:     env("PLUGIN_LISTEN_ADDR", ":8090"),
+		ListenAddr:     env("PLUGIN_LISTEN_ADDR", "127.0.0.1:8090"),
 		ManagerDSN:     env("MANAGER_DATABASE_URL", ""),
 		RequestTimeout: envDuration("QUERY_TIMEOUT", 15*time.Second),
 		IncludeTest:    envBool("INCLUDE_TEST", false),
 		AuthToken:      env("PLUGIN_AUTH_TOKEN", ""),
+	}
+	if cfg.RequestTimeout <= 0 {
+		cfg.RequestTimeout = 15 * time.Second
 	}
 	return cfg
 }

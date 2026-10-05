@@ -41,7 +41,7 @@ func testStore(t *testing.T, includeTest bool) (*Store, *pgxpool.Pool, context.C
 		t.Fatalf("seed schema: %v", err)
 	}
 
-	store, err := OpenStore(ctx, dsn, includeTest)
+	store, err := OpenStore(ctx, dsn, includeTest, 15*time.Second)
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}

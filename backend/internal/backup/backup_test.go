@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -170,6 +171,67 @@ func TestResolveUnknownCategory(t *testing.T) {
 	}
 	if _, err := Resolve(nil); err != nil {
 		t.Fatalf("defaults should resolve: %v", err)
+	}
+}
+
+// TestBackupSkipsSymlinks locks the fix for a file leak: os.Open follows a
+// symlink, so a link planted under a backed-up folder would pull an arbitrary
+// readable file into the archive.
+func TestBackupSkipsSymlinks(t *testing.T) {
+	if testing.Short() {
+		t.Skip("symlinks")
+	}
+	sg, out := fixture(t)
+
+	secret := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(secret, []byte("TOP SECRET"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(sg, "Scripts", "leak.lua")
+	if err := os.Symlink(secret, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	a, err := Create(sg, out, []string{"scripts"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zip.OpenReader(a.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		if strings.Contains(f.Name, "leak") {
+			t.Fatalf("symlink was archived: %s", f.Name)
+		}
+	}
+}
+
+// TestRestoreRefusesSymlinkEntry locks the fix that a symlink zip entry cannot
+// be extracted (which would plant a link a later restore follows outside Saved
+// Games).
+func TestRestoreRefusesSymlinkEntry(t *testing.T) {
+	dir := t.TempDir()
+	sg := filepath.Join(dir, "DCS")
+	if err := os.MkdirAll(sg, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	arc := filepath.Join(dir, "link.zip")
+	f, err := os.Create(arc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	hdr := &zip.FileHeader{Name: "files/scripts/Scripts/evil.lua"}
+	hdr.SetMode(os.ModeSymlink | 0o777)
+	w, _ := zw.CreateHeader(hdr)
+	_, _ = w.Write([]byte("/etc/passwd"))
+	_ = zw.Close()
+	_ = f.Close()
+
+	if _, err := Restore(arc, sg, false); err == nil {
+		t.Fatal("a symlink entry must be refused, not extracted")
 	}
 }
 

@@ -238,9 +238,11 @@ const (
 // lineContaining returns the whole line holding kw, at or after from, with its
 // byte range (end includes the trailing newline).
 //
-// Only a Lua comment line is accepted. The markers are always comments, and
-// requiring that keeps a passing mention of the keyword in real code from being
-// mistaken for a block boundary — a mistake here would delete user content.
+// Only a Lua comment line is accepted, and the keyword must be followed by a
+// non-identifier character. Both matter: the markers are always comments, and a
+// passing mention of the keyword in real code — or a name like
+// `DCSMANAGER-BEGINNING` — must never be mistaken for a block boundary, because
+// a mistake here deletes user content.
 func lineContaining(s string, from int, kw string) (start, end int, ok bool) {
 	search := from
 	for {
@@ -254,18 +256,35 @@ func lineContaining(s string, from int, kw string) (start, end int, ok bool) {
 		if j := strings.IndexByte(s[i:], '\n'); j >= 0 {
 			end = i + j + 1
 		}
-		if strings.HasPrefix(strings.TrimSpace(s[start:end]), "--") {
+		// The keyword must not run into a longer identifier.
+		after := i + len(kw)
+		wellFormed := after >= len(s) || !isIdentByte(s[after])
+		if wellFormed && strings.HasPrefix(strings.TrimSpace(s[start:end]), "--") {
 			return start, end, true
 		}
 		search = end
 	}
 }
 
-// findBlocks returns the byte ranges of every DCSMANAGER managed block in s, in order.
+// isIdentByte reports whether b can continue an identifier-like token, so a
+// keyword embedded in a longer word is rejected.
+func isIdentByte(b byte) bool {
+	return b == '-' || b == '_' || b == '.' ||
+		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
+// findBlocks returns the byte ranges of every well-formed DCSMANAGER managed
+// block in s, in order.
 //
-// Every block is found, not just the first, on purpose: an Export.lua that, for
-// whatever reason, ended up with two blocks must be repaired rather than left
-// with the old one still defining the same Lua globals.
+// A block only counts when a BEGIN is matched by a *later* END. A BEGIN with no
+// following END is a hand-edit accident (the "do not edit" marker removed, say);
+// treating it as a block would make the next install swallow — and delete —
+// everything between that orphan marker and the block it appends. So an orphan
+// BEGIN is ignored, and the scan resumes just after it.
+//
+// Every well-formed block is found, not just the first: an Export.lua that ended
+// up with two blocks must be repaired rather than left with the old one still
+// defining the same Lua globals.
 func findBlocks(s string) [][2]int {
 	var spans [][2]int
 	from := 0
@@ -276,7 +295,9 @@ func findBlocks(s string) [][2]int {
 		}
 		_, eEnd, ok := lineContaining(s, bEnd, endKeyword)
 		if !ok {
-			break
+			// Orphan BEGIN: skip just past it and keep looking.
+			from = bEnd
+			continue
 		}
 		spans = append(spans, [2]int{bStart, eEnd})
 		from = eEnd

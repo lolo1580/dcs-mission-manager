@@ -10,7 +10,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 		t.Setenv(k, "")
 	}
 	cfg := LoadConfig()
-	if cfg.ListenAddr != ":8090" {
+	if cfg.ListenAddr != "127.0.0.1:8090" {
 		t.Errorf("ListenAddr = %q", cfg.ListenAddr)
 	}
 	if cfg.ManagerDSN != "" {
