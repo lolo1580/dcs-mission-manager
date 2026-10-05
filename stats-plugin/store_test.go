@@ -50,8 +50,10 @@ func testStore(t *testing.T, includeTest bool) (*Store, *pgxpool.Pool, context.C
 }
 
 // seedSchema recreates the subset of the manager's schema the plugin reads.
+// Every table is dropped first, including the ones only counted by the health
+// footer (debriefs, track_positions), so each test starts from a clean slate.
 const seedSchema = `
-DROP TABLE IF EXISTS player_stats, events, chat, players, missions CASCADE;
+DROP TABLE IF EXISTS player_stats, events, chat, players, missions, debriefs, track_positions CASCADE;
 CREATE TABLE missions (
 	id bigint PRIMARY KEY, name text NOT NULL, theatre text,
 	source text NOT NULL DEFAULT 'live', started_at bigint NOT NULL,
