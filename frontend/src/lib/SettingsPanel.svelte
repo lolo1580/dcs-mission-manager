@@ -8,6 +8,7 @@
   import ModulesPanel from './ModulesPanel.svelte';
   import InstallPanel from './InstallPanel.svelte';
   import PanelsPanel from './PanelsPanel.svelte';
+  import BackupPanel from './BackupPanel.svelte';
   import { t } from './i18n.js';
 
   // "install" first: it is the place to check what is set up on the DCS side.
@@ -17,6 +18,7 @@
     { id: 'install', label: 'tab.install' },
     { id: 'modules', label: 'tab.modules' },
     { id: 'panels', label: 'tab.panels' },
+    { id: 'backup', label: 'backup.title' },
   ];
 </script>
 
@@ -32,6 +34,8 @@
       <InstallPanel />
     {:else if section === 'modules'}
       <ModulesPanel />
+    {:else if section === 'backup'}
+      <BackupPanel />
     {:else}
       <PanelsPanel />
     {/if}

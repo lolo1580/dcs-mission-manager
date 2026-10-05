@@ -26,8 +26,11 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"dcsmanager/internal/app"
+	"dcsmanager/internal/backup"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
 	"dcsmanager/internal/desktop"
@@ -67,6 +70,10 @@ func main() {
 			os.Exit(runPurgeCommand(os.Args[2:]))
 		case "migrate-db":
 			os.Exit(runMigrateCommand(os.Args[2:]))
+		case "backup":
+			os.Exit(runBackupCommand(os.Args[2:]))
+		case "restore":
+			os.Exit(runRestoreCommand(os.Args[2:]))
 		case "version", "--version", "-v":
 			fmt.Printf("dcsmanager %s\n", Version)
 			return
@@ -89,6 +96,8 @@ Usage:
   dcsmanager status          Report whether the scripts are installed / up to date
   dcsmanager purge           Delete recorded sessions (destructive; see options)
   dcsmanager migrate-db      Copy a SQLite database into PostgreSQL (one-shot)
+  dcsmanager backup          Save a DCS player profile to a portable archive
+  dcsmanager restore         Restore a profile archive into Saved Games
   dcsmanager version         Print the version
 
 Options for install-lua / uninstall-lua / status:
@@ -99,6 +108,17 @@ Options for install-lua / uninstall-lua / status:
 Options for migrate-db:
   --from <path>   SQLite database to copy (default: DCSMANAGER_DB_PATH)
   --to <dsn>      PostgreSQL DSN to copy into (default: DCSMANAGER_DB_DSN)
+
+Options for backup:
+  --saved-games <dir>   DCS Saved Games directory (auto-detected)
+  --out <dir>           Where to write the archive (default: <data>/backups)
+  --categories <list>   Comma-separated ids (default: logbook,input,config,scripts)
+  --list-categories     Show the available categories and exit
+
+Options for restore:
+  --from <archive>      The .zip archive to restore (required)
+  --saved-games <dir>   DCS Saved Games directory (auto-detected)
+  --dry-run             Show what would be written, change nothing
 
 Options for purge (exactly one is required):
   --source test         Delete sessions recorded from the test tools
@@ -339,6 +359,151 @@ func redactDSN(dsn string) string {
 		u.User = url.UserPassword(u.User.Username(), "xxxxx")
 	}
 	return u.String()
+}
+
+// runBackupCommand implements `dcsmanager backup`: it archives the selected
+// parts of the player's Saved Games profile.
+func runBackupCommand(args []string) int {
+	fs := flag.NewFlagSet("backup", flag.ExitOnError)
+	savedGames := fs.String("saved-games", "", "DCS Saved Games directory")
+	out := fs.String("out", "", "directory to write the archive into")
+	cats := fs.String("categories", "", "comma-separated category ids")
+	list := fs.Bool("list-categories", false, "list the available categories and exit")
+	_ = fs.Parse(args)
+
+	if *list {
+		fmt.Println("Categories (＊ = included by default):")
+		for _, c := range backup.Categories {
+			mark := " "
+			if c.Default {
+				mark = "*"
+			}
+			size := ""
+			if c.Large {
+				size = "  [large]"
+			}
+			fmt.Printf("  %s %-10s %s%s\n", mark, c.ID, c.Label, size)
+		}
+		return 0
+	}
+
+	cfg := config.Load()
+	sg := *savedGames
+	if sg == "" {
+		sg = cfg.SavedGames
+	}
+	if sg == "" {
+		var err error
+		sg, err = install.FindSavedGames()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "backup: %v\n", err)
+			return 1
+		}
+	}
+
+	outDir := *out
+	if outDir == "" {
+		outDir = backupDir(cfg)
+	}
+
+	ids := splitCSV(*cats)
+	a, err := backup.Create(sg, outDir, ids, app.Version)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "backup: %v\n", err)
+		return 1
+	}
+
+	fmt.Printf("Saved Games : %s\n", sg)
+	fmt.Printf("Archive     : %s\n", a.Path)
+	fmt.Printf("Categories  : %s\n", strings.Join(a.Categories, ", "))
+	fmt.Printf("Contents    : %d file(s), %s\n", a.Entries, humanBytes(a.Bytes))
+	return 0
+}
+
+// runRestoreCommand implements `dcsmanager restore`.
+func runRestoreCommand(args []string) int {
+	fs := flag.NewFlagSet("restore", flag.ExitOnError)
+	from := fs.String("from", "", "archive to restore (required)")
+	savedGames := fs.String("saved-games", "", "DCS Saved Games directory")
+	dryRun := fs.Bool("dry-run", false, "show what would be written, change nothing")
+	_ = fs.Parse(args)
+
+	if *from == "" {
+		fmt.Fprintln(os.Stderr, "restore: --from <archive.zip> is required")
+		return 2
+	}
+
+	cfg := config.Load()
+	sg := *savedGames
+	if sg == "" {
+		sg = cfg.SavedGames
+	}
+	if sg == "" {
+		var err error
+		sg, err = install.FindSavedGames()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "restore: %v\n", err)
+			return 1
+		}
+	}
+
+	fmt.Printf("Archive     : %s\n", *from)
+	fmt.Printf("Saved Games : %s\n", sg)
+	if *dryRun {
+		fmt.Println("Mode        : dry run (no writes)")
+	}
+
+	res, err := backup.Restore(*from, sg, *dryRun)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "restore: %v\n", err)
+		return 1
+	}
+	if res.SafetyBackup != "" {
+		fmt.Printf("Safety copy : %s\n", res.SafetyBackup)
+	}
+	if res.DryRun {
+		fmt.Printf("\nWould restore %d file(s).\n", res.Files)
+	} else {
+		fmt.Printf("\nRestored %d file(s).\n", res.Files)
+	}
+	return 0
+}
+
+// backupDir is where archives go: beside the database, under backups/, so the
+// manager's state stays in one folder.
+func backupDir(cfg config.Config) string {
+	dir := filepath.Dir(cfg.DBPath)
+	if dir == "" || dir == "." {
+		return filepath.Join("data", "backups")
+	}
+	return filepath.Join(dir, "backups")
+}
+
+func splitCSV(v string) []string {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func humanBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for v := n / unit; v >= unit; v /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
 func printResults(results []install.Result) {
