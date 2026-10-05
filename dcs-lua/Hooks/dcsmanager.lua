@@ -550,6 +550,16 @@ do
       t = modelTime(),
     }))
 
+    -- Diagnostic: log each distinct event name once per session, so the DCS log
+    -- shows exactly which game events the hook actually receives. In single
+    -- player DCS delivers fewer events than in multiplayer, and without this the
+    -- manager just looks like it is dropping them.
+    eventNamesSeen = eventNamesSeen or {}
+    if not eventNamesSeen[eventName] then
+      eventNamesSeen[eventName] = true
+      say("game event: " .. tostring(eventName))
+    end
+
     -- A slot change or a connection changes the players' state:
     -- we refresh right away so the UI stays consistent.
     if eventName == "change_slot" or eventName == "connect"
