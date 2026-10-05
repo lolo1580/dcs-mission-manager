@@ -9,9 +9,10 @@
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
   import { onMount } from 'svelte';
 
-  // The Session tab (players, events, chat) was removed: the manager now opens
-  // on the debriefs, which are the durable record of a flight.
-  let tab = 'debriefs';
+  // The Debriefs tab is disabled for now: the panel and its store are kept in
+  // place, but the tab is hidden from the bar and the manager opens on the
+  // statistics. Re-enable it by restoring its button below.
+  let tab = 'stats';
 
   function goTo(id) {
     tab = id;
@@ -41,7 +42,8 @@
     </span>
 
     <nav class="tabs">
-      <button class:active={tab === 'debriefs'} on:click={() => goTo('debriefs')}>{$t('tab.debriefs')}</button>
+      <!-- Debriefs is hidden for now; its panel and store are still in place. -->
+      <!-- <button class:active={tab === 'debriefs'} on:click={() => goTo('debriefs')}>{$t('tab.debriefs')}</button> -->
       <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
       <button class:active={tab === 'settings'} on:click={() => goTo('settings')}>{$t('tab.settings')}</button>
