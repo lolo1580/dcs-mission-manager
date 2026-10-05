@@ -24,9 +24,8 @@ aside {
 }
 .brand { display: flex; align-items: center; gap: .6rem; padding: 1rem; }
 .brand .mark {
-  width: 34px; height: 34px; border-radius: 9px; flex: none;
-  display: grid; place-items: center; font-weight: 800; color: #04212a; font-size: 15px;
-  background: radial-gradient(circle at 30% 30%, #6fe6ec, #1f8fa0);
+  width: 40px; height: 40px; flex: none; display: block;
+  border-radius: 50%; object-fit: contain;
   box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 6px 16px rgba(57,208,216,.25);
 }
 .brand b { display: block; font-size: 14px; }
