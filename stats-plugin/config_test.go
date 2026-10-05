@@ -6,22 +6,21 @@ import (
 )
 
 func TestLoadConfigDefaults(t *testing.T) {
-	// t.Setenv clears the variable afterwards; set to empty so the defaults win.
-	for _, k := range []string{"DATABASE_URL", "DCSMANAGER_URL", "PLUGIN_LISTEN_ADDR", "SYNC_INTERVAL", "SYNC_SCOPES"} {
+	for _, k := range []string{"MANAGER_DATABASE_URL", "PLUGIN_LISTEN_ADDR", "QUERY_TIMEOUT", "PLUGIN_AUTH_TOKEN"} {
 		t.Setenv(k, "")
 	}
 	cfg := LoadConfig()
-	if cfg.ManagerURL != "http://127.0.0.1:8080" {
-		t.Errorf("ManagerURL = %q", cfg.ManagerURL)
-	}
 	if cfg.ListenAddr != ":8090" {
 		t.Errorf("ListenAddr = %q", cfg.ListenAddr)
 	}
-	if cfg.SyncInterval != 5*time.Minute {
-		t.Errorf("SyncInterval = %s", cfg.SyncInterval)
+	if cfg.ManagerDSN != "" {
+		t.Errorf("ManagerDSN = %q, want empty", cfg.ManagerDSN)
 	}
-	if len(cfg.Scopes) != 1 || cfg.Scopes[0] != "career" {
-		t.Errorf("Scopes = %v", cfg.Scopes)
+	if cfg.RequestTimeout != 15*time.Second {
+		t.Errorf("RequestTimeout = %s", cfg.RequestTimeout)
+	}
+	if cfg.IncludeTest {
+		t.Error("IncludeTest should default to false")
 	}
 }
 
@@ -37,13 +36,6 @@ func TestEnvDuration(t *testing.T) {
 	t.Setenv("X", "garbage")
 	if got := envDuration("X", 7*time.Second); got != 7*time.Second {
 		t.Errorf("garbage should fall back, got %s", got)
-	}
-}
-
-func TestSplitList(t *testing.T) {
-	got := splitList(" career , mission ,, ")
-	if len(got) != 2 || got[0] != "career" || got[1] != "mission" {
-		t.Errorf("splitList = %v", got)
 	}
 }
 

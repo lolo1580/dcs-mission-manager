@@ -9,44 +9,32 @@ import (
 	"strings"
 )
 
-// Server is the plugin's own HTTP API and dashboard. It is separate from the
-// manager's UI: the plugin serves a different port and its own pages.
+// Server is the plugin's own HTTP API and dashboard. It reads the manager's
+// PostgreSQL database directly; it never calls the manager over HTTP.
 type Server struct {
-	cfg    Config
-	store  *Store
-	client *ManagerClient
-	web    fs.FS
+	cfg   Config
+	store *Store
+	web   fs.FS
 }
 
 // NewServer wires the plugin's HTTP layer.
-func NewServer(cfg Config, store *Store, client *ManagerClient, web fs.FS) *Server {
-	return &Server{cfg: cfg, store: store, client: client, web: web}
+func NewServer(cfg Config, store *Store, web fs.FS) *Server {
+	return &Server{cfg: cfg, store: store, web: web}
 }
 
-// latestKinds are the snapshot kinds the generic /latest endpoint accepts.
-var latestKinds = map[string]bool{
-	"overview": true,
-	"pilots":   true,
-	"weapons":  true,
-	"engines":  true,
-	"network":  true,
-}
-
-// Handler builds the plugin's routes. When an auth token is configured, every
-// route (including the static dashboard) is wrapped by auth.
+// Handler builds the plugin's routes, all wrapped by the optional auth.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/plugin/health", s.handleHealth)
-	mux.HandleFunc("/api/plugin/instances", s.handleInstances)
 	mux.HandleFunc("/api/plugin/summary", s.handleSummary)
+	mux.HandleFunc("/api/plugin/overview", s.handleOverview)
 	mux.HandleFunc("/api/plugin/series", s.handleSeries)
-	mux.HandleFunc("/api/plugin/latest", s.handleLatest)
 	mux.HandleFunc("/api/plugin/missions", s.handleMissions)
 	mux.HandleFunc("/api/plugin/export", s.handleExport)
 
-	// Convenience routes for a single kind.
+	// Convenience routes, one per aggregate.
 	for _, kind := range []string{"pilots", "weapons", "engines", "network"} {
-		mux.HandleFunc("/api/plugin/"+kind, s.handleKind(kind))
+		mux.HandleFunc("/api/plugin/"+kind, s.handleAggregate(kind))
 	}
 
 	mux.Handle("/", http.FileServer(http.FS(s.web)))
@@ -55,13 +43,9 @@ func (s *Server) Handler() http.Handler {
 
 // --- authentication ----------------------------------------------------------
 
-// auth enforces the bearer token when one is configured. The token may arrive as
-// an Authorization header (API clients) or as ?token= (first browser hit); a
-// successful ?token= also sets a cookie so the dashboard's later asset and API
-// requests authenticate without repeating the token in every URL.
-//
-// With no token configured the check is a pass-through, which is the normal
-// case on 127.0.0.1.
+// auth enforces the bearer token when one is configured (Authorization header,
+// ?token= which sets a cookie, or the cookie). With no token it is a
+// pass-through, which is the normal case on 127.0.0.1.
 func (s *Server) auth(next http.Handler) http.Handler {
 	if s.cfg.AuthToken == "" {
 		return next
@@ -75,31 +59,20 @@ func (s *Server) auth(next http.Handler) http.Handler {
 	})
 }
 
-// authorize reports whether the request carries a valid token, and sets the
-// convenience cookie when the token arrived through ?token=.
 func (s *Server) authorize(w http.ResponseWriter, r *http.Request) bool {
 	want := s.cfg.AuthToken
-
-	// Cookie, set after a first successful ?token=.
 	if c, err := r.Cookie("plugin_token"); err == nil && subtleEqual(c.Value, want) {
 		return true
 	}
-	// Authorization: Bearer <token>.
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		if subtleEqual(strings.TrimPrefix(h, "Bearer "), want) {
 			return true
 		}
 	}
-	// ?token=<token>, for the browser's first hit. Persist it as a cookie so the
-	// dashboard's later asset and API requests authenticate without repeating it.
 	if q := r.URL.Query().Get("token"); q != "" && subtleEqual(q, want) {
 		http.SetCookie(w, &http.Cookie{
-			Name:     "plugin_token",
-			Value:    want,
-			Path:     "/",
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   30 * 24 * 3600,
+			Name: "plugin_token", Value: want, Path: "/",
+			HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30 * 24 * 3600,
 		})
 		return true
 	}
@@ -121,194 +94,145 @@ func subtleEqual(a, b string) bool {
 
 // --- handlers ----------------------------------------------------------------
 
-// handleHealth reports the plugin status plus the manager's reachability.
-//
-//	GET /api/plugin/health?instance=local
+// handleHealth reports the plugin's status and the manager database's size.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	instance := s.instance(r)
-
 	out := map[string]any{
-		"service":    "dcsmanager-stats-plugin",
-		"managerUrl": s.cfg.ManagerURL,
-		"instance":   instance,
-		"scopes":     s.cfg.Scopes,
+		"service":     "dcsmanager-stats-plugin",
+		"mode":        "postgres-reader",
+		"includeTest": s.cfg.IncludeTest,
 	}
-	if h, err := s.client.Health(ctx); err == nil {
-		out["manager"] = h
-	} else {
-		out["managerError"] = err.Error()
-	}
-	if last, err := s.store.LastSync(ctx, instance); err == nil {
-		out["lastSync"] = last
-	}
-	if c, err := s.store.Counts(ctx, instance); err == nil {
+	if c, err := s.store.CountTotals(r.Context()); err == nil {
 		out["counts"] = c
-	}
-	if instances, err := s.store.Instances(ctx, instance); err == nil {
-		out["instances"] = instances
+	} else {
+		out["error"] = err.Error()
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleInstances lists the manager instances stored in the database.
-func (s *Server) handleInstances(w http.ResponseWriter, r *http.Request) {
-	instances, err := s.store.Instances(r.Context(), s.cfg.Name)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	if instances == nil {
-		instances = []string{}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"instances": instances, "default": s.cfg.Name})
-}
-
-// handleSummary returns the latest snapshot of each kind, keyed by kind. The
-// dashboard builds every tab from this single call.
+// handleSummary builds every dashboard tab in one call, exactly like the
+// manager's stats service but read straight from the tables.
 func (s *Server) handleSummary(w http.ResponseWriter, r *http.Request) {
-	instance := s.instance(r)
-	snaps, err := s.store.Latest(r.Context(), instance)
+	ctx := r.Context()
+
+	out := map[string]any{}
+
+	overview, err := s.store.Overview(ctx)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	out := map[string]any{"instance": instance}
-	for _, sn := range snaps {
-		key := sn.Kind
-		if sn.Scope != "career" {
-			key = sn.Kind + ":" + sn.Scope
-		}
-		out[key] = sn.Payload
+	out["overview"] = overview
+
+	if pilots, err := s.store.Pilots(ctx); err == nil {
+		out["pilots"] = map[string]any{"count": len(pilots), "pilots": pilots}
+	} else {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if weapons, err := s.store.Weapons(ctx); err == nil {
+		out["weapons"] = map[string]any{"count": len(weapons), "weapons": weapons}
+	}
+	if engines, err := s.store.Engines(ctx); err == nil {
+		out["engines"] = map[string]any{"count": len(engines), "engines": engines}
+	}
+	if network, err := s.store.Network(ctx); err == nil {
+		out["network"] = map[string]any{"count": len(network), "network": network}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleLatest returns the most recent snapshot of one kind/scope verbatim.
-//
-//	GET /api/plugin/latest?kind=pilots&scope=career&instance=local
-func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request) {
-	s.writeLatest(w, r, r.URL.Query().Get("kind"), r.URL.Query().Get("scope"))
-}
-
-// handleKind is the fixed-kind form of handleLatest.
-func (s *Server) handleKind(kind string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		s.writeLatest(w, r, kind, r.URL.Query().Get("scope"))
-	}
-}
-
-func (s *Server) writeLatest(w http.ResponseWriter, r *http.Request, kind, scope string) {
-	if kind == "" {
-		kind = "pilots"
-	}
-	if !latestKinds[kind] {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown kind: " + kind})
-		return
-	}
-	if scope == "" {
-		scope = "career"
-	}
-	raw, err := s.store.LatestPayload(r.Context(), s.instance(r), kind, scope)
-	if err != nil || len(raw) == 0 {
-		writeJSON(w, http.StatusOK, emptyPayload(kind))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write(raw)
-}
-
-// handleMissions returns the mirrored missions of an instance, newest first.
-func (s *Server) handleMissions(w http.ResponseWriter, r *http.Request) {
-	missions, err := s.store.Missions(r.Context(), s.instance(r), limitParam(r, 500))
+// handleOverview returns just the dashboard summary.
+func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
+	o, err := s.store.Overview(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	if missions == nil {
-		missions = []Mission{}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"count": len(missions), "missions": missions})
+	writeJSON(w, http.StatusOK, o)
 }
 
-// handleSeries returns a time series for one overview metric.
+// handleAggregate serves one of the per-kind aggregates.
+func (s *Server) handleAggregate(kind string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		switch kind {
+		case "pilots":
+			v, err := s.store.Pilots(ctx)
+			respond(w, err, "pilots", v)
+		case "weapons":
+			v, err := s.store.Weapons(ctx)
+			respond(w, err, "weapons", v)
+		case "engines":
+			v, err := s.store.Engines(ctx)
+			respond(w, err, "engines", v)
+		case "network":
+			v, err := s.store.Network(ctx)
+			respond(w, err, "network", v)
+		}
+	}
+}
+
+// handleSeries returns a daily event series.
 //
-//	GET /api/plugin/series?metric=kills&scope=career&limit=500
+//	GET /api/plugin/series?event=kill&days=30
 func (s *Server) handleSeries(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	metric := q.Get("metric")
-	if metric == "" {
-		metric = "kills"
+	eventKind := q.Get("event")
+	days := 30
+	if v := q.Get("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = n
+		}
 	}
-	scope := q.Get("scope")
-	if scope == "" {
-		scope = "career"
-	}
-	points, err := s.store.OverviewSeries(r.Context(), s.instance(r), scope, metric, limitParam(r, 500))
+	points, err := s.store.EventSeries(r.Context(), eventKind, days)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	if points == nil {
 		points = []Point{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"metric": metric,
-		"scope":  scope,
-		"points": points,
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"event": eventKind, "days": days, "points": points})
 }
 
-// handleExport streams mirrored data as CSV or JSON.
+// handleMissions returns the manager's missions, newest first.
+func (s *Server) handleMissions(w http.ResponseWriter, r *http.Request) {
+	missions, err := s.store.Missions(r.Context(), limitParam(r, 200))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if missions == nil {
+		missions = []MissionRow{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"count": len(missions), "missions": missions})
+}
+
+// handleExport streams data as CSV or JSON.
 //
-//	GET /api/plugin/export?type=events|chat|missions&format=csv&event=kill
-//	GET /api/plugin/export?type=series&metric=kills&format=json
+//	GET /api/plugin/export?type=missions|series&format=csv
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	kind := q.Get("type")
-	instance := s.instance(r)
 	if kind == "" {
-		kind = "events"
+		kind = "missions"
 	}
 	csvOut := q.Get("format") == "csv"
 
 	switch kind {
-	case "events":
-		rows, err := s.store.Events(r.Context(), instance, q.Get("event"), limitParam(r, 10000))
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-		if csvOut {
-			writeCSV(w, "events_"+instance+".csv",
-				[]string{"id", "event", "t", "realTs", "args", "detail"},
-				toRows(rows, func(e Event) []string {
-					a, _ := json.Marshal(e.Args)
-					d, _ := json.Marshal(e.Detail)
-					return []string{
-						strconv.FormatInt(e.ID, 10), e.Event,
-						strconv.FormatFloat(e.T, 'f', -1, 64),
-						strconv.FormatInt(e.RealTS, 10), string(a), string(d),
-					}
-				}))
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"count": len(rows), "events": rows})
-
 	case "missions":
-		rows, err := s.store.Missions(r.Context(), instance, limitParam(r, 10000))
+		rows, err := s.store.Missions(r.Context(), limitParam(r, 10000))
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 		if csvOut {
-			writeCSV(w, "missions_"+instance+".csv",
+			writeCSV(w, "missions.csv",
 				[]string{"id", "name", "theatre", "source", "startedAt", "endedAt", "winner"},
-				toRows(rows, func(m Mission) []string {
+				toRows(rows, func(m MissionRow) []string {
 					return []string{
 						strconv.FormatInt(m.ID, 10), m.Name, m.Theatre, m.Source,
-						strconv.FormatInt(m.StartedAt, 10),
-						strconv.FormatInt(m.EndedAt, 10), m.Winner,
+						strconv.FormatInt(m.StartedAt, 10), strconv.FormatInt(m.EndedAt, 10), m.Winner,
 					}
 				}))
 			return
@@ -316,20 +240,33 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"count": len(rows), "missions": rows})
 
 	case "series":
-		metric := q.Get("metric")
-		if metric == "" {
-			metric = "kills"
-		}
-		scope := q.Get("scope")
-		if scope == "" {
-			scope = "career"
-		}
-		points, err := s.store.OverviewSeries(r.Context(), instance, scope, metric, limitParam(r, 5000))
+		eventKind := q.Get("event")
+		points, err := s.store.EventSeries(r.Context(), eventKind, 90)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"metric": metric, "scope": scope, "points": points})
+		writeJSON(w, http.StatusOK, map[string]any{"event": eventKind, "points": points})
+
+	case "pilots":
+		rows, err := s.store.Pilots(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if csvOut {
+			writeCSV(w, "pilots.csv",
+				[]string{"name", "ucid", "missions", "score", "kills", "deaths", "kd", "avgPing"},
+				toRows(rows, func(p PilotStats) []string {
+					return []string{
+						p.Name, p.UCID, strconv.Itoa(p.Missions), strconv.Itoa(p.Score),
+						strconv.Itoa(p.Kills), strconv.Itoa(p.Deaths),
+						strconv.FormatFloat(p.KD, 'f', 2, 64), strconv.FormatFloat(p.AvgPing, 'f', 1, 64),
+					}
+				}))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"count": len(rows), "pilots": rows})
 
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown type: " + kind})
@@ -338,14 +275,12 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 
 // --- helpers -----------------------------------------------------------------
 
-// instance resolves which manager instance a request targets: ?instance=, or
-// the plugin's own configured name. The value is only ever used as a bound SQL
-// parameter, never interpolated.
-func (s *Server) instance(r *http.Request) string {
-	if v := r.URL.Query().Get("instance"); v != "" {
-		return v
+func respond(w http.ResponseWriter, err error, key string, v any) {
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
 	}
-	return s.cfg.Name
+	writeJSON(w, http.StatusOK, map[string]any{key: v})
 }
 
 func limitParam(r *http.Request, def int) int {
@@ -374,24 +309,6 @@ func writeCSV(w http.ResponseWriter, filename string, header []string, rows [][]
 	for _, row := range rows {
 		_ = cw.Write(row)
 	}
-}
-
-// emptyPayload returns the empty shape a kind would have, so a client can render
-// an empty table instead of having to special-case a missing snapshot.
-func emptyPayload(kind string) map[string]any {
-	switch kind {
-	case "overview":
-		return map[string]any{}
-	case "pilots":
-		return map[string]any{"count": 0, "pilots": []any{}}
-	case "weapons":
-		return map[string]any{"count": 0, "weapons": []any{}}
-	case "engines":
-		return map[string]any{"count": 0, "engines": []any{}}
-	case "network":
-		return map[string]any{"count": 0, "network": []any{}}
-	}
-	return map[string]any{}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

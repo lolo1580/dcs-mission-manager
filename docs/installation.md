@@ -255,7 +255,8 @@ Toute la configuration passe par des **variables d'environnement** préfixées
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `DCSMANAGER_HTTP_ADDR` | `127.0.0.1:8080` | Adresse de l'interface web + SSE. `0` choisit un port libre (fenêtre native). `0.0.0.0:8080` l'expose au réseau — attention, **pas d'authentification** |
+| `DCSMANAGER_HTTP_ADDR` | `127.0.0.1:8080` | Adresse de l'interface web + SSE. `0` choisit un port libre (fenêtre native). `0.0.0.0:8080` l'expose au réseau — **protégez-la alors avec `DCSMANAGER_API_TOKEN`** |
+| `DCSMANAGER_API_TOKEN` | *(vide)* | Si défini, les appels **non locaux** doivent le présenter. L'accès local (loopback) reste autorisé sans jeton |
 | `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7776` | Télémétrie des unités. **Pas 7778** : DCS-BIOS l'occupe |
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | Événements + commandes |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | Base SQLite |
@@ -312,24 +313,63 @@ Détails et compromis : [`database-backends.md`](database-backends.md).
 
 ## 8. Option : plugin de statistiques
 
-Le **plugin de statistiques** est un service **optionnel et séparé** : il lit
-l'API REST du manager, stocke dans **PostgreSQL** et sert son propre tableau de
-bord (tendances dans le temps, multi-serveurs, exports). Le manager reste
-inchangé.
+Le **plugin de statistiques** est un service **optionnel et séparé**. Dans ce
+modèle, **PostgreSQL est la bibliothèque partagée** : le manager y écrit, et le
+plugin lit directement ses tables pour servir son propre tableau de bord. Le
+plugin n'appelle **pas** l'API du manager.
+
+```
+Manager (machine DCS) ── écrit ──► PostgreSQL ◄── lit (SELECT) ── Plugin (Docker)
+```
+
+> **Prérequis** : le manager doit tourner sur **PostgreSQL** (section 7), pas sur
+> SQLite. SQLite est un fichier local, illisible depuis un autre conteneur ou une
+> autre machine. Le plugin hérite donc du mode « bibliothèque partagée ».
+
+### 8.1 Côté manager — écrire dans PostgreSQL
 
 ```powershell
-# 1. PostgreSQL (Docker)
-docker compose -f stats-plugin/docker-compose.yml up -d postgres
+$env:DCSMANAGER_DB_DRIVER = "postgres"
+$env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable"
+.\dcsmanager.exe
+```
 
-# 2. Le plugin, en local
+Le manager reste sur `127.0.0.1` : **rien à exposer**, aucune API à protéger,
+aucun port pare-feu à ouvrir.
+
+### 8.2 Côté plugin — lire la base
+
+```powershell
 cd stats-plugin
-$env:DATABASE_URL   = "postgres://dcs:dcs@localhost:5432/stats?sslmode=disable"
-$env:DCSMANAGER_URL = "http://127.0.0.1:8080"
+$env:MANAGER_DATABASE_URL = "postgres://stats_reader:change-me@localhost:5432/dcsmanager?sslmode=disable"
 go run .
 # tableau de bord : http://localhost:8090
 ```
 
+Le plugin ouvre la base **en lecture seule** (`default_transaction_read_only=on`),
+et il est conseillé de lui donner un **rôle SELECT-only** :
+
+```sql
+CREATE ROLE stats_reader LOGIN PASSWORD 'change-me';
+GRANT CONNECT ON DATABASE dcsmanager TO stats_reader;
+GRANT USAGE   ON SCHEMA public      TO stats_reader;
+GRANT SELECT  ON ALL TABLES IN SCHEMA public TO stats_reader;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO stats_reader;
+```
+
+### 8.3 Plugin sur une autre machine
+
+Le plugin (et PostgreSQL) peuvent tourner **n'importe où**, tant que la base est
+joignable. Comme le plugin ne parle pas au manager en HTTP, il n'y a **pas de
+jeton d'API à configurer** pour lui : il suffit que l'adresse de PostgreSQL soit
+accessible (réseau privé, port 5432). Le manager, lui, n'a toujours rien à
+exposer.
+
 Guide complet : [`stats-plugin/README.md`](../stats-plugin/README.md).
+
+> Si vous avez un jour besoin d'exposer l'**interface/API du manager** elle-même
+> (tablette, navigateur distant), faites-le avec `DCSMANAGER_API_TOKEN` : voir la
+> section 6. Ce jeton **n'est pas utilisé par le plugin** dans ce modèle.
 
 ---
 
@@ -425,4 +465,5 @@ endpoint destructif (`purge`) : réservez-la au réseau local.
 - [`dcs-installation.md`](dcs-installation.md) — installation côté DCS en détail
 - [`architecture.md`](architecture.md) — composants internes et flux de données
 - [`database-backends.md`](database-backends.md) — SQLite par défaut, PostgreSQL en option
+- [`stats-plugin.md`](stats-plugin.md) — plugin de statistiques (lecture PostgreSQL)
 - [`stats-plugin/README.md`](../stats-plugin/README.md) — plugin de statistiques

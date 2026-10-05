@@ -2,47 +2,47 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"strconv"
+	"sort"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Store is the plugin's PostgreSQL persistence. It is intentionally small: the
-// plugin stores snapshots and reads them back, it does not aggregate.
+// Store reads the manager's PostgreSQL database. It is a READER: the pool is
+// opened with default_transaction_read_only=on, so no statement it runs can
+// modify the manager's data — "read-only" is enforced by PostgreSQL, not just by
+// convention. Point it at a dedicated SELECT-only role for defence in depth.
 //
-// Every row is scoped by an `instance` name (the manager the row came from), so
-// several plugin instances can safely share one database.
+// It aggregates directly on the manager's own tables (missions, events, players,
+// player_stats), which is possible because the manager can run on PostgreSQL
+// (DCSMANAGER_DB_DRIVER=postgres). There is no mirror and no snapshot: the
+// manager is the single writer, the plugin a reader.
 type Store struct {
 	pool *pgxpool.Pool
+	// includeTest, when false, excludes simulated missions from every query —
+	// the same policy the manager applies to its own statistics.
+	includeTest bool
 }
 
-// ErrUnknownMetric is returned when a requested metric is not one the overview
-// snapshot can expose. The metric name is whitelisted because it is inlined in
-// the SQL (a jsonb key cannot be a bound parameter in every position).
-var ErrUnknownMetric = errors.New("unknown metric")
+// OpenStore connects read-only to the manager's PostgreSQL database.
+func OpenStore(ctx context.Context, dsn string, includeTest bool) (*Store, error) {
+	if dsn == "" {
+		return nil, errors.New("MANAGER_DATABASE_URL is required (the manager must run with DCSMANAGER_DB_DRIVER=postgres)")
+	}
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	// Enforce read-only at the session level. Combined with a SELECT-only
+	// database role, the plugin physically cannot write.
+	if cfg.ConnConfig.RuntimeParams == nil {
+		cfg.ConnConfig.RuntimeParams = map[string]string{}
+	}
+	cfg.ConnConfig.RuntimeParams["default_transaction_read_only"] = "on"
 
-// overviewMetrics are the numeric fields of an overview snapshot that can be
-// turned into a time series.
-var overviewMetrics = map[string]bool{
-	"kills":        true,
-	"deaths":       true,
-	"crashes":      true,
-	"ejections":    true,
-	"friendlyFire": true,
-	"events":       true,
-	"missions":     true,
-	"players":      true,
-}
-
-// OpenStore connects to PostgreSQL and verifies the connection.
-func OpenStore(ctx context.Context, dbURL string) (*Store, error) {
-	pool, err := pgxpool.New(ctx, dbURL)
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func OpenStore(ctx context.Context, dbURL string) (*Store, error) {
 		pool.Close()
 		return nil, err
 	}
-	return &Store{pool: pool}, nil
+	return &Store{pool: pool, includeTest: includeTest}, nil
 }
 
 // Close releases the connection pool.
@@ -60,338 +60,487 @@ func (s *Store) Close() {
 	}
 }
 
-// Migrate applies the embedded schema. Every statement is idempotent.
-func (s *Store) Migrate(ctx context.Context, schema string) error {
-	_, err := s.pool.Exec(ctx, schema)
-	return err
+// missionFilter returns the SQL fragment and arguments restricting a query on a
+// mission column to the configured test policy. The column is always a literal
+// from this package, never user input.
+func (s *Store) missionFilter(column string) string {
+	if s.includeTest {
+		return ""
+	}
+	return " AND " + column + " IN (SELECT id FROM missions WHERE source <> 'test')"
 }
 
-// Snapshot is one stored API payload.
-type Snapshot struct {
-	Instance   string          `json:"instance"`
-	Kind       string          `json:"kind"`
-	Scope      string          `json:"scope"`
-	CapturedAt time.Time       `json:"capturedAt"`
-	Payload    json.RawMessage `json:"payload"`
+// --- models (mirroring the manager's stats JSON shapes) -----------------------
+
+// Overview is the top-level dashboard payload.
+type Overview struct {
+	Missions   int              `json:"missions"`
+	Players    int              `json:"players"`
+	Events     int              `json:"events"`
+	Kills      int              `json:"kills"`
+	Deaths     int              `json:"deaths"`
+	Crashes    int              `json:"crashes"`
+	Ejections  int              `json:"ejections"`
+	FriendlyFF int              `json:"friendlyFire"`
+	Coalitions []CoalitionStats `json:"coalitions"`
 }
 
-// InsertSnapshot stores one API snapshot and reports whether a row was written.
-// It skips the insert when the payload is byte-identical to the most recent one
-// for the same (instance, kind, scope), so periodic polling does not accumulate
-// identical rows.
-func (s *Store) InsertSnapshot(ctx context.Context, instance, kind, scope string, includeTest bool, payload []byte) (bool, error) {
-	sum := sha256.Sum256(payload)
-	hash := hex.EncodeToString(sum[:])
+// PilotStats is a player's aggregated performance (career-wide, by UCID).
+type PilotStats struct {
+	UCID       string  `json:"ucid"`
+	Name       string  `json:"name"`
+	Missions   int     `json:"missions"`
+	Score      int     `json:"score"`
+	KillsAir   int     `json:"killsAir"`
+	KillsCar   int     `json:"killsCar"`
+	KillsShip  int     `json:"killsShip"`
+	Kills      int     `json:"kills"`
+	Deaths     int     `json:"deaths"`
+	Crashes    int     `json:"crashes"`
+	Ejections  int     `json:"ejections"`
+	Landings   int     `json:"landings"`
+	FriendlyFF int     `json:"friendlyFire"`
+	AvgPing    float64 `json:"avgPing"`
+	KD         float64 `json:"kd"`
+}
 
-	var prev string
-	err := s.pool.QueryRow(ctx, `
-		SELECT payload_hash FROM stat_snapshots
-		WHERE instance = $1 AND kind = $2 AND scope = $3
-		ORDER BY captured_at DESC
-		LIMIT 1`, instance, kind, scope).Scan(&prev)
-	switch {
-	case err == nil && prev == hash:
-		return false, nil
-	case err != nil && !errors.Is(err, pgx.ErrNoRows):
-		return false, err
+// WeaponStats describes the effectiveness of one weapon.
+type WeaponStats struct {
+	Weapon        string         `json:"weapon"`
+	Kills         int            `json:"kills"`
+	FriendlyFire  int            `json:"friendlyFire"`
+	VictimsByType map[string]int `json:"victimsByType"`
+	KillersByType map[string]int `json:"killersByType"`
+}
+
+// EngineStats describes how a DCS unit type performs.
+type EngineStats struct {
+	TypeID   string  `json:"typeId"`
+	Category string  `json:"category"`
+	Kills    int     `json:"kills"`
+	Deaths   int     `json:"deaths"`
+	Sorties  int     `json:"sorties"`
+	KD       float64 `json:"kd"`
+}
+
+// CoalitionStats is a coalition's aggregate performance.
+type CoalitionStats struct {
+	Coalition string `json:"coalition"`
+	Score     int    `json:"score"`
+	Kills     int    `json:"kills"`
+	Players   int    `json:"players"`
+}
+
+// NetworkStats is one player's connection quality.
+type NetworkStats struct {
+	Name    string  `json:"name"`
+	Samples int     `json:"samples"`
+	AvgPing float64 `json:"avgPing"`
+	MaxPing int     `json:"maxPing"`
+}
+
+// Mission is the manager's mission row shape.
+type Mission struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Theatre   string `json:"theatre,omitempty"`
+	Source    string `json:"source,omitempty"`
+	StartedAt int64  `json:"startedAt"`
+	EndedAt   int64  `json:"endedAt,omitempty"`
+	Winner    string `json:"winner,omitempty"`
+}
+
+// Counts reports how many rows the manager holds, for the dashboard footer.
+type Counts struct {
+	Missions  int64 `json:"missions"`
+	Players   int64 `json:"players"`
+	Events    int64 `json:"events"`
+	Debriefs  int64 `json:"debriefs"`
+	Positions int64 `json:"positions"`
+}
+
+// --- queries -----------------------------------------------------------------
+
+// Overview aggregates the dashboard summary, mirroring the manager's Overview.
+func (s *Store) Overview(ctx context.Context) (Overview, error) {
+	var o Overview
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM missions WHERE 1=1`+s.missionFilter("id")).Scan(&o.Missions); err != nil {
+		return o, err
+	}
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM players`).Scan(&o.Players); err != nil {
+		return o, err
 	}
 
-	// The explicit ::text::jsonb cast keeps the encoding unambiguous: the body
-	// is sent as text, then parsed by PostgreSQL.
-	_, err = s.pool.Exec(ctx, `
-		INSERT INTO stat_snapshots(instance, kind, scope, include_test, payload, payload_hash)
-		VALUES($1, $2, $3, $4, $5::text::jsonb, $6)`,
-		instance, kind, scope, includeTest, string(payload), hash)
+	// Events counters. SUM returns NULL on no rows, hence COALESCE.
+	row := s.pool.QueryRow(ctx, `
+		SELECT COUNT(*),
+		       COALESCE(SUM(CASE WHEN event='kill' THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN event='pilot_death' THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN event='crash' THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN event='eject' THEN 1 ELSE 0 END),0),
+		       COALESCE(SUM(CASE WHEN event='friendly_fire' THEN 1 ELSE 0 END),0)
+		FROM events WHERE 1=1`+s.missionFilter("mission_id"))
+	if err := row.Scan(&o.Events, &o.Kills, &o.Deaths, &o.Crashes, &o.Ejections, &o.FriendlyFF); err != nil {
+		return o, err
+	}
+
+	coalitions, err := s.Coalitions(ctx)
 	if err != nil {
-		return false, err
+		return o, err
 	}
-	return true, nil
+	o.Coalitions = coalitions
+	return o, nil
 }
 
-// Latest returns the most recent snapshot for every (kind, scope) of one
-// instance.
-func (s *Store) Latest(ctx context.Context, instance string) ([]Snapshot, error) {
+// Pilots returns per-player career statistics, best score first, keyed by UCID.
+//
+// Like the manager, only the LATEST snapshot per (mission, player) is summed:
+// the hook resends cumulative counters every few seconds, so summing every row
+// would multiply a player's totals by the sampling rate. Deaths and friendly
+// fire are derived from events, resolving the DCS player id per mission.
+func (s *Store) Pilots(ctx context.Context) ([]PilotStats, error) {
+	where := s.missionFilter("ps.mission_id")
 	rows, err := s.pool.Query(ctx, `
-		SELECT DISTINCT ON (kind, scope) instance, kind, scope, captured_at, payload
-		FROM stat_snapshots
-		WHERE instance = $1
-		ORDER BY kind, scope, captured_at DESC`, instance)
+		WITH latest AS (
+			SELECT MAX(id) AS id
+			FROM player_stats ps
+			WHERE 1=1`+where+`
+			GROUP BY ps.mission_id, ps.player_id
+		)
+		SELECT p.id, COALESCE(p.ucid,''), p.name,
+		       COUNT(DISTINCT ps.mission_id),
+		       COALESCE(SUM(ps.score),0),
+		       COALESCE(SUM(ps.kills_air),0), COALESCE(SUM(ps.kills_car),0), COALESCE(SUM(ps.kills_ship),0),
+		       COALESCE(SUM(ps.crashes),0), COALESCE(SUM(ps.ejects),0), COALESCE(SUM(ps.landings),0),
+		       AVG(NULLIF(ps.ping,0))
+		FROM player_stats ps
+		JOIN players p ON p.id = ps.player_id
+		WHERE ps.id IN (SELECT id FROM latest)
+		GROUP BY p.id, p.ucid, p.name
+		ORDER BY COALESCE(SUM(ps.score),0) DESC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var out []Snapshot
+	var out []PilotStats
+	byID := map[int64]int{}
 	for rows.Next() {
-		var sn Snapshot
-		var raw []byte
-		if err := rows.Scan(&sn.Instance, &sn.Kind, &sn.Scope, &sn.CapturedAt, &raw); err != nil {
+		var p PilotStats
+		var id int64
+		var avgPing *float64
+		if err := rows.Scan(&id, &p.UCID, &p.Name, &p.Missions, &p.Score,
+			&p.KillsAir, &p.KillsCar, &p.KillsShip,
+			&p.Crashes, &p.Ejections, &p.Landings, &avgPing); err != nil {
 			return nil, err
 		}
-		sn.Payload = json.RawMessage(raw)
-		out = append(out, sn)
-	}
-	return out, rows.Err()
-}
-
-// LatestPayload returns the raw JSON of the most recent snapshot for one key.
-func (s *Store) LatestPayload(ctx context.Context, instance, kind, scope string) ([]byte, error) {
-	var raw []byte
-	err := s.pool.QueryRow(ctx, `
-		SELECT payload FROM stat_snapshots
-		WHERE instance = $1 AND kind = $2 AND scope = $3
-		ORDER BY captured_at DESC
-		LIMIT 1`, instance, kind, scope).Scan(&raw)
-	return raw, err
-}
-
-// Point is one value of a time series.
-type Point struct {
-	At    time.Time `json:"at"`
-	Value float64   `json:"value"`
-}
-
-// OverviewSeries extracts one numeric metric from the overview snapshots of a
-// scope, oldest first. This is exactly the kind of trend the manager's own UI
-// cannot show, because it keeps no history.
-func (s *Store) OverviewSeries(ctx context.Context, instance, scope, metric string, limit int) ([]Point, error) {
-	if !overviewMetrics[metric] {
-		return nil, ErrUnknownMetric
-	}
-	if limit <= 0 || limit > 5000 {
-		limit = 500
-	}
-	rows, err := s.pool.Query(ctx, `
-		SELECT captured_at, COALESCE((payload ->> '`+metric+`')::numeric, 0)
-		FROM stat_snapshots
-		WHERE instance = $1 AND kind = 'overview' AND scope = $2
-		ORDER BY captured_at ASC
-		LIMIT $3`, instance, scope, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []Point
-	for rows.Next() {
-		var p Point
-		if err := rows.Scan(&p.At, &p.Value); err != nil {
-			return nil, err
+		if avgPing != nil {
+			p.AvgPing = *avgPing
 		}
+		p.Kills = p.KillsAir + p.KillsCar + p.KillsShip
+		byID[id] = len(out)
 		out = append(out, p)
-	}
-	return out, rows.Err()
-}
-
-// Instances lists the manager instances present in the database, so a dashboard
-// can switch between them. The requested default is placed first when present.
-func (s *Store) Instances(ctx context.Context, prefer string) ([]string, error) {
-	rows, err := s.pool.Query(ctx, `SELECT DISTINCT instance FROM stat_snapshots ORDER BY instance`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		out = append(out, name)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	// Put the preferred instance first.
-	if prefer != "" {
-		for i, name := range out {
-			if name == prefer {
-				out = append([]string{name}, append(out[:i:i], out[i+1:]...)...)
-				break
-			}
+
+	deaths, ff, err := s.eventCountsByPlayer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for id, idx := range byID {
+		out[idx].Deaths = deaths[id]
+		out[idx].FriendlyFF = ff[id]
+		if out[idx].Deaths > 0 {
+			out[idx].KD = float64(out[idx].Kills) / float64(out[idx].Deaths)
+		} else if out[idx].Kills > 0 {
+			out[idx].KD = float64(out[idx].Kills)
 		}
 	}
 	return out, nil
 }
 
-// SyncRun records the outcome of one polling pass.
-type SyncRun struct {
-	At    time.Time `json:"at"`
-	OK    bool      `json:"ok"`
-	Error string    `json:"error,omitempty"`
-}
-
-// RecordSync appends the outcome of a polling pass.
-func (s *Store) RecordSync(ctx context.Context, instance string, ok bool, errMsg string) error {
-	var e *string
-	if errMsg != "" {
-		e = &errMsg
-	}
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO sync_runs(instance, ok, error) VALUES($1, $2, $3)`, instance, ok, e)
-	return err
-}
-
-// LastSync returns the most recent polling outcome, if any.
-func (s *Store) LastSync(ctx context.Context, instance string) (SyncRun, error) {
-	var r SyncRun
-	var errMsg *string
-	err := s.pool.QueryRow(ctx, `
-		SELECT at, ok, error FROM sync_runs
-		WHERE instance = $1
-		ORDER BY at DESC LIMIT 1`, instance).Scan(&r.At, &r.OK, &errMsg)
-	if err != nil {
-		return r, err
-	}
-	if errMsg != nil {
-		r.Error = *errMsg
-	}
-	return r, nil
-}
-
-// --- incremental mirror ------------------------------------------------------
-
-// Cursor returns the stored cursor for a feed ("events", "chat" or "missions"),
-// 0 if none.
-func (s *Store) Cursor(ctx context.Context, instance, name string) (int64, error) {
-	var id int64
-	err := s.pool.QueryRow(ctx,
-		`SELECT last_id FROM sync_cursor WHERE instance = $1 AND name = $2`, instance, name).Scan(&id)
-	if err != nil && errors.Is(err, pgx.ErrNoRows) {
-		return 0, nil
-	}
-	return id, err
-}
-
-// SetCursor advances a cursor. GREATEST guarantees it never rewinds, so a late
-// or out-of-order batch cannot make the plugin fetch the same rows again.
-func (s *Store) SetCursor(ctx context.Context, instance, name string, id int64) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO sync_cursor(instance, name, last_id, updated_at) VALUES($1, $2, $3, now())
-		ON CONFLICT (instance, name) DO UPDATE
-		SET last_id = GREATEST(sync_cursor.last_id, EXCLUDED.last_id),
-		    updated_at = now()`, instance, name, id)
-	return err
-}
-
-// UpsertEvents mirrors a batch of manager events, idempotently.
-func (s *Store) UpsertEvents(ctx context.Context, instance string, events []Event) (int, error) {
-	if len(events) == 0 {
-		return 0, nil
-	}
-	batch := &pgx.Batch{}
-	for _, e := range events {
-		args, _ := json.Marshal(e.Args)
-		var detail any
-		if len(e.Detail) > 0 {
-			detail = string(e.Detail)
-		}
-		batch.Queue(`
-			INSERT INTO events(instance, id, event, args, detail, t, real_ts)
-			VALUES($1, $2, $3, $4::text::jsonb, $5::text::jsonb, $6, $7)
-			ON CONFLICT (instance, id) DO UPDATE
-			SET event = EXCLUDED.event, args = EXCLUDED.args,
-			    detail = EXCLUDED.detail, t = EXCLUDED.t, real_ts = EXCLUDED.real_ts`,
-			instance, e.ID, e.Event, string(args), detail, e.T, e.RealTS)
-	}
-	br := s.pool.SendBatch(ctx, batch)
-	defer br.Close()
-	for range events {
-		if _, err := br.Exec(); err != nil {
-			return 0, err
-		}
-	}
-	return len(events), nil
-}
-
-// UpsertChat mirrors a batch of chat messages, idempotently.
-func (s *Store) UpsertChat(ctx context.Context, instance string, chat []Chat) (int, error) {
-	if len(chat) == 0 {
-		return 0, nil
-	}
-	batch := &pgx.Batch{}
-	for _, c := range chat {
-		batch.Queue(`
-			INSERT INTO chat(instance, id, "from", message, real_ts)
-			VALUES($1, $2, $3, $4, $5)
-			ON CONFLICT (instance, id) DO UPDATE
-			SET "from" = EXCLUDED."from", message = EXCLUDED.message, real_ts = EXCLUDED.real_ts`,
-			instance, c.ID, c.From, c.Message, c.RealTS)
-	}
-	br := s.pool.SendBatch(ctx, batch)
-	defer br.Close()
-	for range chat {
-		if _, err := br.Exec(); err != nil {
-			return 0, err
-		}
-	}
-	return len(chat), nil
-}
-
-// UpsertMissions mirrors a batch of missions, idempotently.
-func (s *Store) UpsertMissions(ctx context.Context, instance string, missions []Mission) (int, error) {
-	if len(missions) == 0 {
-		return 0, nil
-	}
-	batch := &pgx.Batch{}
-	for _, m := range missions {
-		batch.Queue(`
-			INSERT INTO missions(instance, id, name, theatre, source, started_at, ended_at, winner)
-			VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-			ON CONFLICT (instance, id) DO UPDATE
-			SET name = EXCLUDED.name, theatre = EXCLUDED.theatre, source = EXCLUDED.source,
-			    started_at = EXCLUDED.started_at, ended_at = EXCLUDED.ended_at, winner = EXCLUDED.winner`,
-			instance, m.ID, m.Name, nullable(m.Theatre), m.Source, m.StartedAt, m.EndedAt, nullable(m.Winner))
-	}
-	br := s.pool.SendBatch(ctx, batch)
-	defer br.Close()
-	for range missions {
-		if _, err := br.Exec(); err != nil {
-			return 0, err
-		}
-	}
-	return len(missions), nil
-}
-
-// Counts reports how many events, chat messages and missions are mirrored for an
-// instance. Used by health and the dashboard.
-type Counts struct {
-	Events   int64 `json:"events"`
-	Chat     int64 `json:"chat"`
-	Missions int64 `json:"missions"`
-}
-
-// Counts returns the mirrored row counts for one instance.
-func (s *Store) Counts(ctx context.Context, instance string) (Counts, error) {
-	var c Counts
-	err := s.pool.QueryRow(ctx, `
-		SELECT
-			(SELECT COUNT(*) FROM events   WHERE instance = $1),
-			(SELECT COUNT(*) FROM chat     WHERE instance = $1),
-			(SELECT COUNT(*) FROM missions WHERE instance = $1)`, instance).
-		Scan(&c.Events, &c.Chat, &c.Missions)
-	return c, err
-}
-
-// Missions returns mirrored missions for an instance, newest first.
-func (s *Store) Missions(ctx context.Context, instance string, limit int) ([]Mission, error) {
-	if limit <= 0 || limit > 5000 {
-		limit = 500
-	}
+// eventCountsByPlayer counts deaths and friendly-fire per player row, resolving
+// each event's DCS player id within its own mission.
+func (s *Store) eventCountsByPlayer(ctx context.Context) (deaths, ff map[int64]int, err error) {
+	resolver := map[[2]int64]int64{}
+	where := s.missionFilter("ps.mission_id")
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name, COALESCE(theatre,''), COALESCE(source,'live'), started_at,
-		       COALESCE(ended_at,0), COALESCE(winner,'')
-		FROM missions WHERE instance = $1
-		ORDER BY started_at DESC LIMIT $2`, instance, limit)
+		SELECT DISTINCT ps.mission_id, ps.dcs_player_id, ps.player_id
+		FROM player_stats ps
+		WHERE ps.dcs_player_id IS NOT NULL AND ps.mission_id IS NOT NULL`+where)
+	if err != nil {
+		return nil, nil, err
+	}
+	for rows.Next() {
+		var missionID, dcsID, playerID int64
+		if err := rows.Scan(&missionID, &dcsID, &playerID); err != nil {
+			rows.Close()
+			return nil, nil, err
+		}
+		resolver[[2]int64{missionID, dcsID}] = playerID
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	erows, err := s.pool.Query(ctx, `
+		SELECT mission_id, event, args FROM events
+		WHERE event IN ('pilot_death','friendly_fire') AND mission_id IS NOT NULL`+s.missionFilter("mission_id"))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer erows.Close()
+
+	deaths = map[int64]int{}
+	ff = map[int64]int{}
+	for erows.Next() {
+		var missionID int64
+		var kind, argsJSON string
+		if err := erows.Scan(&missionID, &kind, &argsJSON); err != nil {
+			return nil, nil, err
+		}
+		var a []any
+		_ = json.Unmarshal([]byte(argsJSON), &a)
+		playerID, ok := resolver[[2]int64{missionID, int64(num(a, 0))}]
+		if !ok {
+			continue
+		}
+		switch kind {
+		case "pilot_death":
+			deaths[playerID]++
+		case "friendly_fire":
+			ff[playerID]++
+		}
+	}
+	return deaths, ff, erows.Err()
+}
+
+// Weapons aggregates weapon performance from kill and friendly-fire events.
+func (s *Store) Weapons(ctx context.Context) ([]WeaponStats, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT event, args FROM events WHERE event IN ('kill','friendly_fire')`+s.missionFilter("mission_id"))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var out []Mission
+	byWeapon := map[string]*WeaponStats{}
 	for rows.Next() {
-		var m Mission
+		var kind, argsJSON string
+		if err := rows.Scan(&kind, &argsJSON); err != nil {
+			return nil, err
+		}
+		var a []any
+		_ = json.Unmarshal([]byte(argsJSON), &a)
+
+		if kind == "kill" {
+			// killerID, killerUnitType, killerSide, victimID, victimUnitType, victimSide, weapon
+			weapon := str(a, 6)
+			if weapon == "" {
+				continue
+			}
+			w := ensureWeapon(byWeapon, weapon)
+			w.Kills++
+			if vt := str(a, 4); vt != "" {
+				w.VictimsByType[vt]++
+			}
+			if kt := str(a, 1); kt != "" {
+				w.KillersByType[kt]++
+			}
+		} else {
+			// playerID, weaponName, victimPlayerID
+			weapon := str(a, 1)
+			if weapon == "" {
+				continue
+			}
+			ensureWeapon(byWeapon, weapon).FriendlyFire++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]WeaponStats, 0, len(byWeapon))
+	for _, w := range byWeapon {
+		out = append(out, *w)
+	}
+	sortWeapons(out)
+	return out, nil
+}
+
+// Engines aggregates per-unit-type performance (exact DCS type id).
+func (s *Store) Engines(ctx context.Context) ([]EngineStats, error) {
+	byType := map[string]*EngineStats{}
+	ensure := func(typeID string) *EngineStats {
+		if e, ok := byType[typeID]; ok {
+			return e
+		}
+		e := &EngineStats{TypeID: typeID, Category: classify(typeID)}
+		byType[typeID] = e
+		return e
+	}
+
+	where := s.missionFilter("mission_id")
+	rows, err := s.pool.Query(ctx, `SELECT args FROM events WHERE event = 'kill'`+where)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var argsJSON string
+		if err := rows.Scan(&argsJSON); err != nil {
+			return nil, err
+		}
+		var a []any
+		_ = json.Unmarshal([]byte(argsJSON), &a)
+		if kt := str(a, 1); kt != "" {
+			ensure(kt).Kills++
+		}
+		if vt := str(a, 4); vt != "" {
+			ensure(vt).Deaths++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	rows2, err := s.pool.Query(ctx,
+		`SELECT DISTINCT unit_type FROM player_stats WHERE unit_type IS NOT NULL AND unit_type <> ''`+where)
+	if err != nil {
+		return nil, err
+	}
+	defer rows2.Close()
+	for rows2.Next() {
+		var unitType string
+		if err := rows2.Scan(&unitType); err != nil {
+			return nil, err
+		}
+		ensure(unitType).Sorties++
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]EngineStats, 0, len(byType))
+	for _, e := range byType {
+		if e.Deaths > 0 {
+			e.KD = float64(e.Kills) / float64(e.Deaths)
+		} else if e.Kills > 0 {
+			e.KD = float64(e.Kills)
+		}
+		out = append(out, *e)
+	}
+	sortEngines(out)
+	return out, nil
+}
+
+// Coalitions aggregates performance per coalition, from the latest snapshot of
+// each player in each mission.
+func (s *Store) Coalitions(ctx context.Context) ([]CoalitionStats, error) {
+	where := s.missionFilter("ps.mission_id")
+	rows, err := s.pool.Query(ctx, `
+		WITH latest AS (
+			SELECT MAX(id) AS id
+			FROM player_stats ps
+			WHERE 1=1`+where+`
+			GROUP BY ps.mission_id, ps.player_id
+		)
+		SELECT ps.side,
+		       COALESCE(SUM(ps.score),0),
+		       COALESCE(SUM(ps.kills_air + ps.kills_car + ps.kills_ship),0),
+		       COUNT(DISTINCT ps.player_id)
+		FROM player_stats ps
+		WHERE ps.id IN (SELECT id FROM latest)
+		GROUP BY ps.side`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []CoalitionStats
+	for rows.Next() {
+		var side, score, kills, players int
+		if err := rows.Scan(&side, &score, &kills, &players); err != nil {
+			return nil, err
+		}
+		out = append(out, CoalitionStats{Coalition: sideName(side), Score: score, Kills: kills, Players: players})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sortCoalitions(out)
+	return out, nil
+}
+
+// Network aggregates ping quality per player.
+func (s *Store) Network(ctx context.Context) ([]NetworkStats, error) {
+	where := s.missionFilter("ps.mission_id")
+	rows, err := s.pool.Query(ctx, `
+		SELECT p.name, COUNT(*), AVG(NULLIF(ps.ping,0)), COALESCE(MAX(ps.ping),0)
+		FROM player_stats ps
+		JOIN players p ON p.id = ps.player_id
+		WHERE 1=1`+where+`
+		GROUP BY p.id, p.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []NetworkStats
+	for rows.Next() {
+		var n NetworkStats
+		var avg *float64
+		if err := rows.Scan(&n.Name, &n.Samples, &avg, &n.MaxPing); err != nil {
+			return nil, err
+		}
+		if avg != nil {
+			n.AvgPing = *avg
+		}
+		out = append(out, n)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sortNetwork(out)
+	return out, nil
+}
+
+// MissionRow is one mission for the missions tab / export.
+type MissionRow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Theatre   string `json:"theatre"`
+	Source    string `json:"source"`
+	StartedAt int64  `json:"startedAt"`
+	EndedAt   int64  `json:"endedAt"`
+	Winner    string `json:"winner"`
+}
+
+// Missions returns the manager's missions, newest first.
+func (s *Store) Missions(ctx context.Context, limit int) ([]MissionRow, error) {
+	if limit <= 0 || limit > 2000 {
+		limit = 200
+	}
+	q := `SELECT id, name, COALESCE(theatre,''), COALESCE(source,'live'), started_at,
+	             COALESCE(ended_at,0), COALESCE(winner,'')
+	      FROM missions`
+	if !s.includeTest {
+		q += ` WHERE source <> 'test'`
+	}
+	q += ` ORDER BY id DESC LIMIT $1`
+
+	rows, err := s.pool.Query(ctx, q, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []MissionRow
+	for rows.Next() {
+		var m MissionRow
 		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source, &m.StartedAt, &m.EndedAt, &m.Winner); err != nil {
 			return nil, err
 		}
@@ -400,20 +549,44 @@ func (s *Store) Missions(ctx context.Context, instance string, limit int) ([]Mis
 	return out, rows.Err()
 }
 
-// Events returns mirrored events for an instance, newest first, optionally
-// filtered by event kind. Used by the export endpoint.
-func (s *Store) Events(ctx context.Context, instance, eventKind string, limit int) ([]Event, error) {
-	if limit <= 0 || limit > 100000 {
-		limit = 10000
+// CountTotals returns raw row counts for the dashboard footer.
+func (s *Store) CountTotals(ctx context.Context) (Counts, error) {
+	var c Counts
+	err := s.pool.QueryRow(ctx, `
+		SELECT
+			(SELECT COUNT(*) FROM missions WHERE 1=1`+s.missionFilter("id")+`),
+			(SELECT COUNT(*) FROM players),
+			(SELECT COUNT(*) FROM events WHERE 1=1`+s.missionFilter("mission_id")+`),
+			(SELECT COUNT(*) FROM debriefs WHERE 1=1`+s.missionFilter("mission_id")+`),
+			(SELECT COUNT(*) FROM track_positions WHERE 1=1`+s.missionFilter("mission_id")+`)`,
+	).Scan(&c.Missions, &c.Players, &c.Events, &c.Debriefs, &c.Positions)
+	return c, err
+}
+
+// Point is one value of a time series (from real event timestamps, so it needs
+// no periodic sampling: the manager already stores every event).
+type Point struct {
+	At    time.Time `json:"at"`
+	Value float64   `json:"value"`
+}
+
+// EventSeries returns a daily count of one event kind over the last N days. This
+// replaces the old snapshot-based trends: the plugin reads the manager's own
+// timestamps, so the series is exact and complete.
+func (s *Store) EventSeries(ctx context.Context, eventKind string, days int) ([]Point, error) {
+	if days <= 0 || days > 3650 {
+		days = 30
 	}
-	q := `SELECT id, event, args, detail, t, real_ts FROM events WHERE instance = $1`
-	args := []any{instance}
+	q := `SELECT to_timestamp(real_ts / 1000.0)::date AS d, COUNT(*)`
+	args := []any{}
+	q += ` FROM events WHERE real_ts >= (EXTRACT(EPOCH FROM now() - ($1 || ' days')::interval) * 1000)`
+	args = append(args, days)
 	if eventKind != "" {
 		q += ` AND event = $2`
 		args = append(args, eventKind)
 	}
-	q += ` ORDER BY id DESC LIMIT $` + strconv.Itoa(len(args)+1)
-	args = append(args, limit)
+	q += s.missionFilter("mission_id")
+	q += ` GROUP BY d ORDER BY d ASC`
 
 	rows, err := s.pool.Query(ctx, q, args...)
 	if err != nil {
@@ -421,25 +594,86 @@ func (s *Store) Events(ctx context.Context, instance, eventKind string, limit in
 	}
 	defer rows.Close()
 
-	var out []Event
+	var out []Point
 	for rows.Next() {
-		var e Event
-		var argsJSON, detailJSON []byte
-		if err := rows.Scan(&e.ID, &e.Event, &argsJSON, &detailJSON, &e.T, &e.RealTS); err != nil {
+		var d time.Time
+		var n int
+		if err := rows.Scan(&d, &n); err != nil {
 			return nil, err
 		}
-		_ = json.Unmarshal(argsJSON, &e.Args)
-		if len(detailJSON) > 0 {
-			e.Detail = json.RawMessage(detailJSON)
-		}
-		out = append(out, e)
+		out = append(out, Point{At: d, Value: float64(n)})
 	}
 	return out, rows.Err()
 }
 
-func nullable(s string) any {
-	if s == "" {
-		return nil
+// --- helpers -----------------------------------------------------------------
+
+func ensureWeapon(m map[string]*WeaponStats, name string) *WeaponStats {
+	if w, ok := m[name]; ok {
+		return w
 	}
+	w := &WeaponStats{Weapon: name, VictimsByType: map[string]int{}, KillersByType: map[string]int{}}
+	m[name] = w
+	return w
+}
+
+func sideName(side int) string {
+	switch side {
+	case 1:
+		return "red"
+	case 2:
+		return "blue"
+	default:
+		return "spectator"
+	}
+}
+
+func str(a []any, i int) string {
+	if i < 0 || i >= len(a) {
+		return ""
+	}
+	s, _ := a[i].(string)
 	return s
+}
+
+func num(a []any, i int) float64 {
+	if i < 0 || i >= len(a) {
+		return 0
+	}
+	f, _ := a[i].(float64)
+	return f
+}
+
+func sortWeapons(out []WeaponStats) {
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Kills != out[j].Kills {
+			return out[i].Kills > out[j].Kills
+		}
+		return out[i].Weapon < out[j].Weapon
+	})
+}
+
+func sortEngines(out []EngineStats) {
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Kills != out[j].Kills {
+			return out[i].Kills > out[j].Kills
+		}
+		if out[i].Deaths != out[j].Deaths {
+			return out[i].Deaths > out[j].Deaths
+		}
+		return out[i].TypeID < out[j].TypeID
+	})
+}
+
+func sortCoalitions(out []CoalitionStats) {
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		return out[i].Coalition < out[j].Coalition
+	})
+}
+
+func sortNetwork(out []NetworkStats) {
+	sort.SliceStable(out, func(i, j int) bool { return out[i].AvgPing > out[j].AvgPing })
 }

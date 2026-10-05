@@ -11,15 +11,6 @@
       <h1>Statistics plugin</h1>
       <span class="muted" id="meta">loading…</span>
       <span class="spacer"></span>
-      <label class="muted">instance
-        <select id="instance"></select>
-      </label>
-      <label class="muted">scope
-        <select id="scope">
-          <option value="career">career</option>
-          <option value="mission">mission</option>
-        </select>
-      </label>
       <button id="refresh" type="button">Refresh</button>
     </header>
 
@@ -94,17 +85,24 @@
       <section class="view hidden" data-view="trends">
         <div class="panel">
           <div class="row">
-            <h2 style="flex:1">Trend over time</h2>
-            <label class="muted">metric
-              <select id="metric">
-                <option>kills</option>
-                <option>deaths</option>
-                <option>events</option>
-                <option>crashes</option>
-                <option>ejections</option>
-                <option>friendlyFire</option>
-                <option>missions</option>
-                <option>players</option>
+            <h2 style="flex:1">Events per day</h2>
+            <label class="muted">event
+              <select id="event">
+                <option>kill</option>
+                <option>friendly_fire</option>
+                <option>pilot_death</option>
+                <option>crash</option>
+                <option>eject</option>
+                <option>takeoff</option>
+                <option>landing</option>
+              </select>
+            </label>
+            <label class="muted">days
+              <select id="days">
+                <option>7</option>
+                <option selected>30</option>
+                <option>90</option>
+                <option>365</option>
               </select>
             </label>
             <a class="btn" id="series-json" href="#" download>Export JSON</a>
@@ -116,17 +114,14 @@
 
       <section class="view hidden" data-view="export">
         <div class="panel">
-          <h2>Export mirrored data</h2>
+          <h2>Export</h2>
           <div class="row">
             <label class="muted">type
               <select id="export-type">
-                <option value="events">events</option>
                 <option value="missions">missions</option>
-                <option value="series">overview series</option>
+                <option value="pilots">pilots</option>
+                <option value="series">event series</option>
               </select>
-            </label>
-            <label class="muted">event kind (events only)
-              <input id="export-event" type="text" placeholder="kill, friendly_fire…" />
             </label>
             <label class="muted">format
               <select id="export-format">
@@ -136,7 +131,7 @@
             </label>
             <button id="export-run" type="button">Download</button>
           </div>
-          <p class="muted">Exports the plugin's own PostgreSQL mirror, scoped to the selected instance.</p>
+          <p class="muted">Reads the manager's PostgreSQL database directly; nothing is copied.</p>
         </div>
       </section>
     </main>

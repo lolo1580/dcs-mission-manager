@@ -1,40 +1,20 @@
 package main
 
 import (
-	"encoding/json"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
-func TestEmptyPayloadShapes(t *testing.T) {
-	cases := map[string]string{
-		"pilots":  `"pilots"`,
-		"weapons": `"weapons"`,
-		"engines": `"engines"`,
-		"network": `"network"`,
-	}
-	for kind, key := range cases {
-		b, err := json.Marshal(emptyPayload(kind))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(b), key) {
-			t.Errorf("emptyPayload(%q) = %s, want key %s", kind, b, key)
-		}
-	}
-}
-
-// TestServesWeb validates that the embedded web assets are served without any
-// database or manager (the FileServer route never touches the store).
+// TestServesWeb validates that the embedded dashboard is served without any
+// database (the static route never touches the store).
 func TestServesWeb(t *testing.T) {
 	web, err := fs.Sub(webFS, "web")
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := NewServer(Config{}, nil, nil, web)
+	srv := NewServer(Config{}, nil, web)
 
 	for _, path := range []string{"/", "/style.css", "/app.js"} {
 		rec := httptest.NewRecorder()
@@ -48,11 +28,10 @@ func TestServesWeb(t *testing.T) {
 	}
 }
 
-// TestAuthDisabledByDefault: with no token, the static dashboard is served
-// without authentication (the route never touches the store).
+// TestAuthDisabledByDefault: with no token the static dashboard is open.
 func TestAuthDisabledByDefault(t *testing.T) {
 	web, _ := fs.Sub(webFS, "web")
-	srv := NewServer(Config{}, nil, nil, web)
+	srv := NewServer(Config{}, nil, web)
 
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/style.css", nil))
@@ -64,7 +43,7 @@ func TestAuthDisabledByDefault(t *testing.T) {
 // TestAuthRejectsWithoutToken checks the gate is closed when a token is set.
 func TestAuthRejectsWithoutToken(t *testing.T) {
 	web, _ := fs.Sub(webFS, "web")
-	srv := NewServer(Config{AuthToken: "s3cret"}, nil, nil, web)
+	srv := NewServer(Config{AuthToken: "s3cret"}, nil, web)
 
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -73,13 +52,12 @@ func TestAuthRejectsWithoutToken(t *testing.T) {
 	}
 }
 
-// TestAuthAcceptsToken forms: header, query, then cookie.
+// TestAuthAcceptsToken forms: header, query (which sets a cookie), cookie.
 func TestAuthAcceptsToken(t *testing.T) {
 	web, _ := fs.Sub(webFS, "web")
-	srv := NewServer(Config{AuthToken: "s3cret"}, nil, nil, web)
+	srv := NewServer(Config{AuthToken: "s3cret"}, nil, web)
 
-	// Bearer header.
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/style.css", nil)
 	req.Header.Set("Authorization", "Bearer s3cret")
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
@@ -87,7 +65,6 @@ func TestAuthAcceptsToken(t *testing.T) {
 		t.Fatalf("Bearer token = %d, want 200", rec.Code)
 	}
 
-	// ?token= sets a cookie.
 	rec = httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/?token=s3cret", nil))
 	if rec.Code != http.StatusOK {
@@ -104,12 +81,30 @@ func TestAuthAcceptsToken(t *testing.T) {
 	}
 }
 
-// TestSubtleEqual covers the constant-time comparison used for tokens.
 func TestSubtleEqual(t *testing.T) {
 	if !subtleEqual("abc", "abc") {
 		t.Error("equal strings should match")
 	}
 	if subtleEqual("abc", "abd") || subtleEqual("abc", "ab") || subtleEqual("", "x") {
 		t.Error("different strings must not match")
+	}
+}
+
+func TestClassify(t *testing.T) {
+	cases := map[string]string{
+		"F-16C_50":          "plane",
+		"F/A-18C":           "plane",
+		"Su-27":             "plane",
+		"AH-64D_BLK_II":     "heli",
+		"Mi-24P":            "heli",
+		"USS_Arleigh_Burke": "ship",
+		"T-72B":             "ground",
+		"SA-10":             "ground",
+		"SomethingElse":     "other",
+	}
+	for typeID, want := range cases {
+		if got := classify(typeID); got != want {
+			t.Errorf("classify(%q) = %q, want %q", typeID, got, want)
+		}
 	}
 }

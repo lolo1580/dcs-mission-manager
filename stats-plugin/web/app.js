@@ -25,27 +25,24 @@ function objCount(o) {
 // ---- state -----------------------------------------------------------------
 
 const state = {
-  scope: "career",
-  instance: "",
-  instances: [],
   summary: {},
   missions: [],
   sort: {}, // tableId -> { key, dir }
   filter: {}, // tableId -> string
 };
 
-// Every API call carries the selected instance.
+// The plugin reads the manager's PostgreSQL database directly, so there is no
+// instance/scope selector and no query parameter to add.
 function api(path) {
-  const sep = path.includes("?") ? "&" : "?";
-  return state.instance ? path + sep + "instance=" + encodeURIComponent(state.instance) : path;
+  return path;
 }
 
 // ---- API mapping -----------------------------------------------------------
 
-// The manager returns arrays under a named key: pilots, weapons, engines,
-// network; overview is a flat object.
+// Aggregates arrive under their key: pilots, weapons, engines, network; overview
+// is a flat object.
 function rowsFor(kind) {
-  const d = dataFor(kind);
+  const d = state.summary[kind];
   if (!d) return [];
   switch (kind) {
     case "pilots": return d.pilots || [];
@@ -57,8 +54,7 @@ function rowsFor(kind) {
 }
 
 function dataFor(kind) {
-  const key = state.scope === "career" ? kind : kind + ":" + state.scope;
-  return state.summary[key];
+  return state.summary[kind];
 }
 
 // ---- generic sortable/filterable table -------------------------------------
@@ -211,37 +207,24 @@ function renderAll() {
 
 async function loadHealth() {
   try {
-    const h = await getJSON(api("/api/plugin/health"));
-    const ok = h.manager && h.manager.service === "dcsmanager";
+    const h = await getJSON("/api/plugin/health");
     const c = h.counts || {};
     $("#meta").innerHTML =
-      `manager <span class="status ${ok ? "ok" : "ko"}">${ok ? "reachable" : "unreachable"}</span>` +
-      ` · <span class="muted">${h.managerUrl}</span>` +
-      (h.lastSync ? ` · last sync ${new Date(h.lastSync.at).toLocaleString()}` : " · no sync yet") +
-      ` · <span class="muted">${fmtNum(c.events)} events, ${fmtNum(c.missions)} missions mirrored</span>`;
-    if (Array.isArray(h.instances) && h.instances.length) setInstances(h.instances);
+      `postgres <span class="status ok">read-only</span>` +
+      ` · <span class="muted">${fmtNum(c.missions)} missions, ${fmtNum(c.players)} players, ` +
+      `${fmtNum(c.events)} events${h.includeTest ? ", incl. test" : ""}</span>`;
   } catch (e) {
-    $("#meta").textContent = String(e);
+    $("#meta").innerHTML = `<span class="status ko">database error</span> <span class="muted">${escapeHTML(e.message)}</span>`;
   }
 }
 
-function setInstances(list) {
-  const same = list.length === state.instances.length && list.every((v, i) => v === state.instances[i]);
-  if (same) return;
-  state.instances = list;
-  if (!state.instance) state.instance = list[0];
-  const sel = $("#instance");
-  sel.innerHTML = list.map((n) =>
-    `<option value="${escapeHTML(n)}"${n === state.instance ? " selected" : ""}>${escapeHTML(n)}</option>`).join("");
-}
-
 async function loadSummary() {
-  state.summary = await getJSON(api("/api/plugin/summary"));
+  state.summary = await getJSON("/api/plugin/summary");
   renderAll();
 }
 
 async function loadMissions() {
-  const d = await getJSON(api("/api/plugin/missions?limit=500"));
+  const d = await getJSON("/api/plugin/missions?limit=500");
   state.missions = d.missions || [];
   renderTable("missions", state.missions, missionCols);
 }
@@ -251,31 +234,30 @@ async function loadMissions() {
 let series = [];
 
 async function loadSeries() {
-  const metric = $("#metric").value;
-  const s = await getJSON(api(`/api/plugin/series?metric=${metric}&scope=${state.scope}`));
+  const event = $("#event").value;
+  const days = $("#days").value;
+  const s = await getJSON(`/api/plugin/series?event=${encodeURIComponent(event)}&days=${days}`);
   series = s.points || [];
-  drawChart(series, metric);
+  drawChart(series, event, days);
   syncExportLinks();
 }
 
-// syncExportLinks keeps the Trend tab's JSON export and the Missions tab's CSV
-// export pointing at the current selection.
+// syncExportLinks keeps the export links pointing at the current selection.
 function syncExportLinks() {
-  const metric = $("#metric") ? $("#metric").value : "kills";
   const m = $("#missions-csv");
-  if (m) m.href = api("/api/plugin/export?type=missions&format=csv");
+  if (m) m.href = "/api/plugin/export?type=missions&format=csv";
   const s = $("#series-json");
-  if (s) s.href = api(`/api/plugin/export?type=series&metric=${metric}&scope=${state.scope}&format=json`);
+  if (s) s.href = `/api/plugin/export?type=series&event=${encodeURIComponent($("#event").value)}&format=json`;
 }
 
-function drawChart(points, metric) {
+function drawChart(points, event, days) {
   const svg = $("#chart");
   const W = 800, H = 220, pad = 28;
   $("#chart-info").textContent = points.length
-    ? `${points.length} snapshot(s) of “${metric}” (${state.scope})`
+    ? `${event} per day over the last ${days} days`
     : "";
   if (points.length < 2) {
-    svg.innerHTML = `<text x="20" y="120" fill="#8b95a7" font-size="13">not enough snapshots yet — one accumulates on each sync where the value changes</text>`;
+    svg.innerHTML = `<text x="20" y="120" fill="#8b95a7" font-size="13">no events in this window</text>`;
     return;
   }
   const ys = points.map((p) => p.value);
@@ -290,7 +272,7 @@ function drawChart(points, metric) {
     <path d="${path}" fill="none" stroke="#62b7ff" stroke-width="2" />
     <text x="${pad}" y="16" fill="#8b95a7" font-size="12">max ${max}</text>
     <text x="${pad}" y="${H - 6}" fill="#8b95a7" font-size="12">min ${min}</text>
-    <text x="${W - pad}" y="16" fill="#8b95a7" font-size="12" text-anchor="end">${new Date(points[points.length - 1].at).toLocaleString()}</text>`;
+    <text x="${W - pad}" y="16" fill="#8b95a7" font-size="12" text-anchor="end">${new Date(points[points.length - 1].at).toLocaleDateString()}</text>`;
 }
 
 // ---- tabs ------------------------------------------------------------------
@@ -318,12 +300,9 @@ function reload() {
 function runExport() {
   const type = $("#export-type").value;
   const format = $("#export-format").value;
-  let url = api(`/api/plugin/export?type=${type}&format=${format}`);
-  if (type === "events" && $("#export-event").value) {
-    url += "&event=" + encodeURIComponent($("#export-event").value);
-  }
+  let url = `/api/plugin/export?type=${type}&format=${format}`;
   if (type === "series") {
-    url += `&metric=${encodeURIComponent($("#metric").value)}&scope=${state.scope}`;
+    url += `&event=${encodeURIComponent($("#event").value)}`;
   }
   window.location.href = url;
 }
@@ -333,18 +312,9 @@ function bind() {
     const b = e.target.closest("button[data-tab]");
     if (b) selectTab(b.dataset.tab);
   });
-  $("#scope").addEventListener("change", (e) => {
-    state.scope = e.target.value;
-    renderAll();
-    syncExportLinks();
-    if (!$('[data-view="trends"]').classList.contains("hidden")) loadSeries().catch(() => {});
-  });
-  $("#instance").addEventListener("change", (e) => {
-    state.instance = e.target.value;
-    reload();
-  });
   $("#refresh").addEventListener("click", reload);
-  $("#metric").addEventListener("change", () => loadSeries().catch(() => {}));
+  $("#event").addEventListener("change", () => loadSeries().catch(() => {}));
+  $("#days").addEventListener("change", () => loadSeries().catch(() => {}));
   $("#export-run").addEventListener("click", runExport);
 
   const bindFilter = (id, tableId) => {

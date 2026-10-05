@@ -1,11 +1,12 @@
-// Command stats-web is the DCS Manager statistics plugin (PoC, phase P0).
+// Command stats-web is the DCS Manager statistics plugin.
 //
-// It is an EXTERNAL consumer of the manager's REST API: it periodically polls
-// the /api/stats/* endpoints, stores timestamped snapshots in PostgreSQL and
-// serves its own read-only dashboard. The manager itself is never modified and
-// does not even know the plugin exists.
+// PostgreSQL is the shared library: the manager writes to it (it runs with
+// DCSMANAGER_DB_DRIVER=postgres), and this plugin reads the manager's own tables
+// directly to serve a statistics dashboard. It never calls the manager over
+// HTTP, and its database session is read-only (see OpenStore).
 //
-// See ../docs/stats-plugin.md for the full design.
+// The manager can therefore stay bound to loopback: the only thing the plugin
+// needs is the database DSN. See ../docs/stats-plugin.md for the design.
 package main
 
 import (
@@ -21,9 +22,6 @@ import (
 	"time"
 )
 
-//go:embed schema.sql
-var schemaSQL string
-
 //go:embed web
 var webFS embed.FS
 
@@ -32,33 +30,23 @@ func main() {
 	log.SetPrefix("stats-plugin: ")
 
 	cfg := LoadConfig()
-	log.Printf("manager=%s listen=%s interval=%s scopes=%v includeTest=%v",
-		cfg.ManagerURL, cfg.ListenAddr, cfg.SyncInterval, cfg.Scopes, cfg.IncludeTest)
+	log.Printf("listen=%s includeTest=%v dsn=%t", cfg.ListenAddr, cfg.IncludeTest, cfg.ManagerDSN != "")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	store, err := OpenStore(ctx, cfg.DatabaseURL)
+	store, err := OpenStore(ctx, cfg.ManagerDSN, cfg.IncludeTest)
 	if err != nil {
 		log.Fatalf("postgres: %v", err)
 	}
 	defer store.Close()
-
-	if err := store.Migrate(ctx, schemaSQL); err != nil {
-		log.Fatalf("migrate: %v", err)
-	}
-	log.Printf("postgres: ready")
-
-	client := NewManagerClient(cfg)
+	log.Printf("postgres: connected (read-only)")
 
 	web, err := fs.Sub(webFS, "web")
 	if err != nil {
 		log.Fatalf("web assets: %v", err)
 	}
-	srv := NewServer(cfg, store, client, web)
-
-	syncer := NewSyncer(cfg, client, store)
-	go syncer.Run(ctx)
+	srv := NewServer(cfg, store, web)
 
 	httpSrv := &http.Server{Addr: cfg.ListenAddr, Handler: srv.Handler()}
 	go func() {
