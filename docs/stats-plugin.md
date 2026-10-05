@@ -129,10 +129,11 @@ base — pas de l'API du manager. Voir
 
 ## 11. Ce qui reste ouvert
 
-- **Tests d'intégration SQL** : les tests actuels couvrent la config, la
-  classification et l'auth ; le SQL (agrégats, `jsonb`, séries) n'est pas encore
-  testé contre une base réelle. La suite de conformité du manager
-  (`internal/db/conformance_test.go`) peut servir de modèle.
+- **Tests d'intégration SQL** — ✅ couverts : `stats-plugin/store_test.go` exerce
+  les agrégations contre un PostgreSQL réel quand `PLUGIN_TEST_DATABASE_URL` est
+  défini : dernier instantané par mission/joueur, résolution de l'id DCS, politique
+  de test, séries, et **rejet des écritures** (session read-only). La CI
+  (`.github/workflows/ci.yml`, job `stats-plugin`) fournit un service PostgreSQL.
 - **Vues read-only** : si le schéma du manager doit évoluer indépendamment, il
   faudra introduire des vues `v_stats_*` et faire lire le plugin dessus.
 - **Multi-managers** : aujourd'hui un plugin lit une base. Plusieurs managers

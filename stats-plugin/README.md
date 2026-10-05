@@ -105,6 +105,14 @@ docker build -f stats-plugin/Dockerfile -t dcsmanager-stats stats-plugin   # fro
 go test ./...   # unit tests; no database needed
 ```
 
-The SQL is not covered by an automated integration test yet (it needs a live
-PostgreSQL). See the design doc for how the manager's own cross-engine
-conformance suite could be extended to cover it.
+The SQL aggregations (latest-snapshot per mission/player, DCS id resolution,
+the test-exclusion policy, event series, read-only enforcement) are covered by
+an **integration suite that only runs with a database**:
+
+```powershell
+$env:PLUGIN_TEST_DATABASE_URL = "postgres://dcs:dcs@localhost:5432/stats_test?sslmode=disable"
+go test ./...
+```
+
+Point it at a **throwaway** database: the suite recreates the manager's tables.
+This runs in CI (`.github/workflows/ci.yml`) against a PostgreSQL service.

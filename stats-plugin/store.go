@@ -577,10 +577,13 @@ func (s *Store) EventSeries(ctx context.Context, eventKind string, days int) ([]
 	if days <= 0 || days > 3650 {
 		days = 30
 	}
-	q := `SELECT to_timestamp(real_ts / 1000.0)::date AS d, COUNT(*)`
-	args := []any{}
-	q += ` FROM events WHERE real_ts >= (EXTRACT(EPOCH FROM now() - ($1 || ' days')::interval) * 1000)`
-	args = append(args, days)
+	// The cutoff is computed in Go and passed as a bigint: comparing it directly
+	// to real_ts avoids any interval-typing surprise in PostgreSQL.
+	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
+
+	q := `SELECT to_timestamp((real_ts / 1000.0)::double precision)::date AS d, COUNT(*)`
+	args := []any{cutoff}
+	q += ` FROM events WHERE real_ts >= $1`
 	if eventKind != "" {
 		q += ` AND event = $2`
 		args = append(args, eventKind)
