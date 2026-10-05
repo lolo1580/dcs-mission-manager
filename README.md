@@ -254,7 +254,24 @@ dcsmanager install-lua     # installs/merges the Lua scripts into Saved Games
 dcsmanager uninstall-lua   # removes the installed block (keeps the config)
 dcsmanager status          # installed / outdated / missing, per file
 dcsmanager purge           # deletes recorded sessions (destructive)
+dcsmanager migrate-db      # copies a SQLite database into PostgreSQL
 dcsmanager version
+```
+
+### Migrating SQLite to PostgreSQL
+
+The PostgreSQL backend is a new integration with no in-place upgrade path. To
+carry an existing SQLite history over (or to feed the statistics plugin, which
+reads PostgreSQL):
+
+```powershell
+# create the destination schema once
+$env:DCSMANAGER_DB_DRIVER = "postgres"
+$env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable"
+.\dcsmanager.exe serve    # then stop it
+
+# copy the data (ids preserved; safe to re-run)
+.\dcsmanager.exe migrate-db --from .\data\dcsmanager.db --to $env:DCSMANAGER_DB_DSN
 ```
 
 ### Test sessions and `purge`

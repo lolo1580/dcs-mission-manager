@@ -438,6 +438,11 @@ Outils possibles, par ordre de coût :
 
 Recommandation : option 1 d'abord, option 2 ensuite (le refactor la rend facile).
 
+> **Livré** : l'option 2 existe maintenant sous `dcsmanager migrate-db` (paquet
+> `internal/migrate`). Elle copie toutes les tables au niveau SQL, préserve les
+> ids, avance les séquences `IDENTITY` et est idempotente. Testée contre un
+> PostgreSQL réel (copie, préservation des ids, idempotence, séquences).
+
 ---
 
 ## 9. Tests

@@ -304,8 +304,23 @@ $env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmod
 
 Le manager crée son schéma au premier démarrage.
 
-> **Pas de migration automatique depuis SQLite** : c'est un mode « nouveau
-> départ ». Les données SQLite existantes ne sont pas copiées.
+### 7.3 Reprendre un historique SQLite
+
+Pour transférer les données SQLite déjà enregistrées vers PostgreSQL (ids
+préservés, réexécution sans risque) :
+
+```powershell
+# 1. créer le schéma de destination une fois
+$env:DCSMANAGER_DB_DRIVER = "postgres"
+$env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable"
+.\dcsmanager.exe serve    # puis l'arrêter (Ctrl+C)
+
+# 2. copier
+.\dcsmanager.exe migrate-db --from .\data\dcsmanager.db --to $env:DCSMANAGER_DB_DSN
+```
+
+> **Pas de migration automatique** : c'est une commande explicite. Sans elle,
+> PostgreSQL démarre vide.
 
 Détails et compromis : [`database-backends.md`](database-backends.md).
 
@@ -429,6 +444,7 @@ dcsmanager install-lua     Installe/fusionne les scripts Lua dans Saved Games
 dcsmanager uninstall-lua   Retire le bloc installé (garde la config)
 dcsmanager status          Installé / obsolète / manquant, par fichier
 dcsmanager purge           Supprime des sessions (destructif ; voir options)
+dcsmanager migrate-db      Copie une base SQLite vers PostgreSQL (one-shot)
 dcsmanager version         Affiche la version
 
 install-lua / uninstall-lua / status :
@@ -440,6 +456,13 @@ purge (exactement une option requise) :
   --source test|live    Supprime les sessions d'une source
   --mission-id <n>      Supprime une mission et tout ce qui y est lié
   --all                 Supprime toutes les sessions
+```
+
+### migrate-db
+
+```text
+--from <path>   Base SQLite à copier (défaut : DCSMANAGER_DB_PATH)
+--to <dsn>      DSN PostgreSQL de destination (défaut : DCSMANAGER_DB_DSN)
 ```
 
 ---
