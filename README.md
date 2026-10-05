@@ -164,7 +164,8 @@ defaults. None of them is required for a normal install.
 
 | Variable | Default | Description |
 |---|---|---|
-| `DCSMANAGER_HTTP_ADDR` | `127.0.0.1:8080` | HTTP listening address (Web UI + SSE). A port of `0` picks a free one automatically (native window). Set `0.0.0.0:8080` to reach the UI from another device; the API has no authentication |
+| `DCSMANAGER_HTTP_ADDR` | `127.0.0.1:8080` | HTTP listening address (Web UI + SSE). A port of `0` picks a free one automatically (native window). Set `0.0.0.0:8080` to reach the UI from another device; the API has no authentication unless `DCSMANAGER_API_TOKEN` is set |
+| `DCSMANAGER_API_TOKEN` | *(empty)* | When set, non-loopback callers must present it (Authorization: Bearer, or `?token=`) to reach the manager. Required when exposing it beyond the local machine (e.g. a plugin on another host). Local (loopback) access is always allowed |
 | `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7776` | UDP listening address (unit telemetry). Not 7778: **DCS-BIOS owns that port**, and the two are meant to run together |
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | SQLite database path |

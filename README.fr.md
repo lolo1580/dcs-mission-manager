@@ -173,7 +173,8 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 
 | Variable | Défaut | Description |
 |---|---|---|
-| `DCSMANAGER_HTTP_ADDR` | `127.0.0.1:8080` | Adresse d'écoute HTTP (Web UI + SSE). Un port `0` en choisit un libre automatiquement (fenêtre native). Mettre `0.0.0.0:8080` pour atteindre l'UI depuis un autre appareil ; l'API est alors sans authentification |
+| `DCSMANAGER_HTTP_ADDR` | `127.0.0.1:8080` | Adresse d'écoute HTTP (Web UI + SSE). Un port `0` en choisit un libre automatiquement (fenêtre native). Mettre `0.0.0.0:8080` pour atteindre l'UI depuis un autre appareil ; l'API est alors sans authentification sauf si `DCSMANAGER_API_TOKEN` est défini |
+| `DCSMANAGER_API_TOKEN` | *(vide)* | Si défini, les appels non locaux doivent le présenter (`Authorization: Bearer`, ou `?token=`) pour atteindre le manager. Requis dès que le manager est exposé au-delà de la machine locale (ex. un plugin sur un autre hôte). L'accès local (loopback) reste toujours autorisé |
 | `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7776` | Adresse d'écoute UDP (télémétrie des unités). Pas 7778 : **DCS-BIOS possède ce port**, et les deux sont censés tourner ensemble |
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | Chemin de la base SQLite |

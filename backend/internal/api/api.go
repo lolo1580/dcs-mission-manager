@@ -157,9 +157,14 @@ func (s *Server) SetScripts(st dcsdata.ScriptStatus) {
 }
 
 // Handler returns the HTTP router.
+//
+// Two guards wrap the router. The origin guard is outermost, so a cross-origin
+// or non-local-Host browser request is refused before anything else. The token
+// guard sits just below and is the opt-in protection for the documented case
+// where the whole manager is exposed beyond loopback.
 func (s *Server) Handler() http.Handler {
 	mux := s.routes()
-	return s.originGuard(mux)
+	return s.originGuard(s.tokenGuard(mux))
 }
 
 // originGuard protects an API that has a destructive endpoint and no

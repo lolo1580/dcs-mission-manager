@@ -27,6 +27,15 @@ Le refactor décrit ici a été implémenté :
   `DCSMANAGER_TEST_POSTGRES_DSN` est défini.
 - **`docker-compose.yml`** à la racine : un PostgreSQL pour tester l'option.
 
+> **Sécurité réseau.** Exposer le manager (`DCSMANAGER_HTTP_ADDR=0.0.0.0:8080`)
+> désactivait jusqu'ici toute protection : `localOnly` tombait, et l'API — qui
+> **n'a pas d'authentification** — porte un endpoint destructeur (`purge`).
+> Un **jeton d'API optionnel** (`DCSMANAGER_API_TOKEN`) a été ajouté : quand il
+> est défini, les appels **non-loopback** doivent le présenter (`Bearer` ou
+> `?token=`), l'accès local restant libre. Le plugin envoie ce jeton via
+> `DCSMANAGER_TOKEN`. C'est ce qui rend possible un plugin **sur une autre
+> machine** sans exposer l'API.
+
 ---
 
 ## 1. Objet et recommandation

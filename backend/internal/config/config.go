@@ -40,6 +40,12 @@ type Config struct {
 	// DBDSN is the PostgreSQL connection string, used when DBDriver is
 	// "postgres". SQLite keeps using DBPath.
 	DBDSN string
+	// APIToken, when set, is required from non-loopback callers to reach the
+	// API (Authorization: Bearer, or ?token= which sets a cookie). It exists for
+	// the documented opt-in where the UI is exposed beyond the local machine (a
+	// plugin on another host, a tablet). Empty leaves the API open, which is
+	// safe only because it then listens on loopback.
+	APIToken string
 	// Theatre is the default DCS theatre.
 	Theatre string
 	// LogLevel is one of debug, info, warn, error.
@@ -137,6 +143,7 @@ func Load() Config {
 		DBEnabled:      envBool("DCSMANAGER_DB_ENABLED", true),
 		DBDriver:       strings.ToLower(env("DCSMANAGER_DB_DRIVER", "sqlite")),
 		DBDSN:          env("DCSMANAGER_DB_DSN", ""),
+		APIToken:       env("DCSMANAGER_API_TOKEN", ""),
 		Theatre:        env("DCSMANAGER_THEATRE", "Caucasus"),
 		LogLevel:       strings.ToLower(env("DCSMANAGER_LOG_LEVEL", "info")),
 		UnitTTL:        envDuration("DCSMANAGER_UNIT_TTL", 5*time.Second),
