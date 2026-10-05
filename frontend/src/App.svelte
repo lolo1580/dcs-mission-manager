@@ -4,7 +4,6 @@
   import DebriefPanel from './lib/DebriefPanel.svelte';
   import CareerPanel from './lib/CareerPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
-  import MissionsPanel from './lib/MissionsPanel.svelte';
   import SettingsPanel from './lib/SettingsPanel.svelte';
   import { connected, paused, mission, fetchTheatres, connect } from './lib/units.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
@@ -43,7 +42,6 @@
 
     <nav class="tabs">
       <button class:active={tab === 'debriefs'} on:click={() => goTo('debriefs')}>{$t('tab.debriefs')}</button>
-      <button class:active={tab === 'missions'} on:click={() => goTo('missions')}>{$t('tab.library')}</button>
       <button class:active={tab === 'stats'} on:click={() => goTo('stats')}>{$t('tab.stats')}</button>
       <button class:active={tab === 'aerodromes'} on:click={() => goTo('aerodromes')}>{$t('tab.aerodromes')}</button>
       <button class:active={tab === 'settings'} on:click={() => goTo('settings')}>{$t('tab.settings')}</button>
@@ -83,10 +81,6 @@
     {:else if tab === 'stats'}
       <div class="session wide">
         <CareerPanel />
-      </div>
-    {:else if tab === 'missions'}
-      <div class="session wide">
-        <MissionsPanel />
       </div>
     {:else if tab === 'settings'}
       <div class="session wide">

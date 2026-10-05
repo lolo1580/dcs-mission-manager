@@ -1,6 +1,6 @@
 // Package dcsdata reads DCS World's own files from a Saved Games folder that the
-// manager runs next to: the installed module inventory, the player's logbook and
-// the mission library. It only reads; it never writes to the simulator's files.
+// manager runs next to: the installed module inventory and the player's logbook.
+// It only reads; it never writes to the simulator's files.
 //
 // Everything here degrades gracefully: a missing or unreadable file yields an
 // empty result and a reason, never an error that would take the manager down.

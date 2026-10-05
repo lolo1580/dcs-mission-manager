@@ -15,7 +15,7 @@ to [semantic versioning](https://semver.org/).
   sub-tabs.** The three had become a cluster of configuration-focused tabs in the
   main bar, so they are gathered behind **Settings** — sub-tabs *DCS install*,
   *Modules* and *Panels* — leaving the bar to the flight-facing views (Debriefs,
-  Missions, Career & statistics, Airfields). The panels are unchanged; only their
+  Career & statistics, Airfields). The panels are unchanged; only their
   place in the bar moved.
 - **Statistics and Career are now one tab, "Career & statistics".** The two
   answer different questions — "what does DCS say I have done?" (the logbook in
@@ -37,6 +37,13 @@ to [semantic versioning](https://semver.org/).
 
 ### Removed
 
+- **The Missions tab has been removed.** It listed the `.miz` files under
+  `Saved Games\DCS\Missions` (theatre, date, weather, size) and opened a mission's
+  detail. The tab, its store and the `GET /api/missions` route are gone
+  (`MissionsPanel.svelte`, `missions.js`, `internal/api/missions.go`), along with
+  the `internal/dcsdata` mission reader and the `missions` section of the state.
+  The manager reads no `.miz` any more; the debriefs remain the durable record of
+  a flight. The bundle dropped from ~156 KB to ~149 KB.
 - **The Configuration tab has been removed.** It listed DCS's own settings read
   from `Saved Games\DCS\Config` (`options.lua` groups, the `pluginsEnabled.lua`
   toggles, the UI language). The tab, its store, the `GET /api/config` route and the

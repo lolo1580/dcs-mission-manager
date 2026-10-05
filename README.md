@@ -37,7 +37,6 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
 | Career | ✅ New | The player's logbook: rank, squadron, awards, hours and kills per airframe — shown atop the statistics |
-| Mission library | ✅ New | The `.miz` in Saved Games: theatre, date, weather, size |
 | Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`) and the cockpit panels (PZ55/PZ70, DCS-BIOS, mappings) as sub-tabs |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still

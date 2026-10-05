@@ -247,16 +247,6 @@ func Run(onReady func(addr string)) error {
 			log.Printf("career: no logbook in %s (optional)", dcsdata.LogbookPath(cfg.SavedGames))
 		}
 
-		// The mission library is the .miz the player saved in Saved Games.
-		if list, err := dcsdata.LoadMissions(cfg.SavedGames); err != nil {
-			log.Printf("missions: listing failed: %v", err)
-		} else if len(list) > 0 {
-			log.Printf("missions: %d .miz in %s", len(list), dcsdata.MissionsDir(cfg.SavedGames))
-			srv.SetMissions(list)
-		} else {
-			log.Printf("missions: none in %s (optional)", dcsdata.MissionsDir(cfg.SavedGames))
-		}
-
 		// The mods installed under Mods/.
 		if mods, err := dcsdata.InstalledMods(cfg.SavedGames); err != nil {
 			log.Printf("mods: listing failed: %v", err)

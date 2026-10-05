@@ -44,7 +44,6 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
 | Carrière | ✅ Nouveau | Le logbook du joueur : grade, escadrille, décorations, heures et kills par appareil — affiché au-dessus des statistiques |
-| Bibliothèque de missions | ✅ Nouveau | Les `.miz` de Saved Games : théâtre, date, météo, taille |
 | Paramètres | ✅ Nouveau | Un onglet regroupant les modules installés, l'installation DCS (mods, état des scripts, `Export.lua` partagé) et les panneaux de cockpit (PZ55/PZ70, DCS-BIOS, associations) en sous-onglets |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités

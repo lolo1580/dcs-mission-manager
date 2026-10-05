@@ -15,7 +15,7 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   « Paramètres » avec des sous-onglets.** Les trois étaient devenus un groupe
   d'onglets orientés configuration dans la barre principale ; ils sont réunis
   derrière **Paramètres** — sous-onglets *Installation DCS*, *Modules* et
-  *Panneaux* — laissant la barre aux vues de vol (Débriefs, Missions, Carrière &
+  *Panneaux* — laissant la barre aux vues de vol (Débriefs, Carrière &
   statistiques, Aérodromes). Les panneaux sont inchangés, seule leur place dans la
   barre a bougé.
 - **Le projet est renommé DCS Manager.** Il a dépassé le cadre des missions, donc le
@@ -30,6 +30,13 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Retiré
 
+- **L'onglet Missions a été retiré.** Il listait les fichiers `.miz` de
+  `Saved Games\DCS\Missions` (théâtre, date, météo, taille) et ouvrait le détail
+  d'une mission. L'onglet, son store et la route `GET /api/missions` disparaissent
+  (`MissionsPanel.svelte`, `missions.js`, `internal/api/missions.go`), ainsi que
+  le lecteur de missions `internal/dcsdata` et la section `missions` de l'état. Le
+  gestionnaire ne lit plus aucun `.miz` ; les débriefs restent le relevé durable
+  d'un vol. Le bundle passe d'environ 156 Ko à 149 Ko.
 - **L'onglet Configuration a été retiré.** Il listait les réglages de DCS lus dans
   `Saved Games\DCS\Config` (groupes d'`options.lua`, bascules de
   `pluginsEnabled.lua`, langue de l'interface). L'onglet, son store, la route
