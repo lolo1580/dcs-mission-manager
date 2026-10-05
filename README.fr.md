@@ -45,7 +45,9 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
 | Carrière | ✅ Nouveau | Le logbook du joueur : grade, escadrille, décorations, heures et kills par appareil — affiché au-dessus des statistiques |
-| Paramètres | ✅ Nouveau | Un onglet regroupant les modules installés, l'installation DCS (mods, état des scripts, `Export.lua` partagé) et les panneaux de cockpit (PZ55/PZ70, DCS-BIOS, associations) en sous-onglets |
+| Paramètres | ✅ Nouveau | Un onglet regroupant les modules installés, l'installation DCS (mods, état des scripts, `Export.lua` partagé), les panneaux de cockpit (PZ55/PZ70, DCS-BIOS, associations) et la **sauvegarde du profil joueur** en sous-onglets |
+| Sauvegarde du profil | ✅ Nouveau | Sauvegarder/restaurer le logbook, les commandes (bindings), les options et les scripts (et en option kneeboard, missions, mods) dans un zip portable, depuis la CLI, l'API ou les Paramètres |
+| Moteurs de base | ✅ Nouveau | SQLite par défaut, PostgreSQL optionnel (`DCSMANAGER_DB_DRIVER`), avec une copie `dcsmanager migrate-db` et des vues `v_stats_*` en lecture seule pour les lecteurs externes |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
 > est toujours reçue et échantillonnée : elle alimente les statistiques et l'onglet
@@ -77,6 +79,7 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 ┌──────────────────────────────────────────────────────────┐
 │ dcsmanager.exe — backend Go + UI web embarquée                 │
 │  • listeners UDP + TCP, état en mémoire, SQLite (data/)   │
+│    — ou PostgreSQL, optionnel (DCSMANAGER_DB_DRIVER)      │
 │  • parseur de débrief, statistiques, données aérodromes   │
 │  • lit Mods/terrains/ et Saved Games/ directement         │
 │  • REST + SSE, servis à la fenêtre native (WebView2)      │
@@ -105,7 +108,7 @@ côté de la base), puisqu'un exécutable lancé au double-clic n'a pas de conso
    → accès direct à Mods/terrains/ et à Saved Games/
 ```
 
-**Stack :** Go (backend, binaire unique + UI embarquée) · Svelte + Vite (frontend) · SQLite (persistance).
+**Stack :** Go (backend, binaire unique + UI embarquée) · Svelte + Vite (frontend) · SQLite par défaut, PostgreSQL optionnel (persistance).
 
 ---
 
@@ -265,6 +268,8 @@ dcsmanager uninstall-lua   # retire le bloc installé (garde la config)
 dcsmanager status          # installed / outdated / missing, par fichier
 dcsmanager purge           # supprime des sessions enregistrées (destructif)
 dcsmanager migrate-db      # copie une base SQLite vers PostgreSQL
+dcsmanager backup          # sauvegarde le profil joueur DCS dans une archive portable
+dcsmanager restore         # restaure une archive de profil dans Saved Games
 dcsmanager version
 ```
 
@@ -345,10 +350,13 @@ DCS Manager/
 │   │   ├─ live/             # état de session en mémoire
 │   │   ├─ ingest/           # pont live → base de données
 │   │   ├─ tracker/          # historique positions + détection de pertes
-│   │   ├─ db/               # persistance SQLite (pur Go)
+│   │   ├─ db/               # persistance : interface Store, SQLite + postgres/
+│   │   ├─ migrate/          # copie SQLite → PostgreSQL (one-shot)
+│   │   ├─ backup/           # sauvegarde/restauration du profil joueur (zip)
 │   │   ├─ state/            # store unités (en mémoire)
 │   │   ├─ stats/            # agrégations statistiques
 │   │   └─ api/              # REST + SSE + UI embarquée (dist/)
+├─ stats-plugin/             # service de statistiques optionnel (lit PostgreSQL)
 ├─ frontend/                 # Svelte + Vite
 │   └─ src/
 │       ├─ App.svelte

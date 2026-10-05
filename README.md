@@ -38,7 +38,9 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
 | Career | ✅ New | The player's logbook: rank, squadron, awards, hours and kills per airframe — shown atop the statistics |
-| Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`) and the cockpit panels (PZ55/PZ70, DCS-BIOS, mappings) as sub-tabs |
+| Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the cockpit panels (PZ55/PZ70, DCS-BIOS, mappings) and the **player-profile backup** as sub-tabs |
+| Profile backup | ✅ New | Save/restore the logbook, bindings, options and scripts (and optionally kneeboard, missions, mods) as a portable zip, from the CLI, the API or Settings |
+| Database engines | ✅ New | SQLite by default, PostgreSQL optional (`DCSMANAGER_DB_DRIVER`), with a `dcsmanager migrate-db` copy and read-only `v_stats_*` views for external readers |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still
 > received and sampled: it feeds the statistics and the airfields tab (nearest
@@ -69,6 +71,7 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 ┌──────────────────────────────────────────────────────────┐
 │ dcsmanager.exe — Go backend + embedded Web UI                  │
 │  • UDP + TCP listeners, in-memory state, SQLite (data/)   │
+│    — or PostgreSQL, optional (DCSMANAGER_DB_DRIVER)       │
 │  • debrief parser, statistics, airfield reference         │
 │  • reads Mods/terrains/ and Saved Games/ directly         │
 │  • REST + SSE, served to the native window (WebView2)     │
@@ -97,7 +100,7 @@ database), since a double-clicked executable has no console.
    → direct read access to Mods/terrains/ and Saved Games/
 ```
 
-**Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite (frontend) · SQLite (persistence).
+**Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite (frontend) · SQLite by default, PostgreSQL optional (persistence).
 
 ---
 
@@ -255,6 +258,8 @@ dcsmanager uninstall-lua   # removes the installed block (keeps the config)
 dcsmanager status          # installed / outdated / missing, per file
 dcsmanager purge           # deletes recorded sessions (destructive)
 dcsmanager migrate-db      # copies a SQLite database into PostgreSQL
+dcsmanager backup          # saves a DCS player profile to a portable archive
+dcsmanager restore         # restores a profile archive into Saved Games
 dcsmanager version
 ```
 
@@ -334,10 +339,13 @@ DCS Manager/
 │   │   ├─ live/             # in-memory session state
 │   │   ├─ ingest/           # live → database bridge
 │   │   ├─ tracker/          # position history + loss detection
-│   │   ├─ db/               # SQLite persistence (pure Go)
+│   │   ├─ db/               # persistence: Store interface, SQLite + postgres/
+│   │   ├─ migrate/          # SQLite → PostgreSQL one-shot copy
+│   │   ├─ backup/           # player-profile save/restore (zip)
 │   │   ├─ state/            # unit store (in memory)
 │   │   ├─ stats/            # statistical aggregations
 │   │   └─ api/              # REST + SSE + embedded UI (dist/)
+├─ stats-plugin/             # optional statistics service (reads PostgreSQL)
 ├─ frontend/                 # Svelte + Vite
 │   └─ src/
 │       ├─ App.svelte

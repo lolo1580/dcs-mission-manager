@@ -11,6 +11,12 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Modifié
 
+- **L'interface est une coquille barre latérale + bandeau.** La navigation quitte
+  la barre d'onglets d'en-tête pour une barre latérale à vues groupées (Analyse /
+  Référence / Configuration) et un bandeau titré, et les cartes de la vue
+  d'ensemble des statistiques sont retravaillées (un accent coloré par métrique,
+  une valeur plus grande). Les panneaux eux-mêmes sont inchangés ; seules la
+  coquille et les cartes KPI ont bougé.
 - **Les onglets Installation, Modules et Panneaux forment désormais un onglet
   « Paramètres » avec des sous-onglets.** Les trois étaient devenus un groupe
   d'onglets orientés configuration dans la barre principale ; ils sont réunis
@@ -96,6 +102,65 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Un backend PostgreSQL optionnel, et une interface de stockage pour le
+  rendre possible.** La persistance passait par SQLite à travers un `*db.DB`
+  concret. Elle dépend désormais d'une interface **`db.Store`**, implémentée par
+  le store SQLite pur Go existant et par un nouveau **`internal/db/postgres`**,
+  les deux moteurs étant interchangeables partout où une base est utilisée (API,
+  écriture d'ingestion, tracker, statistiques, stockage des débriefs). Le moteur
+  se choisit avec `DCSMANAGER_DB_DRIVER` (`sqlite`, défaut, ou `postgres`) et
+  `DCSMANAGER_DB_DSN`. Le comportement SQLite est inchangé. La traduction
+  PostgreSQL a demandé du vrai travail de dialecte — `RETURNING id` au lieu de
+  `LastInsertId`, placeholders `?` → `$n`, sous-requête avec `round(…::numeric)`
+  pour la heatmap (pas de `GROUP BY` sur un alias, pas de `round(double, int)`),
+  et un index d'expression pour « une seule mission ouverte ». Une **suite de
+  conformité bi-moteur** rejoue les mêmes assertions contre les deux stores
+  (`DCSMANAGER_TEST_POSTGRES_DSN` active la moitié PostgreSQL en CI).
+- **`dcsmanager migrate-db` : copier une base SQLite vers PostgreSQL.** Le backend
+  PostgreSQL n'a pas de chemin de mise à niveau en place, donc une commande
+  one-shot copie l'historique existant : toutes les tables au niveau SQL
+  (l'interface `Store` masque des colonnes brutes comme `player_stats` et le
+  tracking), dans l'ordre des dépendances, en préservant les ids
+  (`OVERRIDING SYSTEM VALUE`) et en avançant chaque séquence d'identité, et
+  idempotente (`ON CONFLICT DO NOTHING`) donc réexécutable.
+- **Des vues `v_stats_*` en lecture seule : l'interface de statistiques.** Le
+  gestionnaire expose désormais les données d'un lecteur via des vues
+  (`v_stats_missions`, `_players`, `_player_stats`, `_events`, `_debriefs`,
+  `_track_positions` et `_config`), chacune avec une colonne `source` pour que le
+  lecteur applique la politique live/test sans connaître les tables internes.
+  Exposer des vues plutôt que des tables laisse le schéma évoluer sans casser un
+  lecteur.
+- **Un plugin de statistiques séparé (`stats-plugin/`).** Un service optionnel
+  qui lit directement la base PostgreSQL du gestionnaire (en lecture seule,
+  ouvert avec `default_transaction_read_only=on`, et de préférence pointé sur un
+  rôle SELECT-only) et sert son propre tableau de bord : vue d'ensemble, pilotes,
+  armes, engins, réseau, missions et tendances, plus des exports CSV/JSON. Il
+  n'appelle jamais le gestionnaire en HTTP, donc celui-ci peut rester sur le
+  loopback pendant que le plugin tourne ailleurs. Il fournit un Dockerfile et un
+  `docker-compose.yml`.
+- **Des endpoints d'historique incrémentaux.** `GET /api/history/events`,
+  `…/chat` et `…/missions` acceptent `?sinceId=N` et renvoient, du plus ancien au
+  plus récent, uniquement les lignes d'id supérieur à N plus un curseur
+  `nextSinceId` — un consommateur peut mirer tout l'historique sans trous ni
+  doublons. Sans `sinceId`, les endpoints gardent leur comportement d'origine
+  (les plus récents).
+- **Sauvegarde du profil joueur.** Sauvegarder et restaurer les parties de
+  `Saved Games` pénibles à perdre — le logbook, les commandes (bindings), les
+  options, les scripts, et en option le kneeboard, les missions et les mods —
+  sous forme d'un zip portable avec manifeste, les catégories étant choisies à
+  chaque appel. Disponible de trois façons : la CLI (`dcsmanager backup` /
+  `restore`, avec `--categories`, `--out`, `--list-categories`, `--dry-run`),
+  l'API (`/api/backup`, `/api/backup/categories`, `/api/backup/restore`,
+  `/api/backup/download/{name}`) et un sous-onglet **Paramètres → Sauvegarde du
+  profil joueur**. La restauration est sûre par conception : une simulation
+  annonce ce qui serait écrit, une **copie de sûreté avant restauration** de
+  l'état courant est conservée à côté de l'archive, et les entrées qui
+  sortiraient de Saved Games (`../`) sont refusées.
+- **Un jeton d'API optionnel.** `DCSMANAGER_API_TOKEN` protège l'API quand le
+  gestionnaire est délibérément exposé au-delà du loopback : les appels non
+  locaux doivent le présenter (`Authorization: Bearer`, ou `?token=`, qui pose un
+  cookie). Les appels loopback restent exemptés, donc l'usage local normal ne
+  demande aucune configuration, et la comparaison est à temps constant.
 - **Des profils de panneaux prêts à l'emploi pour quatre appareils.** La première
   fois que le fichier d'associations est absent, l'onglet Panneaux de cockpit est
   pré-rempli avec des associations fonctionnelles pour le F/A-18C, le F-16C, le

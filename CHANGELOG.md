@@ -11,6 +11,11 @@ to [semantic versioning](https://semver.org/).
 
 ### Changed
 
+- **The interface is a sidebar + topbar shell.** Navigation moved from a header
+  tab bar to a sidebar rail with grouped views (Analysis / Reference /
+  Configuration) and a titled topbar, and the statistics overview cards were
+  reworked (a coloured accent per metric, a larger value). The panels themselves
+  are unchanged; only the surrounding shell and the KPI cards moved.
 - **The install, modules and panels tabs are now one "Settings" tab with
   sub-tabs.** The three had become a cluster of configuration-focused tabs in the
   main bar, so they are gathered behind **Settings** — sub-tabs *DCS install*,
@@ -97,6 +102,60 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **An optional PostgreSQL backend, and a storage interface to make it
+  possible.** The manager's persistence used to be SQLite through a concrete
+  `*db.DB`. It now depends on a **`db.Store`** interface, implemented by the
+  existing pure-Go SQLite store and by a new **`internal/db/postgres`** one, so
+  the two engines are interchangeable wherever a database is used (the API, the
+  ingest writer, the tracker, the statistics, the debrief store). The engine is
+  chosen with `DCSMANAGER_DB_DRIVER` (`sqlite`, the default, or `postgres`) and
+  `DCSMANAGER_DB_DSN`. SQLite behaviour is unchanged. The PostgreSQL translation
+  needed real dialect work — `RETURNING id` instead of `LastInsertId`,
+  `?` → `$n` placeholders, a sub-query with `round(…::numeric)` for the heatmap
+  (no `GROUP BY` on an alias, no `round(double, int)`), and an expression index
+  for "a single open mission". A cross-engine **conformance suite** runs the
+  same assertions against both stores (`DCSMANAGER_TEST_POSTGRES_DSN` enables
+  the PostgreSQL half in CI).
+- **`dcsmanager migrate-db`: copy a SQLite database into PostgreSQL.** The
+  PostgreSQL backend has no in-place upgrade path, so a one-shot command copies
+  the existing history over: every table at the SQL level (the `Store` interface
+  hides raw columns like `player_stats` and the tracking), in dependency order,
+  preserving ids (`OVERRIDING SYSTEM VALUE`) and advancing each identity
+  sequence, and idempotent (`ON CONFLICT DO NOTHING`) so it can be re-run.
+- **Read-only `v_stats_*` views: the statistics interface.** The manager now
+  exposes the data a reader needs through views (`v_stats_missions`, `_players`,
+  `_player_stats`, `_events`, `_debriefs`, `_track_positions` and `_config`),
+  each with a `source` column so a reader applies the live/test policy without
+  knowing the internal tables. Exposing views rather than tables lets the schema
+  change without breaking a reader.
+- **A separate statistics plugin (`stats-plugin/`).** An optional service that
+  reads the manager's PostgreSQL database directly (read-only, opened with
+  `default_transaction_read_only=on`, and best pointed at a SELECT-only role) and
+  serves its own dashboard: overview, pilots, weapons, airframes, network,
+  missions and trends, plus CSV/JSON exports. It never calls the manager over
+  HTTP, so the manager can stay on loopback while the plugin runs elsewhere. It
+  ships a Dockerfile and a `docker-compose.yml`.
+- **Incremental history endpoints.** `GET /api/history/events`, `…/chat` and
+  `…/missions` accept `?sinceId=N` and return, oldest first, only the rows with
+  an id greater than N plus a `nextSinceId` cursor — a consumer can mirror the
+  whole history without gaps or duplicates. Without `sinceId` the endpoints keep
+  their original "most recent" behaviour.
+- **Player-profile backup.** Save and restore the parts of `Saved Games` that are
+  painful to lose — the logbook, the control bindings, the options, the scripts,
+  and optionally the kneeboard, missions and mods — as a portable zip with a
+  manifest, with the categories chosen per call. Available three ways: the CLI
+  (`dcsmanager backup` / `restore`, with `--categories`, `--out`,
+  `--list-categories`, `--dry-run`), the API (`/api/backup`,
+  `/api/backup/categories`, `/api/backup/restore`, `/api/backup/download/{name}`)
+  and a **Settings → Player profile backup** sub-tab. Restore is safe by design:
+  a dry run reports what it would write, a **pre-restore safety copy** of the
+  current state is kept beside the archive, and entries that would escape Saved
+  Games (`../`) are refused.
+- **An optional API token.** `DCSMANAGER_API_TOKEN` protects the API when the
+  manager is deliberately exposed beyond the loopback interface: non-local
+  callers must present it (`Authorization: Bearer`, or `?token=`, which sets a
+  cookie). Loopback callers stay exempt, so the normal local setup needs no
+  configuration, and the comparison is constant-time.
 - **Ready-made panel profiles for four aircraft.** The first time the binding
   file is absent, the Cockpit panels tab is seeded with working bindings for the
   F/A-18C, the F-16C, the F-5E-3 and the Mirage 2000C — the aircraft the original
