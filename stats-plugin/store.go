@@ -63,11 +63,15 @@ func (s *Store) Close() {
 // missionFilter returns the SQL fragment and arguments restricting a query on a
 // mission column to the configured test policy. The column is always a literal
 // from this package, never user input.
+//
+// Readers go through the manager's read-only views (v_stats_*), which carry a
+// `source` column, so the test policy is applied here rather than by trusting
+// the underlying tables.
 func (s *Store) missionFilter(column string) string {
 	if s.includeTest {
 		return ""
 	}
-	return " AND " + column + " IN (SELECT id FROM missions WHERE source <> 'test')"
+	return " AND " + column + " IN (SELECT id FROM v_stats_missions WHERE source <> 'test')"
 }
 
 // --- models (mirroring the manager's stats JSON shapes) -----------------------
@@ -164,10 +168,10 @@ type Counts struct {
 // Overview aggregates the dashboard summary, mirroring the manager's Overview.
 func (s *Store) Overview(ctx context.Context) (Overview, error) {
 	var o Overview
-	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM missions WHERE 1=1`+s.missionFilter("id")).Scan(&o.Missions); err != nil {
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM v_stats_missions WHERE 1=1`+s.missionFilter("id")).Scan(&o.Missions); err != nil {
 		return o, err
 	}
-	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM players`).Scan(&o.Players); err != nil {
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM v_stats_players`).Scan(&o.Players); err != nil {
 		return o, err
 	}
 
@@ -179,7 +183,7 @@ func (s *Store) Overview(ctx context.Context) (Overview, error) {
 		       COALESCE(SUM(CASE WHEN event='crash' THEN 1 ELSE 0 END),0),
 		       COALESCE(SUM(CASE WHEN event='eject' THEN 1 ELSE 0 END),0),
 		       COALESCE(SUM(CASE WHEN event='friendly_fire' THEN 1 ELSE 0 END),0)
-		FROM events WHERE 1=1`+s.missionFilter("mission_id"))
+		FROM v_stats_events WHERE 1=1`+s.missionFilter("mission_id"))
 	if err := row.Scan(&o.Events, &o.Kills, &o.Deaths, &o.Crashes, &o.Ejections, &o.FriendlyFF); err != nil {
 		return o, err
 	}
@@ -203,7 +207,7 @@ func (s *Store) Pilots(ctx context.Context) ([]PilotStats, error) {
 	rows, err := s.pool.Query(ctx, `
 		WITH latest AS (
 			SELECT MAX(id) AS id
-			FROM player_stats ps
+			FROM v_stats_player_stats ps
 			WHERE 1=1`+where+`
 			GROUP BY ps.mission_id, ps.player_id
 		)
@@ -213,8 +217,8 @@ func (s *Store) Pilots(ctx context.Context) ([]PilotStats, error) {
 		       COALESCE(SUM(ps.kills_air),0), COALESCE(SUM(ps.kills_car),0), COALESCE(SUM(ps.kills_ship),0),
 		       COALESCE(SUM(ps.crashes),0), COALESCE(SUM(ps.ejects),0), COALESCE(SUM(ps.landings),0),
 		       AVG(NULLIF(ps.ping,0))
-		FROM player_stats ps
-		JOIN players p ON p.id = ps.player_id
+		FROM v_stats_player_stats ps
+		JOIN v_stats_players p ON p.id = ps.player_id
 		WHERE ps.id IN (SELECT id FROM latest)
 		GROUP BY p.id, p.ucid, p.name
 		ORDER BY COALESCE(SUM(ps.score),0) DESC`)
@@ -268,7 +272,7 @@ func (s *Store) eventCountsByPlayer(ctx context.Context) (deaths, ff map[int64]i
 	where := s.missionFilter("ps.mission_id")
 	rows, err := s.pool.Query(ctx, `
 		SELECT DISTINCT ps.mission_id, ps.dcs_player_id, ps.player_id
-		FROM player_stats ps
+		FROM v_stats_player_stats ps
 		WHERE ps.dcs_player_id IS NOT NULL AND ps.mission_id IS NOT NULL`+where)
 	if err != nil {
 		return nil, nil, err
@@ -287,7 +291,7 @@ func (s *Store) eventCountsByPlayer(ctx context.Context) (deaths, ff map[int64]i
 	}
 
 	erows, err := s.pool.Query(ctx, `
-		SELECT mission_id, event, args FROM events
+		SELECT mission_id, event, args FROM v_stats_events
 		WHERE event IN ('pilot_death','friendly_fire') AND mission_id IS NOT NULL`+s.missionFilter("mission_id"))
 	if err != nil {
 		return nil, nil, err
@@ -321,7 +325,7 @@ func (s *Store) eventCountsByPlayer(ctx context.Context) (deaths, ff map[int64]i
 // Weapons aggregates weapon performance from kill and friendly-fire events.
 func (s *Store) Weapons(ctx context.Context) ([]WeaponStats, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT event, args FROM events WHERE event IN ('kill','friendly_fire')`+s.missionFilter("mission_id"))
+		`SELECT event, args FROM v_stats_events WHERE event IN ('kill','friendly_fire')`+s.missionFilter("mission_id"))
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +388,7 @@ func (s *Store) Engines(ctx context.Context) ([]EngineStats, error) {
 	}
 
 	where := s.missionFilter("mission_id")
-	rows, err := s.pool.Query(ctx, `SELECT args FROM events WHERE event = 'kill'`+where)
+	rows, err := s.pool.Query(ctx, `SELECT args FROM v_stats_events WHERE event = 'kill'`+where)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +412,7 @@ func (s *Store) Engines(ctx context.Context) ([]EngineStats, error) {
 	}
 
 	rows2, err := s.pool.Query(ctx,
-		`SELECT DISTINCT unit_type FROM player_stats WHERE unit_type IS NOT NULL AND unit_type <> ''`+where)
+		`SELECT DISTINCT unit_type FROM v_stats_player_stats WHERE unit_type IS NOT NULL AND unit_type <> ''`+where)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +448,7 @@ func (s *Store) Coalitions(ctx context.Context) ([]CoalitionStats, error) {
 	rows, err := s.pool.Query(ctx, `
 		WITH latest AS (
 			SELECT MAX(id) AS id
-			FROM player_stats ps
+			FROM v_stats_player_stats ps
 			WHERE 1=1`+where+`
 			GROUP BY ps.mission_id, ps.player_id
 		)
@@ -452,7 +456,7 @@ func (s *Store) Coalitions(ctx context.Context) ([]CoalitionStats, error) {
 		       COALESCE(SUM(ps.score),0),
 		       COALESCE(SUM(ps.kills_air + ps.kills_car + ps.kills_ship),0),
 		       COUNT(DISTINCT ps.player_id)
-		FROM player_stats ps
+		FROM v_stats_player_stats ps
 		WHERE ps.id IN (SELECT id FROM latest)
 		GROUP BY ps.side`)
 	if err != nil {
@@ -480,8 +484,8 @@ func (s *Store) Network(ctx context.Context) ([]NetworkStats, error) {
 	where := s.missionFilter("ps.mission_id")
 	rows, err := s.pool.Query(ctx, `
 		SELECT p.name, COUNT(*), AVG(NULLIF(ps.ping,0)), COALESCE(MAX(ps.ping),0)
-		FROM player_stats ps
-		JOIN players p ON p.id = ps.player_id
+		FROM v_stats_player_stats ps
+		JOIN v_stats_players p ON p.id = ps.player_id
 		WHERE 1=1`+where+`
 		GROUP BY p.id, p.name`)
 	if err != nil {
@@ -526,7 +530,7 @@ func (s *Store) Missions(ctx context.Context, limit int) ([]MissionRow, error) {
 	}
 	q := `SELECT id, name, COALESCE(theatre,''), COALESCE(source,'live'), started_at,
 	             COALESCE(ended_at,0), COALESCE(winner,'')
-	      FROM missions`
+	      FROM v_stats_missions`
 	if !s.includeTest {
 		q += ` WHERE source <> 'test'`
 	}
@@ -554,11 +558,11 @@ func (s *Store) CountTotals(ctx context.Context) (Counts, error) {
 	var c Counts
 	err := s.pool.QueryRow(ctx, `
 		SELECT
-			(SELECT COUNT(*) FROM missions WHERE 1=1`+s.missionFilter("id")+`),
-			(SELECT COUNT(*) FROM players),
-			(SELECT COUNT(*) FROM events WHERE 1=1`+s.missionFilter("mission_id")+`),
-			(SELECT COUNT(*) FROM debriefs WHERE 1=1`+s.missionFilter("mission_id")+`),
-			(SELECT COUNT(*) FROM track_positions WHERE 1=1`+s.missionFilter("mission_id")+`)`,
+			(SELECT COUNT(*) FROM v_stats_missions WHERE 1=1`+s.missionFilter("id")+`),
+			(SELECT COUNT(*) FROM v_stats_players),
+			(SELECT COUNT(*) FROM v_stats_events WHERE 1=1`+s.missionFilter("mission_id")+`),
+			(SELECT COUNT(*) FROM v_stats_debriefs WHERE 1=1`+s.missionFilter("mission_id")+`),
+			(SELECT COUNT(*) FROM v_stats_track_positions WHERE 1=1`+s.missionFilter("mission_id")+`)`,
 	).Scan(&c.Missions, &c.Players, &c.Events, &c.Debriefs, &c.Positions)
 	return c, err
 }
@@ -583,7 +587,7 @@ func (s *Store) EventSeries(ctx context.Context, eventKind string, days int) ([]
 
 	q := `SELECT to_timestamp((real_ts / 1000.0)::double precision)::date AS d, COUNT(*)`
 	args := []any{cutoff}
-	q += ` FROM events WHERE real_ts >= $1`
+	q += ` FROM v_stats_events WHERE real_ts >= $1`
 	if eventKind != "" {
 		q += ` AND event = $2`
 		args = append(args, eventKind)

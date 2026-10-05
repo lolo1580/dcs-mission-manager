@@ -262,8 +262,68 @@ func (d *DB) migrate() error {
 	if _, err := d.sql.Exec(`ALTER TABLE missions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'live'`); err != nil {
 		return err
 	}
+	if _, err := d.sql.Exec(views); err != nil {
+		return err
+	}
 	return d.ensureSingleOpenMissionIndex()
 }
+
+// views is the read-only statistics interface, the contract between the manager
+// and any reader (the statistics plugin, a BI tool). Exposing views rather than
+// the tables lets the internal schema evolve — a column renamed, a table split —
+// without breaking readers, as long as the view keeps its shape. A reader is
+// expected to be granted SELECT on these and nothing else.
+//
+// The views keep the manager's "test" policy out of the reader's hands: each
+// carries a `source` column (and `include_test` on the config view) so a reader
+// filters with `source <> 'test'` or joins `v_stats_config`.
+//
+// CREATE OR REPLACE makes them updatable in place when this list changes.
+const views = `
+CREATE OR REPLACE VIEW v_stats_missions AS
+	SELECT id, name, theatre, COALESCE(source,'live') AS source, started_at, ended_at, winner
+	FROM missions;
+
+CREATE OR REPLACE VIEW v_stats_players AS
+	SELECT id, COALESCE(ucid,'') AS ucid, name, first_seen, last_seen
+	FROM players;
+
+CREATE OR REPLACE VIEW v_stats_player_stats AS
+	SELECT ps.id, ps.mission_id, ps.player_id, ps.dcs_player_id, ps.side, ps.slot,
+	       ps.unit_type, ps.ping, ps.crashes, ps.kills_car, ps.kills_air, ps.kills_ship,
+	       ps.score, ps.landings, ps.ejects, ps.real_ts,
+	       COALESCE(m.source,'live') AS source
+	FROM player_stats ps
+	LEFT JOIN missions m ON m.id = ps.mission_id;
+
+CREATE OR REPLACE VIEW v_stats_events AS
+	SELECT e.id, e.mission_id, e.event, e.args, e.detail, e.t, e.real_ts,
+	       COALESCE(m.source,'live') AS source
+	FROM events e
+	LEFT JOIN missions m ON m.id = e.mission_id;
+
+CREATE OR REPLACE VIEW v_stats_debriefs AS
+	SELECT d.id, d.mission_id, d.mission, d.theatre, d.size, d.created_at,
+	       COALESCE(m.source,'live') AS source
+	FROM debriefs d
+	LEFT JOIN missions m ON m.id = d.mission_id;
+
+CREATE OR REPLACE VIEW v_stats_track_positions AS
+	SELECT t.id, t.mission_id, t.unit_id, t.name, t.type, t.category, t.coalition,
+	       t.lat, t.lng, t.alt, t.heading, t.speed, t.g, t.ownship, t.real_ts,
+	       COALESCE(m.source,'live') AS source
+	FROM track_positions t
+	LEFT JOIN missions m ON m.id = t.mission_id;
+
+CREATE OR REPLACE VIEW v_stats_config AS
+	SELECT
+		(SELECT COUNT(*) FROM missions)  AS mission_count,
+		(SELECT COUNT(*) FROM players)   AS player_count,
+		(SELECT COUNT(*) FROM events)    AS event_count,
+		(SELECT COUNT(*) FROM debriefs)  AS debrief_count,
+		(SELECT COUNT(*) FROM track_positions) AS position_count,
+		(SELECT COUNT(*) FROM missions WHERE source = 'test') AS test_mission_count;
+`
 
 // ensureSingleOpenMissionIndex enforces "at most one open mission". PostgreSQL
 // cannot index a constant expression, so the index is on `(ended_at IS NULL)`,

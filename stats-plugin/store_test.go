@@ -75,6 +75,35 @@ CREATE TABLE debriefs (
 	raw text, parsed text, size integer, created_at bigint);
 CREATE TABLE track_positions (
 	id bigint PRIMARY KEY, mission_id bigint, real_ts bigint NOT NULL);
+
+-- The manager's read-only interface (v_stats_*). The plugin reads only these, so
+-- the internal tables can change without breaking it. Kept in step with the DDL
+-- in backend/internal/db/postgres/postgres.go.
+CREATE OR REPLACE VIEW v_stats_missions AS
+	SELECT id, name, theatre, COALESCE(source,'live') AS source, started_at, ended_at, winner FROM missions;
+CREATE OR REPLACE VIEW v_stats_players AS
+	SELECT id, COALESCE(ucid,'') AS ucid, name, first_seen, last_seen FROM players;
+CREATE OR REPLACE VIEW v_stats_player_stats AS
+	SELECT ps.id, ps.mission_id, ps.player_id, ps.dcs_player_id, ps.side, ps.slot,
+	       ps.unit_type, ps.ping, ps.crashes, ps.kills_car, ps.kills_air, ps.kills_ship,
+	       ps.score, ps.landings, ps.ejects, ps.real_ts, COALESCE(m.source,'live') AS source
+	FROM player_stats ps LEFT JOIN missions m ON m.id = ps.mission_id;
+CREATE OR REPLACE VIEW v_stats_events AS
+	SELECT e.id, e.mission_id, e.event, e.args, e.detail, e.t, e.real_ts, COALESCE(m.source,'live') AS source
+	FROM events e LEFT JOIN missions m ON m.id = e.mission_id;
+CREATE OR REPLACE VIEW v_stats_debriefs AS
+	SELECT d.id, d.mission_id, d.mission, d.theatre, d.size, d.created_at, COALESCE(m.source,'live') AS source
+	FROM debriefs d LEFT JOIN missions m ON m.id = d.mission_id;
+CREATE OR REPLACE VIEW v_stats_track_positions AS
+	SELECT t.id, t.mission_id, t.real_ts, COALESCE(m.source,'live') AS source
+	FROM track_positions t LEFT JOIN missions m ON m.id = t.mission_id;
+CREATE OR REPLACE VIEW v_stats_config AS
+	SELECT (SELECT COUNT(*) FROM missions) AS mission_count,
+	       (SELECT COUNT(*) FROM players) AS player_count,
+	       (SELECT COUNT(*) FROM events) AS event_count,
+	       (SELECT COUNT(*) FROM debriefs) AS debrief_count,
+	       (SELECT COUNT(*) FROM track_positions) AS position_count,
+	       (SELECT COUNT(*) FROM missions WHERE source = 'test') AS test_mission_count;
 `
 
 // jsonArgs renders the []any the manager stores in events.args.
