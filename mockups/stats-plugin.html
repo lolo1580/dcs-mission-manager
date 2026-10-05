@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mockup — Plugin de statistiques (refonte)</title>
+<style>
+  /* Même langage visuel que le manager, accent cyan pour marquer le service séparé. */
+  :root{
+    --bg:#0b0f14; --surface:#11171f; --panel:#151c26; --raised:#1b2430;
+    --border:#242e3b; --border-2:#2f3b4b;
+    --text:#e8eef5; --muted:#8f9bab; --faint:#5d6b7c;
+    --accent:#39d0d8; --accent-2:#2b9fb0;
+    --blue:#5aa9ff; --green:#3fb950; --red:#f85149; --amber:#e3b341; --violet:#a371f7;
+    --r:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45}
+  .app{display:grid;grid-template-columns:236px 1fr;height:100%}
+
+  aside{background:linear-gradient(180deg,var(--surface),var(--bg));border-right:1px solid var(--border);display:flex;flex-direction:column;min-width:0}
+  .brand{display:flex;align-items:center;gap:.6rem;padding:1rem}
+  .brand .mark{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center;font-weight:800;color:#04212a;font-size:15px;
+    background:radial-gradient(circle at 30% 30%,#6fe6ec,#1f8fa0);box-shadow:0 0 0 1px rgba(255,255,255,.06),0 6px 16px rgba(57,208,216,.25)}
+  .brand b{display:block;font-size:14px} .brand small{color:var(--faint);font-size:11px}
+  nav{padding:.4rem .6rem;display:flex;flex-direction:column;gap:2px}
+  .group{color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;padding:.7rem .6rem .3rem;font-weight:600}
+  .nav-item{display:flex;align-items:center;gap:.65rem;padding:.55rem .6rem;border-radius:9px;color:var(--muted);cursor:pointer;border:1px solid transparent;background:none;font:inherit;text-align:left}
+  .nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+  .nav-item.active{color:var(--text);background:var(--raised);border-color:var(--border-2);box-shadow:inset 2px 0 0 var(--accent)}
+  .nav-item .ic{width:17px;height:17px;flex:none}
+  .nav-item.active .ic{color:var(--accent)}
+  .side-foot{margin-top:auto;padding:.9rem 1rem;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px;display:flex;flex-direction:column;gap:.35rem}
+  .side-foot .row{display:flex;align-items:center;gap:.45rem}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none}
+  .dot.on{background:var(--green);box-shadow:0 0 0 3px rgba(63,185,80,.16)}
+  .side-foot .k{color:var(--faint)} .side-foot .v{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text)}
+
+  main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;padding:.7rem 1.2rem;background:var(--surface);border-bottom:1px solid var(--border)}
+  .topbar h1{font-size:16px;margin:0;font-weight:650}
+  .topbar .sub{color:var(--faint);font-size:12px}
+  .spacer{flex:1}
+  .seg{display:inline-flex;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:2px}
+  .seg button{background:none;border:none;color:var(--muted);font:inherit;font-size:12px;padding:.28rem .7rem;border-radius:7px;cursor:pointer}
+  .seg button.active{background:var(--raised);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.4)}
+  select{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.32rem .5rem;font:inherit;font-size:12px}
+  .btn{background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.34rem .7rem;font:inherit;font-size:12px;cursor:pointer}
+  .btn.primary{background:linear-gradient(180deg,var(--accent-2),#1f7c8a);border-color:var(--accent-2);color:#032027;font-weight:600}
+
+  .scroll{overflow:auto;padding:1.2rem;display:flex;flex-direction:column;gap:1.1rem}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:.85rem 1rem;position:relative;overflow:hidden}
+  .kpi::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent);opacity:.75}
+  .kpi.k2::after{background:var(--blue)} .kpi.k3::after{background:var(--green)} .kpi.k4::after{background:var(--amber)}
+  .kpi .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .kpi .v{font-size:26px;font-weight:700;margin-top:.15rem;font-variant-numeric:tabular-nums}
+  .kpi .d{font-size:11.5px;color:var(--faint);margin-top:.15rem}
+
+  .grid{display:grid;gap:1.1rem}
+  .cols-2{grid-template-columns:1.35fr 1fr}
+  .cols-3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:1080px){.cols-2,.cols-3{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;min-width:0}
+  .panel h2{font-size:13.5px;margin:0 0 .85rem;font-weight:650;display:flex;align-items:center;gap:.5rem}
+  .panel h2 .ic{width:15px;height:15px;color:var(--muted)}
+  .panel h2 .more{margin-left:auto;color:var(--faint);font-size:11.5px;font-weight:400}
+
+  table{width:100%;border-collapse:collapse;font-size:12.8px}
+  th,td{text-align:left;padding:.5rem .55rem;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  tbody tr:hover{background:rgba(255,255,255,.025)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;padding:.08rem .45rem;border-radius:999px;font-size:11px;border:1px solid var(--border-2);color:var(--muted)}
+  .pill.green{color:#8ee79b;border-color:#2f7a3c;background:rgba(63,185,80,.1)}
+  .pill.red{color:#ffb3ae;border-color:#a5342f;background:rgba(248,81,73,.1)}
+  .pill.cyan{color:#9df3f6;border-color:#1f8fa0;background:rgba(57,208,216,.12)}
+  .pill.amber{color:#f0d48a;border-color:#8a6f22;background:rgba(227,179,65,.12)}
+
+  /* chart with axes */
+  .chart{width:100%;height:220px;display:block}
+  .legend{display:flex;gap:1rem;color:var(--muted);font-size:11.5px;margin-top:.5rem;flex-wrap:wrap}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:.35rem}
+
+  .hidden{display:none}
+  .barrow{display:grid;grid-template-columns:52px 1fr 60px;align-items:center;gap:.6rem;margin:.55rem 0}
+  .bar{height:9px;border-radius:6px;background:var(--raised);overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#1f8fa0,#39d0d8)}
+  .barrow .num{text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><span class="mark">Σ</span><span><b>Stats Plugin</b><small>instance · server-1</small></span></div>
+    <nav id="nav">
+      <div class="group">Tableau de bord</div>
+      <button class="nav-item active" data-view="overview"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Vue d'ensemble</button>
+      <button class="nav-item" data-view="trends"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-6 4 3 6-8"/><path d="M3 21h18"/></svg>Tendances</button>
+      <div class="group">Analyse</div>
+      <button class="nav-item" data-view="pilots"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 3v4M15 5h4"/></svg>Pilotes</button>
+      <button class="nav-item" data-view="weapons"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l9-9 9 9-9 9z"/><path d="M7 12h10"/></svg>Armes</button>
+      <button class="nav-item" data-view="engines"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h5l2-7 4 14 2-7h7"/></svg>Machines</button>
+      <button class="nav-item" data-view="network"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18a10 10 0 0116 0M7 15a6 6 0 0110 0M12 14v.01"/></svg>Réseau</button>
+      <div class="group">Données</div>
+      <button class="nav-item" data-view="missions"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Missions</button>
+      <button class="nav-item" data-view="export"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export</button>
+    </nav>
+    <div class="side-foot">
+      <div class="row"><span class="dot on"></span>Manager joignable</div>
+      <div class="row"><span class="k">Dernière synchro</span><span class="v">12:04:31</span></div>
+      <div class="row"><span class="k">Événements mirés</span><span class="v">48 712</span></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div><h1 id="title">Vue d'ensemble</h1><div class="sub" id="subtitle">Instantané le plus récent · carrière</div></div>
+      <span class="spacer"></span>
+      <label class="muted" style="font-size:12px">instance
+        <select id="instance"><option>server-1</option><option>server-2</option><option>local</option></select>
+      </label>
+      <div class="seg" id="scope"><button class="active" data-scope="career">Carrière</button><button data-scope="mission">Mission</button></div>
+      <button class="btn">⟳</button>
+    </div>
+
+    <div class="scroll">
+      <!-- VUE D'ENSEMBLE -->
+      <section data-pane="overview">
+        <div class="kpis" style="margin-bottom:1.1rem">
+          <div class="kpi"><div class="k">Missions</div><div class="v">142</div><div class="d">3 serveurs agrégés</div></div>
+          <div class="kpi k2"><div class="k">Pilotes</div><div class="v">27</div><div class="d">identités UCID</div></div>
+          <div class="kpi k3"><div class="k">Kills</div><div class="v">1 047</div><div class="d">toutes coalitions</div></div>
+          <div class="kpi k4"><div class="k">Événements</div><div class="v">48 712</div><div class="d">mirés en PostgreSQL</div></div>
+        </div>
+        <div class="grid cols-2">
+          <div class="panel"><h2>Évolution des kills<span class="more">instantanés</span></h2>
+            <svg class="chart" viewBox="0 0 620 220" preserveAspectRatio="none">
+              <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#39d0d8" stop-opacity=".32"/><stop offset="1" stop-color="#39d0d8" stop-opacity="0"/></linearGradient></defs>
+              <g stroke="#242e3b" stroke-width="1"><line x1="48" y1="20" x2="600" y2="20"/><line x1="48" y1="70" x2="600" y2="70"/><line x1="48" y1="120" x2="600" y2="120"/><line x1="48" y1="170" x2="600" y2="170"/></g>
+              <g fill="#5d6b7c" font-size="10"><text x="6" y="24">600</text><text x="6" y="74">400</text><text x="6" y="124">200</text><text x="6" y="174">0</text></g>
+              <path d="M48,160 L130,140 L212,146 L294,105 L376,112 L458,74 L540,52 L600,38 L600,170 L48,170 Z" fill="url(#ga)"/>
+              <path d="M48,160 L130,140 L212,146 L294,105 L376,112 L458,74 L540,52 L600,38" fill="none" stroke="#39d0d8" stroke-width="2.2"/>
+              <g fill="#5d6b7c" font-size="10"><text x="48" y="192">01/09</text><text x="180" y="192">08/09</text><text x="320" y="192">15/09</text><text x="460" y="192">22/09</text><text x="560" y="192">30/09</text></g>
+            </svg>
+            <div class="legend"><span><i style="background:#39d0d8"></i>Kills cumulés</span><span class="faint">+63 sur 7 jours</span></div>
+          </div>
+          <div class="panel"><h2>Répartition par coalition</h2>
+            <div class="barrow"><span class="pill cyan">Bleu</span><span class="bar"><i style="width:62%"></i></span><span class="num">62 %</span></div>
+            <div class="barrow"><span class="pill red">Rouge</span><span class="bar"><i style="width:38%"></i></span><span class="num">38 %</span></div>
+            <div style="margin-top:1rem" class="faint">Dernier instantané il y a 4 min</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PILOTES -->
+      <section data-pane="pilots" class="hidden">
+        <div class="panel"><h2>Pilotes<span class="more">tri par colonne</span></h2>
+          <table><thead><tr><th>Pilote</th><th>UCID</th><th class="num">Missions</th><th class="num">Kills</th><th class="num">Morts</th><th class="num">K/D</th><th class="num">Ping moy.</th></tr></thead>
+          <tbody>
+            <tr><td>Viper</td><td class="faint">a91f…c2</td><td class="num">96</td><td class="num">512</td><td class="num">125</td><td class="num">4.10</td><td class="num">38</td></tr>
+            <tr><td>Ghost</td><td class="faint">7b2e…01</td><td class="num">88</td><td class="num">401</td><td class="num">113</td><td class="num">3.55</td><td class="num">42</td></tr>
+            <tr><td>Falcon</td><td class="faint">cc04…9f</td><td class="num">71</td><td class="num">287</td><td class="num">95</td><td class="num">3.01</td><td class="num">55</td></tr>
+          </tbody></table>
+        </div>
+      </section>
+
+      <!-- ARMES -->
+      <section data-pane="weapons" class="hidden">
+        <div class="panel"><h2>Armes</h2>
+          <table><thead><tr><th>Arme</th><th class="num">Kills</th><th class="num">Fratricide</th><th class="num">Types ciblés</th><th class="num">Plateformes</th></tr></thead>
+          <tbody>
+            <tr><td>AIM-120C</td><td class="num">248</td><td class="num">0</td><td class="num">7</td><td class="num">4</td></tr>
+            <tr><td>AIM-9X</td><td class="num">191</td><td class="num">2</td><td class="num">5</td><td class="num">4</td></tr>
+            <tr><td>Mk-82</td><td class="num">143</td><td class="num">1</td><td class="num">9</td><td class="num">3</td></tr>
+          </tbody></table>
+        </div>
+      </section>
+
+      <!-- MACHINES -->
+      <section data-pane="engines" class="hidden">
+        <div class="panel"><h2>Machines (type DCS exact)</h2>
+          <table><thead><tr><th>Type</th><th>Catégorie</th><th class="num">Kills</th><th class="num">Pertes</th><th class="num">Sorties</th><th class="num">K/D</th></tr></thead>
+          <tbody>
+            <tr><td>F-16C_50</td><td><span class="pill">plane</span></td><td class="num">412</td><td class="num">108</td><td class="num">124</td><td class="num">3.81</td></tr>
+            <tr><td>F/A-18C</td><td><span class="pill">plane</span></td><td class="num">271</td><td class="num">87</td><td class="num">88</td><td class="num">3.11</td></tr>
+            <tr><td>Su-27</td><td><span class="pill">plane</span></td><td class="num">132</td><td class="num">60</td><td class="num">52</td><td class="num">2.20</td></tr>
+          </tbody></table>
+        </div>
+      </section>
+
+      <!-- RÉSEAU -->
+      <section data-pane="network" class="hidden">
+        <div class="panel"><h2>Qualité réseau</h2>
+          <table><thead><tr><th>Pilote</th><th class="num">Échantillons</th><th class="num">Ping moy.</th><th class="num">Ping max</th></tr></thead>
+          <tbody><tr><td>Viper</td><td class="num">8 120</td><td class="num">38</td><td class="num">212</td></tr><tr><td>Ghost</td><td class="num">6 004</td><td class="num">42</td><td class="num">340</td></tr></tbody></table>
+        </div>
+      </section>
+
+      <!-- MISSIONS -->
+      <section data-pane="missions" class="hidden">
+        <div class="panel"><h2>Missions mirées<span class="more">142</span></h2>
+          <table><thead><tr><th>Mission</th><th>Carte</th><th>Source</th><th>Début</th><th>Fin</th><th>Vainqueur</th></tr></thead>
+          <tbody>
+            <tr><td>Free Flight</td><td>Caucasus</td><td><span class="pill green">live</span></td><td>30/09 20:14</td><td>—</td><td class="faint">en cours</td></tr>
+            <tr><td>Red Flag 24-3</td><td>Nevada</td><td><span class="pill green">live</span></td><td>29/09 21:02</td><td>29/09 22:47</td><td><span class="pill cyan">blue</span></td></tr>
+            <tr><td>test-flight</td><td>Caucasus</td><td><span class="pill amber">test</span></td><td>29/09 18:11</td><td>29/09 18:20</td><td class="faint">—</td></tr>
+          </tbody></table>
+        </div>
+      </section>
+
+      <!-- EXPORT -->
+      <section data-pane="export" class="hidden">
+        <div class="panel"><h2>Export</h2>
+          <p class="muted" style="font-size:12.5px">Exporte le miroir PostgreSQL de l'instance sélectionnée.</p>
+          <div style="display:flex;gap:.7rem;flex-wrap:wrap;align-items:center;margin-top:.8rem">
+            <select><option>events</option><option>missions</option><option>series</option></select>
+            <input placeholder="type d'événement (kill, friendly_fire…)" style="background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.34rem .6rem;font:inherit;font-size:12px" />
+            <select><option>CSV</option><option>JSON</option></select>
+            <button class="btn primary">Télécharger</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+  const titles={overview:["Vue d'ensemble","Instantané le plus récent · carrière"],trends:["Tendances","Séries temporelles"],pilots:["Pilotes","Classement de carrière"],weapons:["Armes","Efficacité par arme"],engines:["Machines","Type DCS exact"],network:["Réseau","Qualité de connexion"],missions:["Missions","Miroir incrémental"],export:["Export","CSV / JSON"]};
+  document.querySelectorAll('#nav .nav-item').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#nav .nav-item').forEach(x=>x.classList.toggle('active',x===b));
+    const v=b.dataset.view;
+    document.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('hidden',p.dataset.pane!==v));
+    document.getElementById('title').textContent=titles[v][0];
+    document.getElementById('subtitle').textContent=titles[v][1];
+  }));
+  document.querySelectorAll('#scope button').forEach(b=>b.addEventListener('click',()=>document.querySelectorAll('#scope button').forEach(x=>x.classList.toggle('active',x===b))));
+</script>
+</body>
+</html>
