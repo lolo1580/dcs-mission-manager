@@ -18,7 +18,7 @@ import (
 // Writer persists DCS messages, ensuring a mission is open and resolving player
 // identities before writing statistics.
 type Writer struct {
-	db   *db.DB
+	db   db.Store
 	live *live.Store
 
 	mu sync.Mutex
@@ -31,7 +31,7 @@ type Writer struct {
 }
 
 // New creates a writer backed by the given database and live store.
-func New(database *db.DB, store *live.Store) *Writer {
+func New(database db.Store, store *live.Store) *Writer {
 	return &Writer{db: database, live: store}
 }
 
@@ -183,7 +183,7 @@ func (w *Writer) missionIDFor(m model.Message) int64 {
 // or an error is treated as "gone", so the caller opens a new one.
 func (w *Writer) missionExists(id int64) bool {
 	var got int64
-	err := w.db.SQL().QueryRow(`SELECT id FROM missions WHERE id = ?`, id).Scan(&got)
+	err := w.db.QueryRow(`SELECT id FROM missions WHERE id = ?`, id).Scan(&got)
 	return err == nil && got == id
 }
 

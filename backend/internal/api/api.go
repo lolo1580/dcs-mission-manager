@@ -92,7 +92,7 @@ type Server struct {
 	cfg        config.Config
 	store      *state.Store
 	live       *live.Store
-	db         *db.DB
+	db         db.Store
 	stats      *stats.Service
 	aerodromes *aerodrome.Catalog
 	charts     *charts.Catalog
@@ -117,7 +117,7 @@ type Server struct {
 
 // New creates a server backed by store. live, database, statsService and
 // commander may be nil.
-func New(cfg config.Config, store *state.Store, liveStore *live.Store, database *db.DB, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, commander Commander) *Server {
+func New(cfg config.Config, store *state.Store, liveStore *live.Store, database db.Store, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, commander Commander) *Server {
 	return &Server{
 		cfg:        cfg,
 		store:      store,

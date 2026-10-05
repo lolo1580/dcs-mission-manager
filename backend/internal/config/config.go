@@ -34,6 +34,12 @@ type Config struct {
 	DBPath string
 	// DBEnabled toggles persistence (SQLite). Disabled keeps everything in memory.
 	DBEnabled bool
+	// DBDriver selects the persistence engine: "sqlite" (default) or "postgres".
+	// The change is read at startup and requires a restart.
+	DBDriver string
+	// DBDSN is the PostgreSQL connection string, used when DBDriver is
+	// "postgres". SQLite keeps using DBPath.
+	DBDSN string
 	// Theatre is the default DCS theatre.
 	Theatre string
 	// LogLevel is one of debug, info, warn, error.
@@ -129,6 +135,8 @@ func Load() Config {
 		TCPAddr:        env("DCSMANAGER_TCP_ADDR", "127.0.0.1:7779"),
 		DBPath:         env("DCSMANAGER_DB_PATH", "./data/dcsmanager.db"),
 		DBEnabled:      envBool("DCSMANAGER_DB_ENABLED", true),
+		DBDriver:       strings.ToLower(env("DCSMANAGER_DB_DRIVER", "sqlite")),
+		DBDSN:          env("DCSMANAGER_DB_DSN", ""),
 		Theatre:        env("DCSMANAGER_THEATRE", "Caucasus"),
 		LogLevel:       strings.ToLower(env("DCSMANAGER_LOG_LEVEL", "info")),
 		UnitTTL:        envDuration("DCSMANAGER_UNIT_TTL", 5*time.Second),

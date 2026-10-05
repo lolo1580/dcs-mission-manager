@@ -1,0 +1,48 @@
+# DCS Manager statistics plugin — full stack in Docker.
+#
+# The manager itself runs natively on Windows (it must read DCS and the Saved
+# Games folder). Only the plugin and PostgreSQL are containerised here.
+#
+# IMPORTANT: a container cannot reach the Windows host's 127.0.0.1. To use this
+# compose file, start the manager with DCSMANAGER_HTTP_ADDR=0.0.0.0:8080 and be
+# aware that the manager's API has no authentication. See docs/stats-plugin.md
+# section 8 for the safer "plugin local, Postgres in Docker" topology.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: dcs
+      POSTGRES_PASSWORD: dcs
+      POSTGRES_DB: stats
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dcs -d stats"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  stats-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: "postgres://dcs:dcs@postgres:5432/stats?sslmode=disable"
+      DCSMANAGER_URL: "http://host.docker.internal:8080"
+      SYNC_INTERVAL: "5m"
+      SYNC_SCOPES: "career"
+      MIRROR_EVENTS: "true"
+      MANAGER_NAME: "local"
+      PLUGIN_LISTEN_ADDR: ":8090"
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  pgdata:

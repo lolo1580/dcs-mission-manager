@@ -1,0 +1,7 @@
+# Build artifacts and local configuration.
+stats-web
+stats-web.exe
+.env
+
+# Go
+/vendor/

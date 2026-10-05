@@ -64,9 +64,15 @@ statistics that survive callsign changes.
 | `GET /api/players` | Connected players |
 | `GET /api/chat` | Recent chat; `POST` reserved for sending to DCS (coming soon) |
 | `GET /api/mission` | Current mission |
-| `GET /api/history/events` | Persisted events (SQLite) |
-| `GET /api/history/chat` | Persisted chat |
-| `GET /api/history/missions` | Past missions |
+| `GET /api/history/events` | Persisted events (SQLite). `?sinceId=N` switches to incremental mode: only events with `id > N`, oldest first, plus `nextSinceId` |
+| `GET /api/history/chat` | Persisted chat. `?sinceId=N` works the same way |
+| `GET /api/history/missions` | Past missions. `?sinceId=N` works the same way |
+
+The `?sinceId=` form exists so an **external consumer** (the statistics plugin, or
+any script) can mirror the whole history without gaps or duplicates: it stores the
+largest id it has seen and asks for everything after it. Without `sinceId`, the
+endpoints keep their original meaning — the most recent rows, newest first. A
+non-numeric `sinceId` is treated as `0` (the whole history) rather than an error.
 
 The same data arrives in real time via **SSE** (`/api/events`) as a
 `{"type":"session", ...}` frame emitted every second.

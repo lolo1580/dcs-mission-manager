@@ -18,7 +18,7 @@ import (
 
 // Tracker periodically samples the unit store and detects losses.
 type Tracker struct {
-	db    *db.DB
+	db    db.Store
 	store *state.Store
 
 	mu          sync.Mutex
@@ -55,7 +55,7 @@ type Options struct {
 
 // New creates a tracker. A nil database disables persistence (the tracker then
 // only maintains its in-memory view, which is harmless).
-func New(database *db.DB, store *state.Store, opts Options) *Tracker {
+func New(database db.Store, store *state.Store, opts Options) *Tracker {
 	if opts.SampleEvery <= 0 {
 		opts.SampleEvery = 3 * time.Second
 	}

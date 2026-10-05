@@ -24,6 +24,7 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 - [Fonctionnalités](#fonctionnalités)
 - [Architecture](#architecture)
 - [Prérequis](#prérequis)
+- [Manuel d'installation](#manuel-dinstallation)
 - [Démarrage rapide (PoC Phase 0)](#démarrage-rapide-poc-phase-0)
 - [Configuration](#configuration)
 - [Installation des scripts Lua dans DCS](#installation-des-scripts-lua-dans-dcs)
@@ -124,6 +125,14 @@ côté de la base), puisqu'un exécutable lancé au double-clic n'a pas de conso
 
 ---
 
+## Manuel d'installation
+
+Pour une installation complète, pas à pas — téléchargement d'une release,
+installation des scripts Lua, premier lancement, configuration, PostgreSQL et
+plugin de statistiques, dépannage — voir **[`docs/installation.md`](docs/installation.md)**.
+
+---
+
 ## Démarrage rapide (PoC Phase 0)
 
 Le PoC valide toute la chaîne : **DCS → UDP → Go → SSE → navigateur**.
@@ -169,6 +178,8 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | Chemin de la base SQLite |
 | `DCSMANAGER_DB_ENABLED` | `true` | Activer la persistance (sinon tout en mémoire) |
+| `DCSMANAGER_DB_DRIVER` | `sqlite` | Moteur de persistance : `sqlite` ou `postgres`. Lu au démarrage, redémarrage requis |
+| `DCSMANAGER_DB_DSN` | *(vide)* | Chaîne de connexion PostgreSQL, quand `DCSMANAGER_DB_DRIVER=postgres` (ex. `postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable`) |
 | `DCSMANAGER_THEATRE` | `Caucasus` | Théâtre par défaut |
 | `DCSMANAGER_UNIT_TTL` | `5` (secondes) | Délai avant qu'une unité silencieuse disparaisse |
 | `DCSMANAGER_CATEGORIES` | `./categories.json` | Surcharge de classification des engins |

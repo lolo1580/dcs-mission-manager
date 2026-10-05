@@ -54,12 +54,12 @@ func (sc Scope) filter(column string) (string, []any) {
 
 // Service exposes statistics queries.
 type Service struct {
-	db         *db.DB
+	db         db.Store
 	classifier *category.Classifier
 }
 
 // New creates a stats service.
-func New(database *db.DB, classifier *category.Classifier) *Service {
+func New(database db.Store, classifier *category.Classifier) *Service {
 	return &Service{db: database, classifier: classifier}
 }
 
@@ -150,7 +150,7 @@ type Overview struct {
 func (s *Service) Pilots(sc Scope) ([]PilotStats, error) {
 	where, args := sc.filter("ps.mission_id")
 
-	rows, err := s.db.SQL().Query(`
+	rows, err := s.db.Query(`
 		WITH latest AS (
 			SELECT MAX(id) AS id
 			FROM player_stats ps
@@ -220,7 +220,7 @@ func (s *Service) eventCountsByPlayer(sc Scope) (deaths, ff map[int64]int, err e
 	// (mission_id, dcs_player_id) -> player row id.
 	resolver := map[[2]int64]int64{}
 	where, args := sc.filter("ps.mission_id")
-	rows, err := s.db.SQL().Query(`
+	rows, err := s.db.Query(`
 		SELECT DISTINCT ps.mission_id, ps.dcs_player_id, ps.player_id
 		FROM player_stats ps
 		WHERE ps.dcs_player_id IS NOT NULL AND ps.mission_id IS NOT NULL`+where, args...)
@@ -241,7 +241,7 @@ func (s *Service) eventCountsByPlayer(sc Scope) (deaths, ff map[int64]int, err e
 	}
 
 	eWhere, eArgs := sc.filter("mission_id")
-	erows, err := s.db.SQL().Query(
+	erows, err := s.db.Query(
 		`SELECT mission_id, event, args FROM events
 		 WHERE event IN ('pilot_death','friendly_fire') AND mission_id IS NOT NULL`+eWhere, eArgs...)
 	if err != nil {
@@ -279,7 +279,7 @@ func (s *Service) eventCountsByPlayer(sc Scope) (deaths, ff map[int64]int, err e
 // Weapons aggregates weapon performance from kill and friendly-fire events.
 func (s *Service) Weapons(sc Scope) ([]WeaponStats, error) {
 	where, args := sc.filter("mission_id")
-	rows, err := s.db.SQL().Query(
+	rows, err := s.db.Query(
 		`SELECT event, args FROM events WHERE event IN ('kill','friendly_fire')`+where, args...)
 	if err != nil {
 		return nil, err
@@ -343,7 +343,7 @@ func (s *Service) Engines(sc Scope) ([]EngineStats, error) {
 	}
 
 	where, args := sc.filter("mission_id")
-	rows, err := s.db.SQL().Query(`SELECT args FROM events WHERE event = 'kill'`+where, args...)
+	rows, err := s.db.Query(`SELECT args FROM events WHERE event = 'kill'`+where, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ func (s *Service) Engines(sc Scope) ([]EngineStats, error) {
 	}
 
 	// Uses: the unit types players occupied, from the resolved unit type.
-	rows2, err := s.db.SQL().Query(
+	rows2, err := s.db.Query(
 		`SELECT DISTINCT unit_type FROM player_stats WHERE unit_type IS NOT NULL AND unit_type <> ''`+where, args...)
 	if err != nil {
 		return nil, err
@@ -402,7 +402,7 @@ func (s *Service) Engines(sc Scope) ([]EngineStats, error) {
 // totals by the sampling rate).
 func (s *Service) Coalitions(sc Scope) ([]CoalitionStats, error) {
 	where, args := sc.filter("ps.mission_id")
-	rows, err := s.db.SQL().Query(`
+	rows, err := s.db.Query(`
 		WITH latest AS (
 			SELECT MAX(id) AS id
 			FROM player_stats ps
@@ -444,7 +444,7 @@ func (s *Service) Coalitions(sc Scope) ([]CoalitionStats, error) {
 // Network aggregates ping quality per player.
 func (s *Service) Network(sc Scope) ([]NetworkStats, error) {
 	where, args := sc.filter("ps.mission_id")
-	rows, err := s.db.SQL().Query(`
+	rows, err := s.db.Query(`
 		SELECT p.name, COUNT(*), AVG(NULLIF(ps.ping,0)), MAX(ps.ping)
 		FROM player_stats ps
 		JOIN players p ON p.id = ps.player_id
@@ -489,7 +489,7 @@ func (s *Service) Overview(sc Scope) (Overview, error) {
 
 	where, args := sc.filter("mission_id")
 	var kills, deaths, crashes, ejects, ff *int
-	row := s.db.SQL().QueryRow(`
+	row := s.db.QueryRow(`
 		SELECT COUNT(*),
 		       SUM(CASE WHEN event='kill' THEN 1 ELSE 0 END),
 		       SUM(CASE WHEN event='pilot_death' THEN 1 ELSE 0 END),
@@ -504,12 +504,12 @@ func (s *Service) Overview(sc Scope) (Overview, error) {
 		deref(kills), deref(deaths), deref(crashes), deref(ejects), deref(ff)
 
 	mWhere, mArgs := sc.filter("id")
-	if err := s.db.SQL().QueryRow(`SELECT COUNT(*) FROM missions WHERE 1=1`+mWhere, mArgs...).Scan(&o.Missions); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM missions WHERE 1=1`+mWhere, mArgs...).Scan(&o.Missions); err != nil {
 		return o, err
 	}
 	// Players is a count of identities, not sessions: player rows survive a
 	// purge and carry no source of their own, so it is not filtered here.
-	if err := s.db.SQL().QueryRow(`SELECT COUNT(*) FROM players`).Scan(&o.Players); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM players`).Scan(&o.Players); err != nil {
 		return o, err
 	}
 	return o, nil

@@ -17,6 +17,7 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 - [Features](#features)
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
+- [Installation guide](#installation-guide)
 - [Quick start (PoC Phase 0)](#quick-start-poc-phase-0)
 - [Configuration](#configuration)
 - [Installing the Lua scripts into DCS](#installing-the-lua-scripts-into-dcs)
@@ -116,6 +117,14 @@ database), since a double-clicked executable has no console.
 
 ---
 
+## Installation guide
+
+For a complete, step-by-step installation — release download, Lua script
+installation, first launch, configuration, PostgreSQL and the statistics plugin,
+troubleshooting — see **[`docs/installation.md`](docs/installation.md)**.
+
+---
+
 ## Quick start (PoC Phase 0)
 
 The PoC validates the whole chain: **DCS → UDP → Go → SSE → browser**.
@@ -160,6 +169,8 @@ defaults. None of them is required for a normal install.
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | SQLite database path |
 | `DCSMANAGER_DB_ENABLED` | `true` | Enable persistence (otherwise everything in memory) |
+| `DCSMANAGER_DB_DRIVER` | `sqlite` | Persistence engine: `sqlite` or `postgres`. The change is read at startup and needs a restart |
+| `DCSMANAGER_DB_DSN` | *(empty)* | PostgreSQL connection string, when `DCSMANAGER_DB_DRIVER=postgres` (e.g. `postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable`) |
 | `DCSMANAGER_THEATRE` | `Caucasus` | Default theatre |
 | `DCSMANAGER_UNIT_TTL` | `5` (seconds) | Delay before a silent unit disappears |
 | `DCSMANAGER_CATEGORIES` | `./categories.json` | Override for engine classification |

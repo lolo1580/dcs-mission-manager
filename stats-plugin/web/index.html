@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DCS Manager — Statistics plugin</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Statistics plugin</h1>
+      <span class="muted" id="meta">loading…</span>
+      <span class="spacer"></span>
+      <label class="muted">instance
+        <select id="instance"></select>
+      </label>
+      <label class="muted">scope
+        <select id="scope">
+          <option value="career">career</option>
+          <option value="mission">mission</option>
+        </select>
+      </label>
+      <button id="refresh" type="button">Refresh</button>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="pilots">Pilots</button>
+      <button data-tab="weapons">Weapons</button>
+      <button data-tab="engines">Aircraft &amp; vehicles</button>
+      <button data-tab="network">Network</button>
+      <button data-tab="missions">Missions</button>
+      <button data-tab="trends">Trends</button>
+      <button data-tab="export">Export</button>
+    </nav>
+
+    <main>
+      <section class="view" data-view="overview">
+        <div class="cards" id="cards"></div>
+        <div class="panel">
+          <h2>Coalitions</h2>
+          <table id="coalitions"></table>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="pilots">
+        <div class="panel">
+          <div class="row">
+            <h2 style="flex:1">Pilots</h2>
+            <input id="pilots-filter" type="search" placeholder="filter name…" />
+          </div>
+          <table id="pilots" class="sortable"></table>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="weapons">
+        <div class="panel">
+          <div class="row">
+            <h2 style="flex:1">Weapons</h2>
+            <input id="weapons-filter" type="search" placeholder="filter weapon…" />
+          </div>
+          <table id="weapons" class="sortable"></table>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="engines">
+        <div class="panel">
+          <div class="row">
+            <h2 style="flex:1">Aircraft &amp; vehicles (exact DCS type)</h2>
+            <input id="engines-filter" type="search" placeholder="filter type…" />
+          </div>
+          <table id="engines" class="sortable"></table>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="network">
+        <div class="panel">
+          <h2>Connection quality</h2>
+          <table id="network" class="sortable"></table>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="missions">
+        <div class="panel">
+          <div class="row">
+            <h2 style="flex:1">Missions</h2>
+            <input id="missions-filter" type="search" placeholder="filter name…" />
+            <a class="btn" id="missions-csv" href="#" download>Export CSV</a>
+          </div>
+          <table id="missions" class="sortable"></table>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="trends">
+        <div class="panel">
+          <div class="row">
+            <h2 style="flex:1">Trend over time</h2>
+            <label class="muted">metric
+              <select id="metric">
+                <option>kills</option>
+                <option>deaths</option>
+                <option>events</option>
+                <option>crashes</option>
+                <option>ejections</option>
+                <option>friendlyFire</option>
+                <option>missions</option>
+                <option>players</option>
+              </select>
+            </label>
+            <a class="btn" id="series-json" href="#" download>Export JSON</a>
+          </div>
+          <svg id="chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+          <p class="muted" id="chart-info"></p>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="export">
+        <div class="panel">
+          <h2>Export mirrored data</h2>
+          <div class="row">
+            <label class="muted">type
+              <select id="export-type">
+                <option value="events">events</option>
+                <option value="missions">missions</option>
+                <option value="series">overview series</option>
+              </select>
+            </label>
+            <label class="muted">event kind (events only)
+              <input id="export-event" type="text" placeholder="kill, friendly_fire…" />
+            </label>
+            <label class="muted">format
+              <select id="export-format">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+              </select>
+            </label>
+            <button id="export-run" type="button">Download</button>
+          </div>
+          <p class="muted">Exports the plugin's own PostgreSQL mirror, scoped to the selected instance.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

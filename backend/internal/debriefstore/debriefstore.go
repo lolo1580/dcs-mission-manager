@@ -20,7 +20,7 @@ import (
 // and stores the result. Transfers are keyed by transferId and are independent,
 // so a slow or aborted transfer never blocks another.
 type Assembler struct {
-	db *db.DB
+	db db.Store
 
 	// DumpDir, when set, is where an assembled debrief that fails to parse is
 	// written for inspection. A malformed transfer is otherwise dropped with only
@@ -56,7 +56,7 @@ const (
 )
 
 // New creates an assembler writing to database.
-func New(database *db.DB) *Assembler {
+func New(database db.Store) *Assembler {
 	return &Assembler{
 		db:        database,
 		transfers: make(map[string]*transfer),
