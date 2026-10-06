@@ -42,6 +42,18 @@ to [semantic versioning](https://semver.org/).
 
 ### Removed
 
+- **The manager is local-only: PostgreSQL, `migrate-db` and the statistics plugin
+  are removed.** Persistence is SQLite only — a file in `data/` beside the binary
+  — so there is no server to run, no container and nothing to configure. Gone with
+  the optional engine: `internal/db/postgres`, the `DCSMANAGER_DB_DRIVER` /
+  `DCSMANAGER_DB_DSN` settings and the engine switch in `openStore`, the
+  `dcsmanager migrate-db` command and `internal/migrate`, the read-only `v_stats_*`
+  views, the `pgx` dependency, the root `docker-compose.yml`, the whole
+  `stats-plugin/` service (Go code, web UI, `Dockerfile` and `docker-compose.yml`),
+  the `docs/database-backends.md` and `docs/stats-plugin.md` guides, the
+  PostgreSQL/plugin sections of `docs/installation.md`, the CI `postgres` service
+  containers and the stats-plugin job, and the stats-plugin mockup. The binary
+  dropped from ~17.6 MB to ~13.6 MB.
 - **The Missions tab has been removed.** It listed the `.miz` files under
   `Saved Games\DCS\Missions` (theatre, date, weather, size) and opened a mission's
   detail. The tab, its store and the `GET /api/missions` route are gone

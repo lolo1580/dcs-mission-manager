@@ -40,7 +40,7 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Career | ✅ New | The player's logbook: rank, squadron, awards, hours and kills per airframe — shown atop the statistics |
 | Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the cockpit panels (PZ55/PZ70, DCS-BIOS, mappings) and the **player-profile backup** as sub-tabs |
 | Profile backup | ✅ New | Save/restore the logbook, bindings, options and scripts (and optionally kneeboard, missions, mods) as a portable zip, from the CLI, the API or Settings |
-| Database engines | ✅ New | SQLite by default, PostgreSQL optional (`DCSMANAGER_DB_DRIVER`), with a `dcsmanager migrate-db` copy and read-only `v_stats_*` views for external readers |
+| Local by design | ✅ New | One self-contained Windows `.exe`, no server and no container: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still
 > received and sampled: it feeds the statistics and the airfields tab (nearest
@@ -71,7 +71,6 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 ┌──────────────────────────────────────────────────────────┐
 │ dcsmanager.exe — Go backend + embedded Web UI                  │
 │  • UDP + TCP listeners, in-memory state, SQLite (data/)   │
-│    — or PostgreSQL, optional (DCSMANAGER_DB_DRIVER)       │
 │  • debrief parser, statistics, airfield reference         │
 │  • reads Mods/terrains/ and Saved Games/ directly         │
 │  • REST + SSE, served to the native window (WebView2)     │
@@ -100,7 +99,7 @@ database), since a double-clicked executable has no console.
    → direct read access to Mods/terrains/ and Saved Games/
 ```
 
-**Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite (frontend) · SQLite by default, PostgreSQL optional (persistence).
+**Stack:** Go (backend, single binary + embedded UI) · Svelte + Vite (frontend) · SQLite (persistence).
 
 ---
 
@@ -123,8 +122,8 @@ database), since a double-clicked executable has no console.
 ## Installation guide
 
 For a complete, step-by-step installation — release download, Lua script
-installation, first launch, configuration, PostgreSQL and the statistics plugin,
-troubleshooting — see **[`docs/installation.md`](docs/installation.md)**.
+installation, first launch, configuration, troubleshooting — see
+**[`docs/installation.md`](docs/installation.md)**.
 
 ---
 
@@ -173,8 +172,6 @@ defaults. None of them is required for a normal install.
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | SQLite database path |
 | `DCSMANAGER_DB_ENABLED` | `true` | Enable persistence (otherwise everything in memory) |
-| `DCSMANAGER_DB_DRIVER` | `sqlite` | Persistence engine: `sqlite` or `postgres`. The change is read at startup and needs a restart |
-| `DCSMANAGER_DB_DSN` | *(empty)* | PostgreSQL connection string, when `DCSMANAGER_DB_DRIVER=postgres` (e.g. `postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable`) |
 | `DCSMANAGER_THEATRE` | `Caucasus` | Default theatre |
 | `DCSMANAGER_UNIT_TTL` | `5` (seconds) | Delay before a silent unit disappears |
 | `DCSMANAGER_CATEGORIES` | `./categories.json` | Override for engine classification |
@@ -257,26 +254,9 @@ dcsmanager install-lua     # installs/merges the Lua scripts into Saved Games
 dcsmanager uninstall-lua   # removes the installed block (keeps the config)
 dcsmanager status          # installed / outdated / missing, per file
 dcsmanager purge           # deletes recorded sessions (destructive)
-dcsmanager migrate-db      # copies a SQLite database into PostgreSQL
 dcsmanager backup          # saves a DCS player profile to a portable archive
 dcsmanager restore         # restores a profile archive into Saved Games
 dcsmanager version
-```
-
-### Migrating SQLite to PostgreSQL
-
-The PostgreSQL backend is a new integration with no in-place upgrade path. To
-carry an existing SQLite history over (or to feed the statistics plugin, which
-reads PostgreSQL):
-
-```powershell
-# create the destination schema once
-$env:DCSMANAGER_DB_DRIVER = "postgres"
-$env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable"
-.\dcsmanager.exe serve    # then stop it
-
-# copy the data (ids preserved; safe to re-run)
-.\dcsmanager.exe migrate-db --from .\data\dcsmanager.db --to $env:DCSMANAGER_DB_DSN
 ```
 
 ### Test sessions and `purge`
@@ -339,13 +319,11 @@ DCS Manager/
 │   │   ├─ live/             # in-memory session state
 │   │   ├─ ingest/           # live → database bridge
 │   │   ├─ tracker/          # position history + loss detection
-│   │   ├─ db/               # persistence: Store interface, SQLite + postgres/
-│   │   ├─ migrate/          # SQLite → PostgreSQL one-shot copy
+│   │   ├─ db/               # persistence: SQLite store behind the Store interface
 │   │   ├─ backup/           # player-profile save/restore (zip)
 │   │   ├─ state/            # unit store (in memory)
 │   │   ├─ stats/            # statistical aggregations
 │   │   └─ api/              # REST + SSE + embedded UI (dist/)
-├─ stats-plugin/             # optional statistics service (reads PostgreSQL)
 ├─ frontend/                 # Svelte + Vite
 │   └─ src/
 │       ├─ App.svelte

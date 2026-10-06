@@ -7,14 +7,13 @@ import (
 	"dcsmanager/internal/model"
 )
 
-// Store is the persistence contract the rest of the manager depends on. It is
-// implemented today by the pure-Go SQLite store (*DB); a second implementation
-// (PostgreSQL) can be added without touching the consumers, which all talk to
-// this interface rather than to *DB.
+// Store is the persistence contract the rest of the manager depends on, so
+// consumers talk to this interface rather than to *DB. It is implemented by the
+// pure-Go SQLite store.
 //
 // The interface is deliberately the union of what the consumers need, not every
 // method *DB has: SQL() stays off it on purpose (it is an escape hatch for tests
-// and migrations), and the analytics queries go through Query/QueryRow instead.
+// and maintenance), and the analytics queries go through Query/QueryRow instead.
 type Store interface {
 	// Lifecycle.
 	Close() error
@@ -66,9 +65,9 @@ type Store interface {
 	Querier
 }
 
-// Querier is the read-only SQL surface the analytics package needs. A SQLite
-// implementation passes queries through unchanged; a PostgreSQL one rewrites the
-// `?` placeholders to `$1, $2, …` before handing them to its driver.
+// Querier is the read-only SQL surface the analytics package needs. It is put
+// on the interface (rather than exposing the raw *sql.DB) so the analytics code
+// depends only on what it actually uses.
 type Querier interface {
 	Query(query string, args ...any) (*sql.Rows, error)
 	QueryRow(query string, args ...any) *sql.Row

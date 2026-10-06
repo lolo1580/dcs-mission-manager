@@ -1,21 +1,14 @@
 // Package db_test holds a conformance suite that exercises the db.Store
-// contract against whatever implementations are available. SQLite always runs;
-// PostgreSQL runs too when DCSMANAGER_TEST_POSTGRES_DSN is set, which is how the
-// port is validated against the same assertions:
-//
-//	$env:DCSMANAGER_TEST_POSTGRES_DSN = "postgres://dcs:dcs@localhost:5432/dcsmanager_test?sslmode=disable"
-//	go test ./internal/db/...
-//
-// Point the DSN at a THROWAWAY database: the suite purges it.
+// contract against the SQLite store. The manager is local-only, so SQLite is the
+// single implementation; the suite still pins the contract down so a change to
+// the store cannot silently break its consumers.
 package db_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"dcsmanager/internal/db"
-	"dcsmanager/internal/db/postgres"
 	"dcsmanager/internal/model"
 )
 
@@ -33,20 +26,7 @@ func stores(t *testing.T) []namedStore {
 		t.Fatalf("sqlite open: %v", err)
 	}
 	t.Cleanup(func() { _ = sqlite.Close() })
-	out := []namedStore{{name: "sqlite", store: sqlite}}
-
-	if dsn := os.Getenv("DCSMANAGER_TEST_POSTGRES_DSN"); dsn != "" {
-		pg, err := postgres.Open(dsn)
-		if err != nil {
-			t.Fatalf("postgres open: %v", err)
-		}
-		t.Cleanup(func() { _ = pg.Close() })
-		if _, err := pg.PurgeAll(); err != nil {
-			t.Fatalf("postgres purge: %v", err)
-		}
-		out = append(out, namedStore{name: "postgres", store: pg})
-	}
-	return out
+	return []namedStore{{name: "sqlite", store: sqlite}}
 }
 
 // forEachStore runs fn against every implementation under its own subtest.
@@ -161,7 +141,7 @@ func TestConformanceTrackingAndHeatmap(t *testing.T) {
 		}
 
 		// Heatmap exercises the most dialect-sensitive SQL (GROUP BY over a
-		// computed grid, rounded via numeric on PostgreSQL).
+		// computed grid, rounded to the grid step).
 		points, err := s.Heatmap(mid, "losses", 0.05, 100)
 		if err != nil {
 			t.Fatalf("Heatmap: %v", err)

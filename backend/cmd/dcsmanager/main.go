@@ -20,11 +20,9 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +33,6 @@ import (
 	"dcsmanager/internal/db"
 	"dcsmanager/internal/desktop"
 	"dcsmanager/internal/install"
-	"dcsmanager/internal/migrate"
 )
 
 // Version is set at build time with -ldflags "-X main.Version=...".
@@ -68,8 +65,6 @@ func main() {
 			os.Exit(runLuaCommand(os.Args[2:], "status"))
 		case "purge":
 			os.Exit(runPurgeCommand(os.Args[2:]))
-		case "migrate-db":
-			os.Exit(runMigrateCommand(os.Args[2:]))
 		case "backup":
 			os.Exit(runBackupCommand(os.Args[2:]))
 		case "restore":
@@ -95,7 +90,6 @@ Usage:
   dcsmanager uninstall-lua   Remove the installed scripts
   dcsmanager status          Report whether the scripts are installed / up to date
   dcsmanager purge           Delete recorded sessions (destructive; see options)
-  dcsmanager migrate-db      Copy a SQLite database into PostgreSQL (one-shot)
   dcsmanager backup          Save a DCS player profile to a portable archive
   dcsmanager restore         Restore a profile archive into Saved Games
   dcsmanager version         Print the version
@@ -104,10 +98,6 @@ Options for install-lua / uninstall-lua / status:
   --saved-games <dir>   DCS Saved Games directory (auto-detected)
   --lua-dir <dir>       dcs-lua directory of the distribution (auto-detected)
   --dry-run             Show what would be done, without writing anything
-
-Options for migrate-db:
-  --from <path>   SQLite database to copy (default: DCSMANAGER_DB_PATH)
-  --to <dsn>      PostgreSQL DSN to copy into (default: DCSMANAGER_DB_DSN)
 
 Options for backup:
   --saved-games <dir>   DCS Saved Games directory (auto-detected)
@@ -300,65 +290,6 @@ func countFor(source string, live, test int) int {
 		return test
 	}
 	return live
-}
-
-// runMigrateCommand implements `dcsmanager migrate-db`: it copies an existing
-// SQLite database into PostgreSQL, preserving ids. It is a one-shot maintenance
-// operation rather than a daemon: the PostgreSQL backend has no in-place upgrade
-// path, so a user switching engines (or feeding the statistics plugin) needs
-// their history carried over.
-func runMigrateCommand(args []string) int {
-	fs := flag.NewFlagSet("migrate-db", flag.ExitOnError)
-	from := fs.String("from", "", "SQLite database to copy (default: DCSMANAGER_DB_PATH)")
-	to := fs.String("to", "", "PostgreSQL DSN to copy into (default: DCSMANAGER_DB_DSN)")
-	_ = fs.Parse(args)
-
-	cfg := config.Load()
-
-	sqlitePath := *from
-	if sqlitePath == "" {
-		sqlitePath = cfg.DBPath
-	}
-	if sqlitePath == "" {
-		sqlitePath = "./data/dcsmanager.db"
-	}
-
-	dsn := *to
-	if dsn == "" {
-		dsn = cfg.DBDSN
-	}
-	if dsn == "" {
-		fmt.Fprintln(os.Stderr, "migrate-db: no destination; pass --to <dsn> or set DCSMANAGER_DB_DSN")
-		return 2
-	}
-
-	fmt.Printf("From     : %s (SQLite)\n", sqlitePath)
-	fmt.Printf("To       : %s\n\n", redactDSN(dsn))
-
-	res, err := migrate.Run(context.Background(), sqlitePath, dsn)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "migrate-db: %v\n", err)
-		fmt.Fprintln(os.Stderr, "Is the destination schema created? Start the manager once with DCSMANAGER_DB_DRIVER=postgres.")
-		return 1
-	}
-
-	for _, t := range res.Tables {
-		fmt.Printf("  copied  %-16s %d\n", t.Table, t.Rows)
-	}
-	fmt.Printf("\nDone: %d row(s) copied.\n", res.Total)
-	return 0
-}
-
-// redactDSN hides the password in a PostgreSQL connection string for display.
-func redactDSN(dsn string) string {
-	u, err := url.Parse(dsn)
-	if err != nil || u.User == nil {
-		return dsn
-	}
-	if _, hasPw := u.User.Password(); hasPw {
-		u.User = url.UserPassword(u.User.Username(), "xxxxx")
-	}
-	return u.String()
 }
 
 // runBackupCommand implements `dcsmanager backup`: it archives the selected

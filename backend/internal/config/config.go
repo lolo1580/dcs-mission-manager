@@ -34,12 +34,6 @@ type Config struct {
 	DBPath string
 	// DBEnabled toggles persistence (SQLite). Disabled keeps everything in memory.
 	DBEnabled bool
-	// DBDriver selects the persistence engine: "sqlite" (default) or "postgres".
-	// The change is read at startup and requires a restart.
-	DBDriver string
-	// DBDSN is the PostgreSQL connection string, used when DBDriver is
-	// "postgres". SQLite keeps using DBPath.
-	DBDSN string
 	// APIToken, when set, is required from non-loopback callers to reach the
 	// API (Authorization: Bearer, or ?token= which sets a cookie). It exists for
 	// the documented opt-in where the UI is exposed beyond the local machine (a
@@ -141,8 +135,6 @@ func Load() Config {
 		TCPAddr:        env("DCSMANAGER_TCP_ADDR", "127.0.0.1:7779"),
 		DBPath:         env("DCSMANAGER_DB_PATH", "./data/dcsmanager.db"),
 		DBEnabled:      envBool("DCSMANAGER_DB_ENABLED", true),
-		DBDriver:       strings.ToLower(env("DCSMANAGER_DB_DRIVER", "sqlite")),
-		DBDSN:          env("DCSMANAGER_DB_DSN", ""),
 		APIToken:       env("DCSMANAGER_API_TOKEN", ""),
 		Theatre:        env("DCSMANAGER_THEATRE", "Caucasus"),
 		LogLevel:       strings.ToLower(env("DCSMANAGER_LOG_LEVEL", "info")),

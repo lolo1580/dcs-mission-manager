@@ -17,7 +17,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -33,7 +32,6 @@ import (
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
-	"dcsmanager/internal/db/postgres"
 	"dcsmanager/internal/dcsbios"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/dcsdir"
@@ -110,7 +108,7 @@ func Run(onReady func(addr string)) error {
 	if cfg.DBEnabled {
 		opened, err := openStore(cfg)
 		if err != nil {
-			log.Printf("db: disabled, could not open (%s): %v", cfg.DBDriver, err)
+			log.Printf("db: disabled, could not open %s: %v", cfg.DBPath, err)
 		} else {
 			database = opened
 			defer database.Close()
@@ -464,41 +462,15 @@ func probeExistingServer(addr string) bool {
 	return health.Service == "dcsmanager"
 }
 
-// openStore opens the configured persistence engine. SQLite stays the default;
-// PostgreSQL is opt-in through DCSMANAGER_DB_DRIVER=postgres and a DSN.
+// openStore opens the SQLite persistence, the only supported engine. It is a
+// plain local file beside the manager; there is no server and no configuration.
 func openStore(cfg config.Config) (db.Store, error) {
-	switch cfg.DBDriver {
-	case "postgres", "postgresql", "pg":
-		if cfg.DBDSN == "" {
-			return nil, errors.New("DCSMANAGER_DB_DRIVER=postgres requires DCSMANAGER_DB_DSN")
-		}
-		store, err := postgres.Open(cfg.DBDSN)
-		if err != nil {
-			return nil, err
-		}
-		log.Printf("db: using postgres (dsn %s)", redactDSN(cfg.DBDSN))
-		return store, nil
-	default:
-		store, err := db.Open(cfg.DBPath)
-		if err != nil {
-			return nil, err
-		}
-		log.Printf("db: using sqlite %s", cfg.DBPath)
-		return store, nil
+	store, err := db.Open(cfg.DBPath)
+	if err != nil {
+		return nil, err
 	}
-}
-
-// redactDSN hides the password in a PostgreSQL connection string before it is
-// written to the log.
-func redactDSN(dsn string) string {
-	u, err := url.Parse(dsn)
-	if err != nil || u.User == nil {
-		return dsn
-	}
-	if _, hasPw := u.User.Password(); hasPw {
-		u.User = url.UserPassword(u.User.Username(), "xxxxx")
-	}
-	return u.String()
+	log.Printf("db: using sqlite %s", cfg.DBPath)
+	return store, nil
 }
 
 // mappingPath is where the panel-to-command bindings live: beside the database, so

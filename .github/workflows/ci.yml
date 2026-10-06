@@ -23,23 +23,6 @@ jobs:
   backend:
     name: Backend (Go)
     runs-on: ubuntu-latest
-    # A PostgreSQL service lets the cross-engine conformance suite
-    # (internal/db/conformance_test.go) exercise the postgres backend as well as
-    # SQLite; without a DSN those subtests just skip.
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: dcs
-          POSTGRES_PASSWORD: dcs
-          POSTGRES_DB: dcsmanager
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U dcs"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -69,62 +52,11 @@ jobs:
 
       - name: go test
         working-directory: backend
-        env:
-          DCSMANAGER_TEST_POSTGRES_DSN: postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable
         run: go test -race ./...
 
       - name: go build
         working-directory: backend
         run: go build ./...
-
-  # ---------------------------------------------------------------------------
-  # Statistics plugin: unit tests, plus its integration suite against the
-  # manager's PostgreSQL table layout.
-  # ---------------------------------------------------------------------------
-  stats-plugin:
-    name: Stats plugin (Go)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: stats-plugin
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: dcs
-          POSTGRES_PASSWORD: dcs
-          POSTGRES_DB: stats
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U dcs"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: stats-plugin/go.mod
-          cache-dependency-path: stats-plugin/go.sum
-
-      - name: gofmt (no diff allowed)
-        run: |
-          unformatted="$(gofmt -l .)"
-          if [ -n "$unformatted" ]; then
-            echo "::error::These files are not gofmt-formatted:"
-            echo "$unformatted"
-            exit 1
-          fi
-
-      - name: go vet
-        run: go vet ./...
-
-      - name: go test
-        env:
-          PLUGIN_TEST_DATABASE_URL: postgres://dcs:dcs@localhost:5432/stats?sslmode=disable
-        run: go test -race ./...
 
   # ---------------------------------------------------------------------------
   # Frontend: reproducible install from the lockfile, then a production build.

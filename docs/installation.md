@@ -1,8 +1,7 @@
 # Manuel d'installation — DCS Manager
 
 Ce guide couvre l'installation complète, du téléchargement à la première mission
-enregistrée, ainsi que les options avancées (PostgreSQL, plugin de statistiques)
-et le dépannage.
+enregistrée, ainsi que le dépannage.
 
 > DCS Manager est un **compagnon local de DCS World** : il tourne sur la **même
 > machine Windows** que le simulateur. C'est ce qui lui permet de lire les
@@ -19,12 +18,10 @@ et le dépannage.
 4. [Installer les scripts Lua dans DCS](#4-installer-les-scripts-lua-dans-dcs)
 5. [Premier lancement](#5-premier-lancement)
 6. [Configuration](#6-configuration)
-7. [Option : base PostgreSQL](#7-option--base-postgresql)
-8. [Option : plugin de statistiques](#8-option--plugin-de-statistiques)
-9. [Mise à jour et désinstallation](#9-mise-à-jour-et-désinstallation)
-10. [Dépannage](#10-dépannage)
-11. [Référence CLI](#11-référence-cli)
-12. [Ports et pare-feu](#12-ports-et-pare-feu)
+7. [Mise à jour et désinstallation](#7-mise-à-jour-et-désinstallation)
+8. [Dépannage](#8-dépannage)
+9. [Référence CLI](#9-référence-cli)
+10. [Ports et pare-feu](#10-ports-et-pare-feu)
 
 ---
 
@@ -261,8 +258,6 @@ Toute la configuration passe par des **variables d'environnement** préfixées
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | Événements + commandes |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | Base SQLite |
 | `DCSMANAGER_DB_ENABLED` | `true` | Persistance (sinon tout en mémoire) |
-| `DCSMANAGER_DB_DRIVER` | `sqlite` | `sqlite` ou `postgres` (voir §7) |
-| `DCSMANAGER_DB_DSN` | *(vide)* | Chaîne de connexion PostgreSQL |
 | `DCSMANAGER_THEATRE` | `Caucasus` | Théâtre par défaut |
 | `DCSMANAGER_SAVED_GAMES` | *(auto)* | Dossier Saved Games, si la détection échoue |
 | `DCSMANAGER_CHARTS_DIR` | `./maps_dcs` | Cartes aéronautiques (approches, plans) |
@@ -280,115 +275,7 @@ intervalles). Voir [`dcs-installation.md`](dcs-installation.md).
 
 ---
 
-## 7. Option : base PostgreSQL
-
-Par défaut, DCS Manager utilise **SQLite** : rien à installer, tout est dans le
-binaire. Une base **PostgreSQL** est possible pour un usage avancé. Le moteur est
-choisi au démarrage : **un redémarrage est nécessaire** pour changer.
-
-### 7.1 Démarrer un PostgreSQL (Docker)
-
-Un `docker-compose.yml` est fourni à la racine :
-
-```powershell
-docker compose up -d postgres
-```
-
-### 7.2 Configurer et lancer le manager
-
-```powershell
-$env:DCSMANAGER_DB_DRIVER = "postgres"
-$env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable"
-.\dcsmanager.exe
-```
-
-Le manager crée son schéma au premier démarrage.
-
-### 7.3 Reprendre un historique SQLite
-
-Pour transférer les données SQLite déjà enregistrées vers PostgreSQL (ids
-préservés, réexécution sans risque) :
-
-```powershell
-# 1. créer le schéma de destination une fois
-$env:DCSMANAGER_DB_DRIVER = "postgres"
-$env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable"
-.\dcsmanager.exe serve    # puis l'arrêter (Ctrl+C)
-
-# 2. copier
-.\dcsmanager.exe migrate-db --from .\data\dcsmanager.db --to $env:DCSMANAGER_DB_DSN
-```
-
-> **Pas de migration automatique** : c'est une commande explicite. Sans elle,
-> PostgreSQL démarre vide.
-
-Détails et compromis : [`database-backends.md`](database-backends.md).
-
----
-
-## 8. Option : plugin de statistiques
-
-Le **plugin de statistiques** est un service **optionnel et séparé**. Dans ce
-modèle, **PostgreSQL est la bibliothèque partagée** : le manager y écrit, et le
-plugin lit directement ses tables pour servir son propre tableau de bord. Le
-plugin n'appelle **pas** l'API du manager.
-
-```
-Manager (machine DCS) ── écrit ──► PostgreSQL ◄── lit (SELECT) ── Plugin (Docker)
-```
-
-> **Prérequis** : le manager doit tourner sur **PostgreSQL** (section 7), pas sur
-> SQLite. SQLite est un fichier local, illisible depuis un autre conteneur ou une
-> autre machine. Le plugin hérite donc du mode « bibliothèque partagée ».
-
-### 8.1 Côté manager — écrire dans PostgreSQL
-
-```powershell
-$env:DCSMANAGER_DB_DRIVER = "postgres"
-$env:DCSMANAGER_DB_DSN    = "postgres://dcs:dcs@localhost:5432/dcsmanager?sslmode=disable"
-.\dcsmanager.exe
-```
-
-Le manager reste sur `127.0.0.1` : **rien à exposer**, aucune API à protéger,
-aucun port pare-feu à ouvrir.
-
-### 8.2 Côté plugin — lire la base
-
-```powershell
-cd stats-plugin
-$env:MANAGER_DATABASE_URL = "postgres://stats_reader:change-me@localhost:5432/dcsmanager?sslmode=disable"
-go run .
-# tableau de bord : http://localhost:8090
-```
-
-Le plugin ouvre la base **en lecture seule** (`default_transaction_read_only=on`),
-et il est conseillé de lui donner un **rôle SELECT-only** :
-
-```sql
-CREATE ROLE stats_reader LOGIN PASSWORD 'change-me';
-GRANT CONNECT ON DATABASE dcsmanager TO stats_reader;
-GRANT USAGE   ON SCHEMA public      TO stats_reader;
-GRANT SELECT  ON ALL TABLES IN SCHEMA public TO stats_reader;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO stats_reader;
-```
-
-### 8.3 Plugin sur une autre machine
-
-Le plugin (et PostgreSQL) peuvent tourner **n'importe où**, tant que la base est
-joignable. Comme le plugin ne parle pas au manager en HTTP, il n'y a **pas de
-jeton d'API à configurer** pour lui : il suffit que l'adresse de PostgreSQL soit
-accessible (réseau privé, port 5432). Le manager, lui, n'a toujours rien à
-exposer.
-
-Guide complet : [`stats-plugin/README.md`](../stats-plugin/README.md).
-
-> Si vous avez un jour besoin d'exposer l'**interface/API du manager** elle-même
-> (tablette, navigateur distant), faites-le avec `DCSMANAGER_API_TOKEN` : voir la
-> section 6. Ce jeton **n'est pas utilisé par le plugin** dans ce modèle.
-
----
-
-## 9. Mise à jour et désinstallation
+## 7. Mise à jour et désinstallation
 
 ### Mettre à jour
 
@@ -420,7 +307,7 @@ statistiques excluent `test` par défaut.
 
 ---
 
-## 10. Dépannage
+## 8. Dépannage
 
 | Symptôme | Piste |
 |---|---|
@@ -435,7 +322,7 @@ statistiques excluent `test` par défaut.
 
 ---
 
-## 11. Référence CLI
+## 9. Référence CLI
 
 ```text
 dcsmanager                 Ouvre le manager dans une fenêtre native
@@ -444,7 +331,6 @@ dcsmanager install-lua     Installe/fusionne les scripts Lua dans Saved Games
 dcsmanager uninstall-lua   Retire le bloc installé (garde la config)
 dcsmanager status          Installé / obsolète / manquant, par fichier
 dcsmanager purge           Supprime des sessions (destructif ; voir options)
-dcsmanager migrate-db      Copie une base SQLite vers PostgreSQL (one-shot)
 dcsmanager version         Affiche la version
 
 install-lua / uninstall-lua / status :
@@ -458,16 +344,9 @@ purge (exactement une option requise) :
   --all                 Supprime toutes les sessions
 ```
 
-### migrate-db
-
-```text
---from <path>   Base SQLite à copier (défaut : DCSMANAGER_DB_PATH)
---to <dsn>      DSN PostgreSQL de destination (défaut : DCSMANAGER_DB_DSN)
-```
-
 ---
 
-## 12. Ports et pare-feu
+## 10. Ports et pare-feu
 
 | Port | Protocole | Usage |
 |---|---|---|
@@ -487,6 +366,3 @@ endpoint destructif (`purge`) : réservez-la au réseau local.
 - [`../README.md`](../README.md) — vue d'ensemble, fonctionnalités, architecture
 - [`dcs-installation.md`](dcs-installation.md) — installation côté DCS en détail
 - [`architecture.md`](architecture.md) — composants internes et flux de données
-- [`database-backends.md`](database-backends.md) — SQLite par défaut, PostgreSQL en option
-- [`stats-plugin.md`](stats-plugin.md) — plugin de statistiques (lecture PostgreSQL)
-- [`stats-plugin/README.md`](../stats-plugin/README.md) — plugin de statistiques
