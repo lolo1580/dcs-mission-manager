@@ -37,6 +37,20 @@ do
   end
 
   ---------------------------------------------------------------------------
+  -- Chain the export callbacks instead of replacing them
+  ---------------------------------------------------------------------------
+  -- DCS calls the LAST defined global of each callback, so a block that defines
+  -- LuaExportStart/LuaExportStop/LuaExportActivityNextEvent without calling the
+  -- previous one silently disables every tool loaded before it. DCS-BIOS loads
+  -- first (dofile at the top of Export.lua) and relies on LuaExportStart to open
+  -- its sockets; overriding it here left DCS-BIOS never started — the panels
+  -- looked dead and the link reported "not connected". Capturing and calling the
+  -- previous functions is the same pattern DCS-BIOS itself uses.
+  local prevStart = LuaExportStart
+  local prevStop = LuaExportStop
+  local prevActivity = LuaExportActivityNextEvent
+
+  ---------------------------------------------------------------------------
   -- Configuration
   ---------------------------------------------------------------------------
   local host, udpPort = "127.0.0.1", 7776
@@ -299,7 +313,10 @@ do
   ---------------------------------------------------------------------------
   -- Callbacks Export
   ---------------------------------------------------------------------------
+  -- Each callback runs the previous tool's (DCS-BIOS, Tacview…) first, then its
+  -- own work, so loading after them does not disable them.
   function LuaExportStart()
+    if prevStart then pcall(prevStart) end
     if not enabled then return end
     local ok = connect()
     if ok then
@@ -311,22 +328,35 @@ do
 
   function LuaExportStop()
     if conn then pcall(function() conn:close() end) end
+    if prevStop then pcall(prevStop) end
   end
 
   function LuaExportActivityNextEvent(t)
-    if not enabled then return t end
-    pcall(sendOwnship)
-
-    if worldEnabled then
-      -- We delay the first world send so we don't send everything at once.
-      if not nextWorldAt then nextWorldAt = t + 0.5 end
-      if t >= nextWorldAt then
-        pcall(sendWorld)
-        nextWorldAt = t + worldInterval
-      end
+    -- Let the previous tool schedule its own next event and keep the earliest,
+    -- so chaining never delays its sampling.
+    local nextT = t
+    if prevActivity then
+      local ok, v = pcall(prevActivity, t)
+      if ok and type(v) == "number" and v < nextT then nextT = v end
     end
 
-    return t + interval
+    if enabled then
+      pcall(sendOwnship)
+
+      if worldEnabled then
+        -- We delay the first world send so we don't send everything at once.
+        if not nextWorldAt then nextWorldAt = t + 0.5 end
+        if t >= nextWorldAt then
+          pcall(sendWorld)
+          nextWorldAt = t + worldInterval
+        end
+      end
+
+      local mine = t + interval
+      if mine < nextT then nextT = mine end
+    end
+
+    return nextT
   end
 end
 -- <<< DCSMANAGER-END <<<
