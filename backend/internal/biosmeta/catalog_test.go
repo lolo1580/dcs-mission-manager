@@ -190,6 +190,33 @@ func TestArgForInput(t *testing.T) {
 	}
 }
 
+// TestArgForEncoder checks a wheel's argument is signed by its direction, which is
+// the only thing that differs between the two detents.
+func TestArgForEncoder(t *testing.T) {
+	// variable_step: +step one way, -step the other.
+	if v, ok := ArgForEncoder(VariableStep, 3200, 0, true); !ok || v != 3200 {
+		t.Errorf("clockwise = (%d, %v), want (3200, true)", v, ok)
+	}
+	if v, ok := ArgForEncoder(VariableStep, 3200, 0, false); !ok || v != -3200 {
+		t.Errorf("counter-clockwise = (%d, %v), want (-3200, true)", v, ok)
+	}
+	// A missing suggested step falls back to 1, still signed.
+	if v, _ := ArgForEncoder(VariableStep, 0, 0, false); v != -1 {
+		t.Errorf("no step, counter-clockwise = %d, want -1", v)
+	}
+	// fixed_step: 0 (INC) and 2 (DEC).
+	if v, _ := ArgForEncoder(FixedStep, 0, 0, true); v != 0 {
+		t.Errorf("fixed_step clockwise = %d, want 0", v)
+	}
+	if v, _ := ArgForEncoder(FixedStep, 0, 0, false); v != 2 {
+		t.Errorf("fixed_step counter-clockwise = %d, want 2", v)
+	}
+	// Anything else falls back to the switch convention.
+	if _, ok := ArgForEncoder(Action, 0, 0, true); !ok {
+		t.Error("action should fall back rather than refuse")
+	}
+}
+
 // TestDefaultInterface checks the interface suggested for each kind of control.
 func TestDefaultInterface(t *testing.T) {
 	sg := writeSample(t)

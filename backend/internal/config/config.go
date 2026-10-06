@@ -44,6 +44,9 @@ type Config struct {
 	Theatre string
 	// LogLevel is one of debug, info, warn, error.
 	LogLevel string
+	// Debug enables verbose, per-action logging from the API and, once running,
+	// from the UI. It is off by default; DCSMANAGER_DEBUG turns it on at startup.
+	Debug bool
 	// UnitTTL is how long a unit is kept after its last update.
 	UnitTTL time.Duration
 	// CategoriesFile is an optional JSON file overriding unit type categories.
@@ -138,6 +141,7 @@ func Load() Config {
 		APIToken:       env("DCSMANAGER_API_TOKEN", ""),
 		Theatre:        env("DCSMANAGER_THEATRE", "Caucasus"),
 		LogLevel:       strings.ToLower(env("DCSMANAGER_LOG_LEVEL", "info")),
+		Debug:          envBool("DCSMANAGER_DEBUG", false),
 		UnitTTL:        envDuration("DCSMANAGER_UNIT_TTL", 5*time.Second),
 		CategoriesFile: env("DCSMANAGER_CATEGORIES", "./categories.json"),
 		MaxUnits:       envInt("DCSMANAGER_MAX_UNITS", 5000),

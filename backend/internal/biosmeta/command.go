@@ -112,6 +112,35 @@ func ArgForInput(ctl Control, iface Interface, active bool) (int, bool) {
 	return value, true
 }
 
+// ArgForEncoder returns the argument for one detent of a rotating control, whose
+// direction decides the sign.
+//
+// Unlike a switch, both directions of a wheel produce the same "active" edge, so
+// the sign must come from the direction. DCS-BIOS convention: variable_step is
+// +step turning one way and -step the other; fixed_step is 0 (INC) and 2 (DEC).
+// An interface the control does not accept yields ok=false.
+func ArgForEncoder(iface Interface, suggestedStep, maxValue int, clockwise bool) (int, bool) {
+	switch iface {
+	case VariableStep:
+		step := suggestedStep
+		if step <= 0 {
+			step = 1
+		}
+		if clockwise {
+			return step, true
+		}
+		return -step, true
+	case FixedStep:
+		if clockwise {
+			return 0, true
+		}
+		return 2, true
+	}
+	// Anything else (a rotary selector) has no inherent direction: fall back to the
+	// switch convention.
+	return ArgForInterface(iface, maxValue, clockwise)
+}
+
 // DefaultInterface picks the command interface best suited to a control, so a
 // mapping editor can suggest one instead of making the user choose among four.
 //

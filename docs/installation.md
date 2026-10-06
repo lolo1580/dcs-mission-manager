@@ -262,6 +262,7 @@ Toute la configuration passe par des **variables d'environnement** préfixées
 | `DCSMANAGER_SAVED_GAMES` | *(auto)* | Dossier Saved Games, si la détection échoue |
 | `DCSMANAGER_CHARTS_DIR` | `./maps_dcs` | Cartes aéronautiques (approches, plans) |
 | `DCSMANAGER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `DCSMANAGER_DEBUG` | `false` | Journal de débogage en direct (actions, requêtes API, panneaux). S'active aussi depuis Paramètres → Débogage |
 
 Exemple — exposer l'interface au réseau local en mode `serve` :
 

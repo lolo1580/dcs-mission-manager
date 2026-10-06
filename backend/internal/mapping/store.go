@@ -9,6 +9,7 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,6 +40,51 @@ type Profile struct {
 	// Aircraft is the module name the bindings were made for (F-16C_50).
 	Aircraft string    `json:"aircraft"`
 	Bindings []Binding `json:"bindings"`
+	// Outputs drive the panels' indicators (gear lights, autopilot button LEDs)
+	// from DCS-BIOS-exported values. Empty means no indicator is driven. The key
+	// is always written (no omitempty), so an empty list is distinguishable from a
+	// file that predates outputs — see load.
+	Outputs []OutputBinding `json:"outputs"`
+	// Displays drive the PZ70 LCD. The key is always written (no omitempty), so an
+	// empty list is distinguishable from a file that predates displays — see load.
+	Displays []DisplayBinding `json:"displays"`
+}
+
+// DisplayBinding shows an exported DCS-BIOS value on one PZ70 LCD line, for one
+// position of the ALT/VS/IAS/HDG/CRS selector.
+type DisplayBinding struct {
+	// Model is the panel, always pz70 for now.
+	Model panel.Model `json:"model"`
+	// Mode is the selector position this binding answers to (ALT, VS, IAS, HDG,
+	// CRS), case-insensitive.
+	Mode string `json:"mode"`
+	// Line is "upper" or "lower".
+	Line string `json:"line"`
+	// Command is the DCS-BIOS control whose exported value is shown.
+	Command string `json:"command"`
+	// Export is the index of the output to read within that control.
+	Export int `json:"export"`
+	// Scale and Offset turn the raw value into the displayed number
+	// (displayed = round(raw*Scale + Offset)). Scale 0 is treated as 1.
+	Scale  float64 `json:"scale,omitempty"`
+	Offset float64 `json:"offset,omitempty"`
+	// Unit is a descriptive label (feet, knots, degrees) shown in the UI only; it
+	// is never printed on the numeric LCD.
+	Unit string `json:"unit,omitempty"`
+}
+
+// OutputBinding lights one panel indicator from one exported DCS-BIOS control.
+// LED only: the PZ55's landing-gear lights and the PZ70's autopilot button lights.
+type OutputBinding struct {
+	// Model is the panel whose indicator is lit (pz55, pz70).
+	Model panel.Model `json:"model"`
+	// Target is the indicator id (LIGHT_GEAR_UPPER, LIGHT_AP…).
+	Target string `json:"target"`
+	// Command is the DCS-BIOS control whose exported value drives it (LIGHT_GEAR_N).
+	Command string `json:"command"`
+	// Color is the colour shown when the exported value is non-zero (green, red,
+	// yellow). The PZ55's indicators are bicolour; the PZ70's are single-colour.
+	Color string `json:"color,omitempty"`
 }
 
 // Key identifies the control a binding is attached to.
@@ -57,6 +103,11 @@ type Store struct {
 	// whenever the manager restarts: sending commands into a live cockpit is not
 	// something that should survive a restart unnoticed.
 	enabled bool
+	// outputsEnabled gates the panels' outputs (LEDs, and later the LCD). It is a
+	// separate switch from `enabled`: driving a cockpit from DCS-BIOS is a read-only
+	// action, and must not require the far more dangerous power to send the pilot's
+	// inputs into the aircraft. Off until the operator turns it on, off on restart.
+	outputsEnabled bool
 	// send is the transport, injected so the store can be tested without DCS-BIOS.
 	send func(command string) error
 }
@@ -114,6 +165,34 @@ func (s *Store) SetEnabled(on bool) error {
 	return nil
 }
 
+// Aircraft returns the names that have a profile, sorted.
+func (s *Store) Aircraft() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.profiles))
+	for name := range s.profiles {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// OutputsEnabled reports whether the panels' outputs (LEDs, LCD) are driven.
+func (s *Store) OutputsEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.outputsEnabled
+}
+
+// SetOutputsEnabled turns the panel outputs (LEDs, LCD) on or off. Unlike
+// SetEnabled it needs no transport: outputs only read DCS-BIOS and write the
+// panels, they never command the aircraft.
+func (s *Store) SetOutputsEnabled(on bool) {
+	s.mu.Lock()
+	s.outputsEnabled = on
+	s.mu.Unlock()
+}
+
 // Profile returns a copy of an aircraft's profile, empty when none exists.
 func (s *Store) Profile(aircraft string) Profile {
 	s.mu.RLock()
@@ -122,8 +201,15 @@ func (s *Store) Profile(aircraft string) Profile {
 	if p == nil {
 		return Profile{Aircraft: aircraft, Bindings: []Binding{}}
 	}
-	out := Profile{Aircraft: aircraft, Bindings: make([]Binding, len(p.Bindings))}
+	out := Profile{
+		Aircraft: aircraft,
+		Bindings: make([]Binding, len(p.Bindings)),
+		Outputs:  make([]OutputBinding, len(p.Outputs)),
+		Displays: make([]DisplayBinding, len(p.Displays)),
+	}
 	copy(out.Bindings, p.Bindings)
+	copy(out.Outputs, p.Outputs)
+	copy(out.Displays, p.Displays)
 	return out
 }
 
@@ -160,6 +246,67 @@ func (s *Store) SetProfile(p Profile) error {
 	}
 	if p.Bindings == nil {
 		p.Bindings = []Binding{}
+	}
+	// Output bindings are validated the same way: bounded, safe tokens, one binding
+	// per indicator so the second cannot silently shadow the first.
+	seenOut := map[string]bool{}
+	for i, o := range p.Outputs {
+		if o.Target == "" || o.Command == "" {
+			return fmt.Errorf("mapping: an output needs both a target and a command")
+		}
+		if i >= maxBindings {
+			return fmt.Errorf("mapping: too many outputs (max %d)", maxBindings)
+		}
+		if !validToken(o.Target, 64) || !validToken(o.Command, 96) || !validToken(o.Color, 16) {
+			return fmt.Errorf("mapping: invalid characters in output %q", o.Target)
+		}
+		if o.Model != panel.PZ55 && o.Model != panel.PZ70 {
+			return fmt.Errorf("mapping: unknown output model %q", o.Model)
+		}
+		if !panel.ValidTarget(o.Model, o.Target) {
+			return fmt.Errorf("mapping: %s is not a %s indicator", o.Target, o.Model)
+		}
+		k := string(o.Model) + "/" + o.Target
+		if seenOut[k] {
+			return fmt.Errorf("mapping: %s is driven twice", k)
+		}
+		seenOut[k] = true
+	}
+	if p.Outputs == nil {
+		p.Outputs = []OutputBinding{}
+	}
+	// Displays are validated the same way, plus the mode/line/export rules.
+	seenDisp := map[string]bool{}
+	for i, dp := range p.Displays {
+		if i >= maxBindings {
+			return fmt.Errorf("mapping: too many displays (max %d)", maxBindings)
+		}
+		if dp.Model != panel.PZ70 {
+			return fmt.Errorf("mapping: displays are PZ70 only")
+		}
+		if !validToken(dp.Mode, 8) || !validToken(dp.Line, 8) {
+			return fmt.Errorf("mapping: a display needs a mode and a line")
+		}
+		if !panel.ValidDisplayMode(dp.Mode) {
+			return fmt.Errorf("mapping: %q is not a PZ70 selector mode", dp.Mode)
+		}
+		if !panel.ValidDisplayLine(dp.Line) {
+			return fmt.Errorf("mapping: %q is not an LCD line", dp.Line)
+		}
+		if dp.Command == "" || !validToken(dp.Command, 96) {
+			return fmt.Errorf("mapping: a display needs a source command")
+		}
+		if dp.Export < 0 {
+			return fmt.Errorf("mapping: display export index must not be negative")
+		}
+		if math.IsNaN(dp.Scale) || math.IsInf(dp.Scale, 0) || math.IsNaN(dp.Offset) || math.IsInf(dp.Offset, 0) {
+			return fmt.Errorf("mapping: display conversion must be finite")
+		}
+		k := strings.ToUpper(dp.Mode) + "/" + strings.ToLower(dp.Line)
+		if seenDisp[k] {
+			return fmt.Errorf("mapping: %s line is configured twice for %s", dp.Line, dp.Mode)
+		}
+		seenDisp[k] = true
 	}
 
 	s.mu.Lock()
@@ -236,6 +383,55 @@ func (s *Store) Apply(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []
 	}
 
 	var sent []string
+	for _, line := range commandsFor(p, ev, cat) {
+		if err := send(line); err != nil {
+			continue
+		}
+		sent = append(sent, line)
+	}
+	return sent
+}
+
+// ApplyForced sends the commands a panel input matches even when sending is off.
+// It exists only for the live mapping test, which deliberately overrides the
+// switch so the cockpit can be checked without arming it.
+func (s *Store) ApplyForced(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []string {
+	s.mu.RLock()
+	p := s.profiles[aircraft]
+	send := s.send
+	s.mu.RUnlock()
+	if p == nil || send == nil {
+		return nil
+	}
+	var sent []string
+	for _, line := range commandsFor(p, ev, cat) {
+		if err := send(line); err != nil {
+			continue
+		}
+		sent = append(sent, line)
+	}
+	return sent
+}
+
+// Simulate returns the commands a panel input would send, without sending any.
+// It is what the Panels test view uses to show whether a binding is right: unlike
+// Apply it ignores whether sending is enabled, because the point is to check the
+// mapping, not to arm it.
+func (s *Store) Simulate(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []string {
+	s.mu.RLock()
+	p := s.profiles[aircraft]
+	s.mu.RUnlock()
+	if p == nil {
+		return nil
+	}
+	return commandsFor(p, ev, cat)
+}
+
+// commandsFor builds the DCS-BIOS lines an input matches, in binding order. It
+// does not send anything, so Apply and Simulate share one definition of "what
+// this control is bound to".
+func commandsFor(p *Profile, ev panel.Event, cat *biosmeta.Catalog) []string {
+	var out []string
 	for _, b := range p.Bindings {
 		if b.Model != ev.Model || !strings.EqualFold(b.Control, ev.Control.ID) {
 			continue
@@ -246,9 +442,9 @@ func (s *Store) Apply(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []
 		}
 
 		// A binding stores an interface name, not the whole control, so a profile
-		// stays valid when DCS-BIOS metadata changes. The maximum comes from the
-		// catalog when it is known.
-		max := 0
+		// stays valid when DCS-BIOS metadata changes. The maximum and the suggested
+		// step come from the catalog when it is known.
+		max, step := 0, 0
 		if cat != nil {
 			if ctl, ok := cat.ByID(b.Command); ok {
 				if err := biosmeta.Validate(ctl, biosmeta.Interface(b.Interface)); err != nil {
@@ -258,20 +454,28 @@ func (s *Store) Apply(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []
 					if in.Interface == string(biosmeta.SetState) && in.MaxValue > max {
 						max = in.MaxValue
 					}
+					if in.Interface == string(biosmeta.VariableStep) && in.SuggestedStep > 0 {
+						step = in.SuggestedStep
+					}
 				}
 			}
 		}
-		value, ok := biosmeta.ArgForInterface(biosmeta.Interface(b.Interface), max, active)
+
+		// An encoder (a wheel) is decoded as a pulse whose direction, not whose
+		// active bit, decides the sign: the two directions both report "active".
+		var value int
+		var ok bool
+		if ev.Control.Kind == panel.EncoderPulse {
+			value, ok = biosmeta.ArgForEncoder(biosmeta.Interface(b.Interface), step, max, ev.Control.Clockwise)
+		} else {
+			value, ok = biosmeta.ArgForInterface(biosmeta.Interface(b.Interface), max, active)
+		}
 		if !ok {
 			continue
 		}
-		line := fmt.Sprintf("%s %d\n", b.Command, value)
-		if err := send(line); err != nil {
-			continue
-		}
-		sent = append(sent, line)
+		out = append(out, fmt.Sprintf("%s %d\n", b.Command, value))
 	}
-	return sent
+	return out
 }
 
 // loadResult says how reading the binding file went, which is what lets NewStore
@@ -305,8 +509,37 @@ func (s *Store) load() loadResult {
 	if err := json.Unmarshal(data, &file); err != nil {
 		return fileUnreadable
 	}
+	// A file written before outputs existed has no `outputs` key, so its profiles
+	// decode with a nil slice. Fill those from the starters of the same aircraft so
+	// the LEDs work without the operator redoing their bindings. An explicit `[]`
+	// (a profile the operator cleared) stays empty. Displays are handled the same
+	// way.
+	starterOut := map[string][]OutputBinding{}
+	starterDisp := map[string][]DisplayBinding{}
+	for _, p := range Starter() {
+		if len(p.Outputs) > 0 {
+			starterOut[p.Aircraft] = p.Outputs
+		}
+		if len(p.Displays) > 0 {
+			starterDisp[p.Aircraft] = p.Displays
+		}
+	}
 	for i := range file.Profiles {
 		p := file.Profiles[i]
+		if p.Outputs == nil {
+			if outs, ok := starterOut[p.Aircraft]; ok {
+				p.Outputs = outs
+			} else {
+				p.Outputs = []OutputBinding{}
+			}
+		}
+		if p.Displays == nil {
+			if disps, ok := starterDisp[p.Aircraft]; ok {
+				p.Displays = disps
+			} else {
+				p.Displays = []DisplayBinding{}
+			}
+		}
 		s.profiles[p.Aircraft] = &p
 	}
 	return filePresent

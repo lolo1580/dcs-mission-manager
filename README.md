@@ -183,6 +183,7 @@ defaults. None of them is required for a normal install.
 | `DCSMANAGER_CHARTS_DIR` | `./maps_dcs` | Aeronautical chart scans (approach plates, ground plans) |
 | `DCSMANAGER_SOURCE` | *(auto)* | Force the session source: `live` or `test` (see below) |
 | `DCSMANAGER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `DCSMANAGER_DEBUG` | `false` | Live debug logging (actions, API requests, panels). Also toggled from Settings → Debug |
 
 ### DCS side — `Saved Games\DCS\Config\dcsmanager.cfg`
 

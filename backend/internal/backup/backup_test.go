@@ -142,6 +142,39 @@ func TestRestoreRoundTrip(t *testing.T) {
 	}
 }
 
+// TestRestoreRefusesWhenSafetyBackupFails locks the rule that a restore must not
+// proceed if the pre-restore safety copy cannot be written: replacing live DCS
+// files with no way back is worse than refusing. The safety archive is written
+// next to the input archive as "<name>.prerestore.zip"; a directory there makes the
+// write fail.
+func TestRestoreRefusesWhenSafetyBackupFails(t *testing.T) {
+	sg, out := fixture(t)
+	a, err := Create(sg, out, nil, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Occupy the safety archive's path with a directory so createTo cannot write it.
+	safety := strings.TrimSuffix(a.Path, ".zip") + ".prerestore.zip"
+	if err := os.MkdirAll(safety, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Change a live file, so a wrong restore would be visible.
+	live := filepath.Join(sg, "Config", "options.lua")
+	if err := os.WriteFile(live, []byte("changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Restore(a.Path, sg, false); err == nil {
+		t.Fatal("a restore whose safety backup fails must be refused")
+	}
+	got, _ := os.ReadFile(live)
+	if string(got) != "changed" {
+		t.Fatalf("the restore overwrote a live file despite the failed safety backup: %q", got)
+	}
+}
+
 func TestRestoreDryRun(t *testing.T) {
 	sg, out := fixture(t)
 	a, err := Create(sg, out, nil, "test")

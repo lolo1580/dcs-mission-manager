@@ -13,8 +13,11 @@
 //   - the gear lever is two controls (GEAR_UP and GEAR_DOWN) driving set_state
 //     positions 0 and 1 of one command, rather than one entry with two actions.
 //
-// Output bindings (gear lights, the PZ70 LCD and button LEDs) are not part of the
-// binding model yet, so they are not reproduced.
+// Output bindings (gear lights and autopilot button LEDs) are carried too, for
+// the aircraft the original profiles covered. The PZ55's three gear lights are
+// bicolour (green for down-and-locked, red for unsafe); the PZ70's autopilot
+// lights are single-colour. The PZ70 LCD is not part of the binding model yet, so
+// it is not reproduced.
 package mapping
 
 import "dcsmanager/internal/panel"
@@ -23,11 +26,19 @@ import "dcsmanager/internal/panel"
 // switch drives: the switch position becomes the selector position.
 const setState = "set_state"
 
-// starterProfile is the aircraft name and its bindings.
+// starterProfile is the aircraft name, its bindings, its outputs and its LCD
+// displays.
 type starterProfile struct {
 	aircraft string
 	bindings []Binding
+	outputs  []OutputBinding
+	displays []DisplayBinding
 }
+
+// selectedDegrees converts a DCS-BIOS normalised angle (a 0..1 float exported as a
+// 0..65535 integer, its standard 16-bit form) into degrees. It is the scale the
+// starter displays use for a heading or a course.
+const selectedDegrees = 360.0 / 65535.0
 
 // starterProfiles returns the built-in profiles, in a stable order.
 //
@@ -48,6 +59,11 @@ func starterProfiles() []starterProfile {
 				{Model: panel.PZ70, Control: "FLAPS_UP", Command: "FLAP_SW", Interface: setState, Invert: true},
 				{Model: panel.PZ70, Control: "FLAPS_DOWN", Command: "FLAP_SW", Interface: setState},
 			},
+			outputs: []OutputBinding{
+				{Model: panel.PZ55, Target: panel.TargetGearLeft, Command: "FLP_LG_LEFT_GEAR_LT", Color: "green"},
+				{Model: panel.PZ55, Target: panel.TargetGearUpper, Command: "FLP_LG_NOSE_GEAR_LT", Color: "green"},
+				{Model: panel.PZ55, Target: panel.TargetGearRight, Command: "FLP_LG_RIGHT_GEAR_LT", Color: "green"},
+			},
 		},
 		{
 			aircraft: "F-16C_50",
@@ -56,6 +72,11 @@ func starterProfiles() []starterProfile {
 				{Model: panel.PZ55, Control: "GEAR_UP", Command: "GEAR_HANDLE", Interface: setState, Invert: true},
 				{Model: panel.PZ55, Control: "GEAR_DOWN", Command: "GEAR_HANDLE", Interface: setState},
 				{Model: panel.PZ70, Control: "PITCH_TRIM", Command: "PITCH_TRIM", Interface: "variable_step"},
+			},
+			outputs: []OutputBinding{
+				{Model: panel.PZ55, Target: panel.TargetGearLeft, Command: "LIGHT_GEAR_L", Color: "green"},
+				{Model: panel.PZ55, Target: panel.TargetGearUpper, Command: "LIGHT_GEAR_N", Color: "green"},
+				{Model: panel.PZ55, Target: panel.TargetGearRight, Command: "LIGHT_GEAR_R", Color: "green"},
 			},
 		},
 		{
@@ -66,6 +87,20 @@ func starterProfiles() []starterProfile {
 				{Model: panel.PZ55, Control: "GEAR_UP", Command: "LDG_LEV", Interface: setState, Invert: true},
 				{Model: panel.PZ55, Control: "GEAR_DOWN", Command: "LDG_LEV", Interface: setState},
 				{Model: panel.PZ70, Control: "AP_BUTTON", Command: "AP_MASTER_BTN", Interface: "action"},
+			},
+			outputs: []OutputBinding{
+				{Model: panel.PZ55, Target: panel.TargetGearUpper, Command: "LANDING_GEAR_LEVER_LIGHT", Color: "red"},
+				{Model: panel.PZ70, Target: panel.TargetAP, Command: "AP_MASTER_VERT", Color: "green"},
+				{Model: panel.PZ70, Target: panel.TargetALT, Command: "AP_ALT_VERT", Color: "green"},
+			},
+			// The HSI exports the selected heading and course as normalised angles; a
+			// 0..1 float is DCS-BIOS' standard 0..65535 integer, so multiplying by
+			// 360/65535 gives degrees. These are the two "selected" references the
+			// aircraft actually exposes as integers (its selected altitude is not
+			// exported on its own).
+			displays: []DisplayBinding{
+				{Model: panel.PZ70, Mode: "HDG", Line: "upper", Command: "HSI_HDG", Export: 0, Scale: selectedDegrees, Unit: "deg"},
+				{Model: panel.PZ70, Mode: "CRS", Line: "upper", Command: "HSI_D_NEEDLE", Export: 0, Scale: selectedDegrees, Unit: "deg"},
 			},
 		},
 		{
@@ -78,6 +113,16 @@ func starterProfiles() []starterProfile {
 				{Model: panel.PZ70, Control: "FLAPS_UP", Command: "FLAPS", Interface: setState, Invert: true},
 				{Model: panel.PZ70, Control: "FLAPS_DOWN", Command: "FLAPS", Interface: setState},
 			},
+			outputs: []OutputBinding{
+				{Model: panel.PZ55, Target: panel.TargetGearLeft, Command: "LEFT_LIGHT", Color: "green"},
+				{Model: panel.PZ55, Target: panel.TargetGearUpper, Command: "NOSE_LIGHT", Color: "green"},
+				{Model: panel.PZ55, Target: panel.TargetGearRight, Command: "RIGHT_LIGHT", Color: "green"},
+			},
+			// The HSI exports the selected heading and course as normalised angles.
+			displays: []DisplayBinding{
+				{Model: panel.PZ70, Mode: "HDG", Line: "upper", Command: "HSI_HDG", Export: 0, Scale: selectedDegrees, Unit: "deg"},
+				{Model: panel.PZ70, Mode: "CRS", Line: "upper", Command: "HSI_CRS", Export: 0, Scale: selectedDegrees, Unit: "deg"},
+			},
 		},
 	}
 }
@@ -87,7 +132,7 @@ func Starter() []Profile {
 	defs := starterProfiles()
 	out := make([]Profile, 0, len(defs))
 	for _, d := range defs {
-		out = append(out, Profile{Aircraft: d.aircraft, Bindings: d.bindings})
+		out = append(out, Profile{Aircraft: d.aircraft, Bindings: d.bindings, Outputs: d.outputs, Displays: d.displays})
 	}
 	return out
 }

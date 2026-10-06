@@ -24,6 +24,68 @@ func (r *recorder) send(line string) error {
 	return nil
 }
 
+// TestOutputsSwitchIsIndependent checks the outputs switch is separate from the
+// command-sending switch: it needs no transport and does not require sending.
+func TestOutputsSwitchIsIndependent(t *testing.T) {
+	// No transport at all: outputs must still be switchable.
+	s := NewStore(filepath.Join(t.TempDir(), "mappings.json"), nil)
+	if s.OutputsEnabled() {
+		t.Fatal("outputs should start off")
+	}
+	s.SetOutputsEnabled(true)
+	if !s.OutputsEnabled() {
+		t.Fatal("outputs should be on after SetOutputsEnabled(true)")
+	}
+	if s.Enabled() {
+		t.Fatal("turning outputs on must not arm command sending")
+	}
+
+	// Persistence: a profile can carry outputs and displays without sending.
+	p := Profile{
+		Aircraft: "F-16C_50",
+		Outputs:  []OutputBinding{{Model: panel.PZ55, Target: panel.TargetGearLeft, Command: "LIGHT_GEAR_L", Color: "green"}},
+		Displays: []DisplayBinding{{Model: panel.PZ70, Mode: "ALT", Line: "upper", Command: "ALT_SEL", Export: 0}},
+	}
+	if err := s.SetProfile(p); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Profile("F-16C_50")
+	if len(got.Outputs) != 1 || len(got.Displays) != 1 {
+		t.Fatalf("profile lost outputs/displays: %+v", got)
+	}
+}
+
+// TestDisplayValidation checks malformed LCD bindings are refused: a bad mode,
+// line, duplicate, negative export index and non-finite conversion.
+func TestDisplayValidation(t *testing.T) {
+	s := NewStore(filepath.Join(t.TempDir(), "mappings.json"), func(string) error { return nil })
+	base := func(dp DisplayBinding) error {
+		return s.SetProfile(Profile{Aircraft: "A", Displays: []DisplayBinding{dp}})
+	}
+	ok := DisplayBinding{Model: panel.PZ70, Mode: "ALT", Line: "upper", Command: "ALT_SEL", Export: 0}
+	if err := base(ok); err != nil {
+		t.Fatalf("a valid display was refused: %v", err)
+	}
+	bad := []DisplayBinding{
+		{Model: panel.PZ70, Mode: "NOPE", Line: "upper", Command: "X", Export: 0},
+		{Model: panel.PZ70, Mode: "ALT", Line: "middle", Command: "X", Export: 0},
+		{Model: panel.PZ70, Mode: "ALT", Line: "upper", Command: "", Export: 0},
+		{Model: panel.PZ70, Mode: "ALT", Line: "upper", Command: "X", Export: -1},
+		{Model: panel.PZ55, Mode: "ALT", Line: "upper", Command: "X", Export: 0},
+	}
+	for i, dp := range bad {
+		if err := base(dp); err == nil {
+			t.Errorf("display %d should have been refused: %+v", i, dp)
+		}
+	}
+
+	// Two displays on the same mode+line collide.
+	dup := []DisplayBinding{ok, ok}
+	if err := s.SetProfile(Profile{Aircraft: "A", Displays: dup}); err == nil {
+		t.Error("two displays on the same line should be refused")
+	}
+}
+
 // apControl finds the AP button in the PZ70 definitions, so the tests use the real
 // control rather than a guessed id.
 func apControl(t *testing.T) panel.Control {
@@ -104,6 +166,129 @@ func TestApplyWhenEnabled(t *testing.T) {
 	if rec.lines[1] != "AP_BTN_Hdg 0\n" {
 		t.Errorf("release = %q, want AP_BTN_Hdg 0", rec.lines[1])
 	}
+}
+
+// TestSimulateDoesNotSendAndWorksDisabled checks the mapping test: Simulate returns
+// what Apply would send without sending anything, and works while sending is off —
+// the whole point is to check a mapping without arming it.
+func TestSimulateDoesNotSendAndWorksDisabled(t *testing.T) {
+	rec := &recorder{}
+	s := NewStore(filepath.Join(t.TempDir(), "mappings.json"), rec.send)
+	if err := s.SetProfile(Profile{
+		Aircraft: "F-16C_50",
+		Bindings: []Binding{{Model: panel.PZ70, Control: "AP_BUTTON", Command: "AP_BTN_Hdg", Interface: "action"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Sending is deliberately left off.
+	if s.Enabled() {
+		t.Fatal("the store should start disabled")
+	}
+
+	ap := apControl(t)
+	got := s.Simulate("F-16C_50", panel.Event{Model: panel.PZ70, Control: ap, Active: true}, nil)
+	if len(got) != 1 || got[0] != "AP_BTN_Hdg 1\n" {
+		t.Fatalf("Simulate = %v, want [AP_BTN_Hdg 1]", got)
+	}
+	if len(rec.lines) != 0 {
+		t.Fatalf("Simulate must not send anything, sent %v", rec.lines)
+	}
+
+	// An unbound control resolves to nothing.
+	gear := gearControl(t)
+	if got := s.Simulate("F-16C_50", panel.Event{Model: panel.PZ55, Control: gear, Active: true}, nil); len(got) != 0 {
+		t.Fatalf("an unbound control should resolve to nothing, got %v", got)
+	}
+}
+
+// TestApplyForcedSendsWhileDisabled checks the mapping test's override: it sends
+// even when the store is disabled, which is how the cockpit is checked live.
+func TestApplyForcedSendsWhileDisabled(t *testing.T) {
+	rec := &recorder{}
+	s := NewStore(filepath.Join(t.TempDir(), "mappings.json"), rec.send)
+	if err := s.SetProfile(Profile{
+		Aircraft: "F-16C_50",
+		Bindings: []Binding{{Model: panel.PZ70, Control: "AP_BUTTON", Command: "AP_BTN_Hdg", Interface: "action"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ap := apControl(t)
+
+	// The normal path sends nothing while disabled.
+	s.Apply("F-16C_50", panel.Event{Model: panel.PZ70, Control: ap, Active: true}, nil)
+	if len(rec.lines) != 0 {
+		t.Fatalf("Apply must respect the switch, sent %v", rec.lines)
+	}
+
+	// The forced path sends anyway.
+	got := s.ApplyForced("F-16C_50", panel.Event{Model: panel.PZ70, Control: ap, Active: true}, nil)
+	if len(got) != 1 || len(rec.lines) != 1 {
+		t.Fatalf("ApplyForced should have sent one line, got %v (rec %v)", got, rec.lines)
+	}
+}
+
+// TestEncoderDirectionSelectsTheSign locks the fix for the wheel bug: both
+// directions of an encoder report the same "active" edge, so the sign must come
+// from Clockwise, not from Active.
+func TestEncoderDirectionSelectsTheSign(t *testing.T) {
+	rec := &recorder{}
+	s := NewStore(filepath.Join(t.TempDir(), "mappings.json"), rec.send)
+	if err := s.SetProfile(Profile{
+		Aircraft: "F-16C_50",
+		Bindings: []Binding{{Model: panel.PZ70, Control: "PITCH_TRIM", Command: "PITCH_TRIM", Interface: "variable_step"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Find the two encoder directions in the real PZ70 definitions.
+	var cw, ccw panel.Control
+	for _, c := range panel.Controls(panel.PZ70) {
+		if c.ID != "PITCH_TRIM" {
+			continue
+		}
+		if c.Clockwise {
+			cw = c
+		} else {
+			ccw = c
+		}
+	}
+	if cw.ID == "" || ccw.ID == "" {
+		t.Fatal("PITCH_TRIM should have both directions")
+	}
+
+	// A catalogue giving the wheel a suggested step of 3200.
+	cat := catalogWithVariableStep(t, "F-16C_50", "PITCH_TRIM", 3200)
+
+	// Both directions arrive Active; only the direction differs.
+	got := s.Simulate("F-16C_50", panel.Event{Model: panel.PZ70, Control: cw, Active: true}, cat)
+	if len(got) != 1 || got[0] != "PITCH_TRIM 3200\n" {
+		t.Fatalf("clockwise = %v, want [+3200]", got)
+	}
+	got = s.Simulate("F-16C_50", panel.Event{Model: panel.PZ70, Control: ccw, Active: true}, cat)
+	if len(got) != 1 || got[0] != "PITCH_TRIM -3200\n" {
+		t.Fatalf("counter-clockwise = %v, want [-3200]", got)
+	}
+}
+
+// catalogWithVariableStep builds a one-control catalogue offering a variable_step
+// input with a suggested step.
+func catalogWithVariableStep(t *testing.T, module, command string, step int) *biosmeta.Catalog {
+	t.Helper()
+	sg := t.TempDir()
+	dir := biosmeta.JSONDir(sg)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := `{"Starter":{"` + command + `":{"category":"Starter","control_type":"dial","identifier":"` +
+		command + `","inputs":[{"interface":"variable_step","suggested_step":` + itoa(step) + `}]}}}`
+	if err := os.WriteFile(filepath.Join(dir, module+".json"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cat, err := biosmeta.LoadModule(sg, module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cat
 }
 
 // TestApplyIgnoresOtherAircraftAndControls checks a binding only fires for its own

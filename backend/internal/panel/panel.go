@@ -124,6 +124,21 @@ func Decode(device string, model Model, prev, cur []byte) []Event {
 	return out
 }
 
+// ActiveState returns, for every control of a model, whether it is currently
+// active in one report. It is the full picture of the panel, not just the change
+// (which Decode reports).
+func ActiveState(model Model, report []byte) map[string]bool {
+	defs, ok := definitions[model]
+	if !ok {
+		return map[string]bool{}
+	}
+	out := make(map[string]bool, len(defs))
+	for _, c := range defs {
+		out[c.ID] = c.ByteIndex < len(report) && report[c.ByteIndex]&c.Mask != 0
+	}
+	return out
+}
+
 // bit builds a toggle or button control at one bit of a report byte.
 func bit(byteIndex int, bitIndex int, id string) Control {
 	return Control{ID: id, Kind: Toggle, ByteIndex: byteIndex, Mask: 1 << uint(bitIndex)}

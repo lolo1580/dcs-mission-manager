@@ -26,11 +26,13 @@ type Service struct {
 
 	mu      sync.Mutex
 	devices map[string]*device // by path
+	// active is the latest full switch state per model, so an output binding can
+	// read any control and a panel connected later starts from the current state.
+	active  map[panel.Model]map[string]bool
 	stop    chan struct{}
 	done    chan struct{}
 	started bool
-	// unsupported is set once the HID layer reports the platform has no support,
-	// so the scanner stops rather than erroring on every tick.
+	// unsupported is set once the HID layer reports the platform has no support,	// so the scanner stops rather than erroring on every tick.
 	unsupported bool
 }
 
@@ -82,6 +84,7 @@ func New(opts Options, emit func(Event)) *Service {
 		openDevice: func(path string) (readWriter, error) { return hid.Open(path) },
 		enumerate:  hid.Enumerate,
 		devices:    make(map[string]*device),
+		active:     map[panel.Model]map[string]bool{},
 		stop:       make(chan struct{}),
 		done:       make(chan struct{}),
 	}
@@ -121,6 +124,46 @@ func (s *Service) Devices() []DeviceInfo {
 	out := make([]DeviceInfo, 0, len(s.devices))
 	for _, d := range s.devices {
 		out = append(out, d.info)
+	}
+	return out
+}
+
+// SelectorMode returns the PZ70 selector's current position as a mode name (ALT,
+// VS, IAS, HDG or CRS), or "" when no PZ70 is connected or the selector is
+// between positions. It is read from the full active state, so it is known even
+// before the user moves anything.
+func (s *Service) SelectorMode() string {
+	s.mu.Lock()
+	active := s.active[panel.PZ70]
+	s.mu.Unlock()
+	for _, mode := range []string{"ALT", "VS", "IAS", "HDG", "CRS"} {
+		if active["KNOB_"+mode] {
+			return mode
+		}
+	}
+	return ""
+}
+
+// InputState returns the latest full switch state of each model, as a snapshot.
+// An output binding uses it to read a control that has no dedicated input event
+// (the PZ55's gear lever has GEAR_UP and GEAR_DOWN, but no single "gear down"
+// control id).
+func (s *Service) InputState() map[panel.Model]map[string]bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeSnapshotLocked()
+}
+
+// activeSnapshotLocked copies the per-model active state. The caller must hold
+// the mutex.
+func (s *Service) activeSnapshotLocked() map[panel.Model]map[string]bool {
+	out := make(map[panel.Model]map[string]bool, len(s.active))
+	for model, active := range s.active {
+		cp := make(map[string]bool, len(active))
+		for id, on := range active {
+			cp[id] = on
+		}
+		out[model] = cp
 	}
 	return out
 }
@@ -193,6 +236,13 @@ func (s *Service) scan() {
 		present[d.Path] = d
 	}
 
+	// Snapshot the state of every model before opening or closing anything, so a
+	// newly connected panel can be told the current switch positions and light
+	// the right LEDs rather than showing a stale display until a control moves.
+	s.mu.Lock()
+	states := s.activeSnapshotLocked()
+	s.mu.Unlock()
+
 	// Open what is new.
 	for path, info := range present {
 		s.mu.Lock()
@@ -201,7 +251,7 @@ func (s *Service) scan() {
 		if known {
 			continue
 		}
-		s.open(path, info)
+		s.open(path, info, states)
 	}
 
 	// Close what is gone.
@@ -218,8 +268,9 @@ func (s *Service) scan() {
 	}
 }
 
-// open starts reading one panel.
-func (s *Service) open(path string, info hid.DeviceInfo) {
+// open starts reading one panel. activeSnapshot is the current switch state, so
+// the connect event carries a full picture even before the first report.
+func (s *Service) open(path string, info hid.DeviceInfo, activeSnapshot map[panel.Model]map[string]bool) {
 	model, ok := panel.ModelFor(info.VendorID, info.ProductID)
 	if !ok {
 		return
@@ -272,7 +323,16 @@ func (s *Service) open(path string, info hid.DeviceInfo) {
 	s.devices[path] = d
 	s.mu.Unlock()
 
-	s.publish(Event{Kind: KindConnected, At: time.Now(), Device: path, Model: model, Info: d.info})
+	ev := Event{Kind: KindConnected, At: time.Now(), Device: path, Model: model, Info: d.info}
+	if active := activeSnapshot[model]; active != nil {
+		ev.Active = active
+	} else {
+		// A panel seen for the first time in this manager (no sibling reported yet):
+		// use the neutral report as its baseline so the first real report is diffed
+		// against the state the panel itself starts in.
+		ev.Active = panel.ActiveState(model, make([]byte, 64))
+	}
+	s.publish(ev)
 	go s.readLoop(d)
 }
 
@@ -348,8 +408,17 @@ func (s *Service) readLoop(d *device) {
 
 		events := panel.Decode(d.path, d.model, d.last, report)
 		d.last = report
+
+		// Keep the full active state of this model: an output binding can read any
+		// control from it (a two-position lever included), and a panel of the same
+		// model connected later is caught up from the same snapshot.
+		active := panel.ActiveState(d.model, report)
+		s.mu.Lock()
+		s.active[d.model] = active
+		s.mu.Unlock()
+
 		for _, e := range events {
-			s.publish(Event{Kind: KindInput, At: time.Now(), Device: d.path, Model: d.model, Input: e})
+			s.publish(Event{Kind: KindInput, At: time.Now(), Device: d.path, Model: d.model, Input: e, Active: active})
 		}
 	}
 }

@@ -47,6 +47,41 @@ func TestStarterProfilesAreWellFormed(t *testing.T) {
 			}
 			seen[b.Key()] = true
 		}
+
+		// Outputs go the other way: an indicator id, a source command, no interface.
+		seenOut := map[string]bool{}
+		for _, o := range p.Outputs {
+			if o.Command == "" {
+				t.Errorf("%s: %s needs a source command", p.Aircraft, o.Target)
+			}
+			if !panel.ValidTarget(o.Model, o.Target) {
+				t.Errorf("%s: %q is not a %s indicator", p.Aircraft, o.Target, o.Model)
+			}
+			if k := string(o.Model) + "/" + o.Target; seenOut[k] {
+				t.Errorf("%s: %s is driven twice", p.Aircraft, k)
+			} else {
+				seenOut[k] = true
+			}
+		}
+
+		// Displays: mode, line, source; no duplicate mode+line.
+		seenDisp := map[string]bool{}
+		for _, d := range p.Displays {
+			if d.Command == "" {
+				t.Errorf("%s: a display has no source", p.Aircraft)
+			}
+			if !panel.ValidDisplayMode(d.Mode) {
+				t.Errorf("%s: %q is not a selector mode", p.Aircraft, d.Mode)
+			}
+			if !panel.ValidDisplayLine(d.Line) {
+				t.Errorf("%s: %q is not an LCD line", p.Aircraft, d.Line)
+			}
+			if k := d.Mode + "/" + d.Line; seenDisp[k] {
+				t.Errorf("%s: %s line is set twice for %s", p.Aircraft, d.Line, d.Mode)
+			} else {
+				seenDisp[k] = true
+			}
+		}
 	}
 }
 
@@ -81,6 +116,29 @@ func TestStarterProfilesMatchDCSBIOS(t *testing.T) {
 			}
 			if _, ok := biosmeta.ArgForInput(ctl, iface, true); !ok {
 				t.Errorf("%s/%s: no argument for %s", p.Aircraft, b.Command, iface)
+			}
+		}
+		// An output binding reads a control's exported value, so the control must
+		// exist and carry an output to read.
+		for _, o := range p.Outputs {
+			ctl, ok := cat.ByID(o.Command)
+			if !ok {
+				t.Errorf("%s: %s is not a control of the aircraft", p.Aircraft, o.Command)
+				continue
+			}
+			if len(ctl.Outputs) == 0 {
+				t.Errorf("%s: %s exports no value to read", p.Aircraft, o.Command)
+			}
+		}
+		// A display reads one exported output by index; it must exist.
+		for _, d := range p.Displays {
+			ctl, ok := cat.ByID(d.Command)
+			if !ok {
+				t.Errorf("%s: display source %s is not a control of the aircraft", p.Aircraft, d.Command)
+				continue
+			}
+			if d.Export < 0 || d.Export >= len(ctl.Outputs) {
+				t.Errorf("%s: display source %s has no output %d", p.Aircraft, d.Command, d.Export)
 			}
 		}
 	}
@@ -152,6 +210,35 @@ func TestNewStorePreservesAnUnreadableFile(t *testing.T) {
 		if prof := s.Profile(p.Aircraft); len(prof.Bindings) != 0 {
 			t.Errorf("%s should not be seeded over an unreadable file", p.Aircraft)
 		}
+	}
+}
+
+// TestNewStoreBackfillsOutputsIntoAnOlderFile locks the upgrade path from a file
+// written before LED outputs existed: its profiles have no `outputs` key, and the
+// starter outputs of the same aircraft must be filled in so the LEDs work without
+// the operator redoing their bindings. An explicit empty list stays empty.
+func TestNewStoreBackfillsOutputsIntoAnOlderFile(t *testing.T) {
+	// A profile as an older build would have written it: no outputs key at all.
+	old := `{"profiles":[{"aircraft":"F-16C_50","bindings":[]}]}`
+	path := filepath.Join(t.TempDir(), "mappings.json")
+	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := NewStore(path, (&recorder{}).send)
+	if got := len(s.Profile("F-16C_50").Outputs); got == 0 {
+		t.Fatal("an older file should have been backfilled with the starter outputs")
+	}
+
+	// An explicit empty list is a deliberate "no LED" and is left alone.
+	cleared := `{"profiles":[{"aircraft":"F-16C_50","bindings":[],"outputs":[]}]}`
+	path2 := filepath.Join(t.TempDir(), "mappings.json")
+	if err := os.WriteFile(path2, []byte(cleared), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s2 := NewStore(path2, (&recorder{}).send)
+	if got := len(s2.Profile("F-16C_50").Outputs); got != 0 {
+		t.Fatalf("an explicit empty outputs list was overwritten (%d)", got)
 	}
 }
 

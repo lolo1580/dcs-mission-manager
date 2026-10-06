@@ -29,6 +29,21 @@ const (
 	KindError
 )
 
+// String renders a Kind for logs.
+func (k Kind) String() string {
+	switch k {
+	case KindConnected:
+		return "connected"
+	case KindDisconnected:
+		return "disconnected"
+	case KindInput:
+		return "input"
+	case KindError:
+		return "error"
+	}
+	return "unknown"
+}
+
 // DeviceInfo is the subset of internal/hid's DeviceInfo the service keeps, so
 // callers do not depend on the HID package directly.
 type DeviceInfo struct {
@@ -53,6 +68,10 @@ type Event struct {
 	Info DeviceInfo
 	// Input is the decoded change, on KindInput.
 	Input panel.Event
+	// Active is the full active state of every control of that model, on
+	// KindInput. An output binding that has no dedicated input event of its own
+	// (a two-position lever) can be read from here.
+	Active map[string]bool
 	// Err carries the failure, on KindError.
 	Err error
 }

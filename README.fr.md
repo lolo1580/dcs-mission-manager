@@ -192,6 +192,7 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMANAGER_CHARTS_DIR` | `./maps_dcs` | Scans de cartes aéronautiques (approches, plans de mouvement) |
 | `DCSMANAGER_SOURCE` | *(auto)* | Force la source de la session : `live` ou `test` (voir plus bas) |
 | `DCSMANAGER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `DCSMANAGER_DEBUG` | `false` | Journal de débogage en direct (actions, requêtes API, panneaux). Activable aussi depuis Paramètres → Débogage |
 
 ### Côté DCS — `Saved Games\DCS\Config\dcsmanager.cfg`
 

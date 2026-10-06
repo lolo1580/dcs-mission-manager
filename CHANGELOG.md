@@ -9,6 +9,85 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A restore no longer proceeds when its safety copy fails.** Restoring replaces
+  live DCS files, so the pre-restore `*.prerestore.zip` is now mandatory: if it
+  cannot be written (or its categories cannot be resolved), the restore is refused
+  with an error and nothing is overwritten.
+- **Panel encoders now honour their direction.** Both detents of a wheel report the
+  same "active" edge, so the old mapping sent the same argument either way and a
+  trim wheel or the PZ70 LCD wheel could only turn one direction. The sign now comes
+  from the direction (`variable_step`: ±step, `fixed_step`: INC/DEC).
+- **The airfields tab no longer shows charts of a previously selected field.** A
+  slow chart response for an airfield picked earlier is ignored when it arrives
+  after the one now shown.
+- **The nearest-field lookup is filtered by the selected theatre.** It used to
+  search every theatre, so a field absent from the current map could appear first.
+
+### Added
+
+- **The panels' LEDs are driven from DCS-BIOS.** The PZ55's landing-gear lights
+  and the PZ70's autopilot button lights now reflect the cockpit, read from the
+  values DCS-BIOS exports (the gear lights are bicolour: green for down-and-
+  locked, red for unsafe). This is the missing half of the panel bridge —
+  `mapping` already sent a switch move into the cockpit — and the Go counterpart
+  of the original profiles' `outputBindings`. Output bindings live in the same
+  per-aircraft profiles as the input ones and are edited in the Panels tab; the
+  starter profiles carry the gear lights (F-16C, F-5E-3, F/A-18C, M-2000C) and the
+  M-2000C's autopilot lights. They have their **own switch** (see below),
+  independent of command sending, and a profile file written before outputs
+  existed is backfilled in memory from the starters (an explicit empty list is
+  respected).
+
+- **A live mapping test in the Panels tab.** Turn it on, move a switch or press a
+  button, and each change is shown with the DCS-BIOS command the binding would
+  send — so a mapping can be checked without flying. The test can also send the
+  input to DCS-BIOS while it is on (so the cockpit reacts), independently of the
+  command-sending switch; like that switch it resets on restart.
+
+- **A debug mode in Settings.** A switch turns on a live log of the manager's
+  actions: every API request, panel input and the command it produces, DCS-BIOS
+  state change, mission transition and debrief transfer. The lines are streamed to
+  a **Debug** sub-tab of Settings (newest first, colour-coded by level) and echoed
+  to `data/dcsmanager.log` / the console. It is off by default and can be turned on
+  at startup with `DCSMANAGER_DEBUG=1`; the switch is `GET/POST /api/debug` and the
+  log is `GET /api/log`.
+
+- **The aircraft can now be chosen by hand in the Panels tab.** Bindings are per
+  aircraft and used to appear only once DCS-BIOS reported the active one — which
+  meant nothing was editable or testable with DCS closed, exactly when a mapping is
+  set up. A picker lists every aircraft with a profile (`GET /api/aircraft`) and
+  loads its bindings without a mission; DCS-BIOS still overrides it while an
+  aircraft is active.
+
+- **Panel outputs now have their own switch, and the panel driver builds one
+  complete report.** Driving the LEDs no longer requires arming command sending
+  (which writes the pilot's inputs into the aircraft): the outputs switch
+  (`POST /api/mappings/outputs`) only reads DCS-BIOS and writes the panels. The
+  driver is ticked on **every** DCS-BIOS frame (not only on a state change), merges
+  the PZ55's gear lights and the PZ70's light byte and (to come) LCD lines into a
+  single report, writes only when it changes, and drops its cache on a panel
+  reconnect or an aircraft change so the panel is redrawn. The profile also gained a
+  validated `displays` section (LCD: mode, line, source, export index, scale/offset,
+  unit), unused by the UI yet.
+
+- **A PZ70 display editor in the Panels tab.** A "PZ70 display" section binds one
+  LCD line to a value DCS-BIOS exports, per selector mode (ALT/VS/IAS/HDG/CRS): pick
+  the source control, the export index, a scale/offset and a unit label. A **Preview**
+  resolves the binding against the live DCS-BIOS memory and shows the raw value, the
+  converted value and the exact LCD text (`POST /api/display/preview`); a **hardware
+  test** writes chosen numbers to the two lines so every cell and the sign can be
+  confirmed on the real panel (`POST /api/display/test`). Both are independent of
+  command sending.
+
+- **Starter LCD profiles for the M-2000C and the F-5E-3.** Each shows the selected
+  heading (HDG) and course (CRS) — the references those aircraft actually export as
+  integers (the HSI angles, normalised 0..1 and so scaled by 360/65535 degrees). The
+  F-16 and F/A-18 export their selected values as text, which this version does not
+  read, so they get no display; the mode is left to the operator to fill once the
+  panel is validated.
+
 ### Changed
 
 - **The interface is a sidebar + topbar shell.** Navigation moved from a header

@@ -58,6 +58,12 @@ type Client struct {
 	// onChange is called when the visible state changes (a new frame, a new
 	// aircraft). It must not block.
 	onChange func(State)
+	// OnFrame is called after every applied frame, without exception. Unlike
+	// onChange (which is coalesced), it is the tick that redraws outputs: a frame
+	// that does not change the aircraft may still change an exported value an LED or
+	// the LCD shows. It must not block, and it runs once per frame. Set it before
+	// Start.
+	OnFrame func()
 
 	mu       sync.RWMutex
 	mem      map[uint16]byte
@@ -212,6 +218,11 @@ func (c *Client) handleDatagram(data []byte) {
 
 		if changed {
 			c.onChange(c.State())
+		}
+		// Every applied frame may change an exported output, whether or not the
+		// visible state did.
+		if c.OnFrame != nil {
+			c.OnFrame()
 		}
 	}
 }

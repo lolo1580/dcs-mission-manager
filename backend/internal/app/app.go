@@ -22,12 +22,12 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"dcsmanager/internal/aerodrome"
 	"dcsmanager/internal/api"
-	"dcsmanager/internal/biosmeta"
 	"dcsmanager/internal/category"
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
@@ -36,8 +36,10 @@ import (
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/dcsdir"
 	"dcsmanager/internal/debriefstore"
+	"dcsmanager/internal/debuglog"
 	"dcsmanager/internal/ingest"
 	"dcsmanager/internal/install"
+	"dcsmanager/internal/led"
 	"dcsmanager/internal/live"
 	"dcsmanager/internal/mapping"
 	"dcsmanager/internal/model"
@@ -93,6 +95,15 @@ func Run(onReady func(addr string)) error {
 	}
 
 	log.Printf("dcsmanager %s", Version)
+
+	// ---- Debug logging ----------------------------------------------------
+	// Off by default; the Settings tab and DCSMANAGER_DEBUG switch it on. The line
+	// sink is wired once the API exists, a few statements below, so the early setup
+	// is only recorded in the ring buffer (and shown when the UI first loads).
+	dbg := debuglog.New(cfg.Debug, nil)
+	if cfg.Debug {
+		log.Printf("debug: enabled by DCSMANAGER_DEBUG")
+	}
 
 	store := state.New(cfg.UnitTTL, cfg.MaxUnits)
 	classifier := category.New(cfg.CategoriesFile)
@@ -225,6 +236,14 @@ func Run(onReady func(addr string)) error {
 	}
 
 	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, tcpListener)
+	// Debug lines are streamed to the UI once the API can broadcast them, and echo
+	// to the file/console log so a problem can still be read after the fact (and in
+	// window mode, where there is no console).
+	srv.SetDebug(dbg)
+	dbg.SetSink(func(line debuglog.Line) {
+		log.Printf("debug %s: %s", line.Area, line.Message)
+		srv.BroadcastMessage(map[string]any{"type": "log", "line": line})
+	})
 	// The module inventory comes from DCS's own list, so the UI can show what is
 	// installed and owned rather than a hand-maintained catalogue. "Owned" is the
 	// store's have="1" (bought); whether a module is actually on disk is answered
@@ -288,12 +307,17 @@ func Run(onReady func(addr string)) error {
 	// examined, rather than dropped with only its first log line.
 	debriefs.DumpDir = filepath.Join(filepath.Dir(cfg.DBPath), "rejected")
 	debriefs.OnDebrief = func(d model.Debrief) {
+		dbg.Infof("debrief", "stored #%d: %s (%d events)", d.ID, d.Mission, len(d.Parsed.Events))
 		srv.BroadcastMessage(map[string]any{"type": "debrief", "debrief": d})
 	}
 	tcpListener.OnMessage = func(m model.Message) {
 		// Debrief transfers are chunked and reassembled separately.
 		if debriefs.Handle(m) {
+			dbg.Infof("debrief", "transfer %s chunk %d/%d (%d bytes)", m.TransferID, m.Chunk+1, m.Chunks, len(m.Data))
 			return
+		}
+		if m.Type == "mission" {
+			dbg.Infof("mission", "phase=%s name=%q theatre=%q", m.Phase, m.Name, m.Theatre)
 		}
 		if database != nil {
 			writer.Handle(m)
@@ -308,6 +332,13 @@ func Run(onReady func(addr string)) error {
 	// The manager drives Logitech panels directly and speaks DCS-BIOS' protocol,
 	// so a cockpit with either can be watched. Both are best-effort: a machine
 	// without panels or without DCS-BIOS simply sees nothing here.
+	//
+	// ledDriver is declared before the DCS-BIOS client so the frame callback can
+	// reach it, and assigned once the panels and the binding store exist. It is an
+	// atomic pointer because the callback runs on the DCS-BIOS reader goroutine
+	// while the assignment happens on the main one.
+	var ledDriver atomic.Pointer[led.Driver]
+
 	bios := dcsbios.New(dcsbios.DefaultOptions(), func(st dcsbios.State) {
 		srv.BroadcastMessage(map[string]any{
 			"type": "dcsbios",
@@ -317,7 +348,23 @@ func Run(onReady func(addr string)) error {
 				"frames":    st.Frames,
 			},
 		})
+		// The callback fires on a visible state change (first frame, new aircraft),
+		// not on every frame, so this is a change log rather than a flood.
+		dbg.Infof("dcsbios", "state change: aircraft=%q connected=%v frames=%d", st.Aircraft, st.Connected, st.Frames)
+		// A new aircraft invalidates the panels' displays: what is shown belongs to
+		// the previous one. Forget the cached reports so the next frame redraws them.
+		if d := ledDriver.Load(); d != nil {
+			d.ForgetAll()
+		}
 	})
+	// Every applied frame redraws the outputs: a frame that does not change the
+	// aircraft may still change an exported LED or display value. This is separate
+	// from onChange, which is coalesced and would leave the panels stale.
+	bios.OnFrame = func() {
+		if d := ledDriver.Load(); d != nil {
+			d.Sync()
+		}
+	}
 	if err := bios.Start(); err != nil {
 		log.Printf("dcsbios: listener unavailable: %v", err)
 	} else {
@@ -334,20 +381,78 @@ func Run(onReady func(addr string)) error {
 
 	panelSvc := panelservice.New(panelservice.DefaultOptions(), func(e panelservice.Event) {
 		srv.BroadcastMessage(map[string]any{"type": "panel", "panel": api.PanelEventJSON(e)})
-		// A panel input drives the bound command, when the aircraft is known and
-		// sending is enabled.
-		if e.Kind == panelservice.KindInput {
-			if aircraft := bios.State().Aircraft; aircraft != "" {
-				if cat, err := biosmeta.LoadModule(cfg.SavedGames, aircraft); err == nil {
-					for _, line := range mappings.Apply(aircraft, e.Input, cat) {
-						srv.BroadcastMessage(map[string]any{"type": "command", "command": line})
+		switch e.Kind {
+		case panelservice.KindConnected, panelservice.KindDisconnected:
+			dbg.Infof("panel", "%s %s (%s)", e.Model, e.Kind.String(), e.Device)
+		case panelservice.KindError:
+			dbg.Warnf("panel", "%s: %v", e.Model, e.Err)
+		}
+		switch e.Kind {
+		case panelservice.KindInput:
+			// Show what the input maps to, whether or not sending is armed, so a
+			// binding can be checked without moving a real cockpit.
+			aircraft := bios.State().Aircraft
+			dbg.Infof("panel", "input %s %s=%v (aircraft=%q, commands=%v)",
+				e.Model, e.Input.Control.ID, e.Input.Active, aircraft, mappings.Enabled())
+			if aircraft != "" {
+				if cat, err := srv.LoadCatalog(aircraft); err == nil {
+					if lines := mappings.Simulate(aircraft, e.Input, cat); len(lines) > 0 {
+						srv.BroadcastMessage(map[string]any{
+							"type":     "mapping",
+							"aircraft": aircraft,
+							"model":    string(e.Model),
+							"control":  e.Input.Control.ID,
+							"active":   e.Input.Active,
+							"commands": lines,
+						})
+					}
+					// Send at most once per input, whichever path applies:
+					//   - the normal path sends when the operator armed sending;
+					//   - test mode forces the send even when sending is off.
+					// Never both, or a switch move that is already risky (gear!) would
+					// be sent twice.
+					if mappings.Enabled() {
+						for _, line := range mappings.Apply(aircraft, e.Input, cat) {
+							dbg.Infof("mapping", "sent -> %s", strings.TrimSpace(line))
+							srv.BroadcastMessage(map[string]any{"type": "command", "command": line})
+						}
+					} else if srv.TestMode() {
+						for _, line := range mappings.ApplyForced(aircraft, e.Input, cat) {
+							dbg.Infof("mapping", "test -> %s", strings.TrimSpace(line))
+							srv.BroadcastMessage(map[string]any{"type": "command", "command": line})
+						}
 					}
 				}
+			}
+			// A button press can be what an output binding watches; redraw the panels
+			// (the LCD shows the selector's mode, which may just have changed).
+			if d := ledDriver.Load(); d != nil {
+				d.Sync()
+			}
+		case panelservice.KindConnected:
+			// A panel that just appeared must be driven from the current state rather
+			// than wait for the next DCS-BIOS frame.
+			if d := ledDriver.Load(); d != nil {
+				d.Forget(e.Device)
+				d.Sync()
+			}
+		case panelservice.KindDisconnected:
+			// Drop the cached report: the panel comes back blank and must be redrawn.
+			if d := ledDriver.Load(); d != nil {
+				d.Forget(e.Device)
 			}
 		}
 	})
 	panelSvc.Start()
 	defer panelSvc.Stop()
+
+	// The output driver reads the aircraft's exported values and writes the panel
+	// reports. It shares the API's metadata cache so a catalogue is loaded once.
+	ledDriver.Store(led.New(bios, panelSvc, mappings, srv.LoadCatalog))
+	if d := ledDriver.Load(); d != nil {
+		d.SetLogger(dbg.Infof)
+		d.SetSwitchPos(panelSvc.SelectorMode)
+	}
 
 	srv.SetPanels(panelSvc, bios)
 	srv.SetMappings(mappings)

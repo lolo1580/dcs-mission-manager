@@ -194,3 +194,48 @@ func TestEncodePZ70PanelLeavesUnsetDisplay(t *testing.T) {
 		}
 	}
 }
+
+// TestFormatPZ70Line checks the preview text matches the LCD layout: five digits
+// (abs, no sign) on top, ten characters with a minus on the bottom, right-aligned
+// with leading spaces.
+func TestFormatPZ70Line(t *testing.T) {
+	cases := []struct {
+		line  DisplayLine
+		value int
+		want  string
+	}{
+		{LineUpper, 12345, "12345"},
+		{LineUpper, 7, "    7"},
+		{LineUpper, -42, "   42"}, // the top line has no sign
+		{LineLower, -1234, "     -1234"},
+		{LineLower, 300, "       300"},
+	}
+	for _, c := range cases {
+		if got := FormatPZ70Line(c.line, c.value); got != c.want {
+			t.Errorf("FormatPZ70Line(%v, %d) = %q, want %q", c.line, c.value, got, c.want)
+		}
+	}
+}
+
+// TestDisplayModeValidation checks the selector modes and lines a display binding
+// may name.
+func TestDisplayModeValidation(t *testing.T) {
+	for _, m := range []string{"ALT", "alt", "VS", "IAS", "HDG", "CRS"} {
+		if !ValidDisplayMode(m) {
+			t.Errorf("%q should be a valid mode", m)
+		}
+	}
+	for _, m := range []string{"", "NOPE", "KNOB_ALT"} {
+		if ValidDisplayMode(m) {
+			t.Errorf("%q should not be a valid mode", m)
+		}
+	}
+	for _, l := range []string{"upper", "UPPER", "lower"} {
+		if !ValidDisplayLine(l) {
+			t.Errorf("%q should be a valid line", l)
+		}
+	}
+	if ValidDisplayLine("middle") {
+		t.Error("middle is not a line")
+	}
+}

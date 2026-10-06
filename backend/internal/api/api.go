@@ -23,6 +23,7 @@ import (
 	"dcsmanager/internal/db"
 	"dcsmanager/internal/dcsbios"
 	"dcsmanager/internal/dcsdata"
+	"dcsmanager/internal/debuglog"
 	"dcsmanager/internal/live"
 	"dcsmanager/internal/mapping"
 	"dcsmanager/internal/panelservice"
@@ -113,6 +114,32 @@ type Server struct {
 	// which case it also refuses requests whose Host is not local (DNS
 	// rebinding).
 	localOnly bool
+	// testMode, when on, lets panel inputs reach DCS-BIOS regardless of the sending
+	// switch, so the mapping can be checked live in the Panels test view. Off by
+	// default and off again on restart.
+	testMode bool
+	// debug is the runtime debug switch and in-memory log. It may be nil (some
+	// tests build a Server without it), so every use goes through helpers below.
+	debug *debuglog.Logger
+}
+
+// SetDebug installs the debug logger. It is optional: the endpoints then just
+// report debug as unavailable.
+func (s *Server) SetDebug(l *debuglog.Logger) {
+	s.debug = l
+}
+
+// DebugEnabled reports whether debug logging is on.
+func (s *Server) DebugEnabled() bool {
+	return s.debug != nil && s.debug.Enabled()
+}
+
+// debugf records a debug line if a logger is installed. The call sites do not have
+// to check for nil.
+func (s *Server) debugf(area, format string, args ...any) {
+	if s.debug != nil {
+		s.debug.Infof(area, format, args...)
+	}
 }
 
 // New creates a server backed by store. live, database, statsService and
@@ -139,6 +166,18 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 // the configured string; this corrects it to match the socket actually bound.
 func (s *Server) SetLocalOnly(local bool) {
 	s.localOnly = local
+}
+
+// SetTestMode turns the live mapping test on or off. In test mode a panel input is
+// sent to DCS-BIOS even when command sending is not armed, so the mapping can be
+// verified against the cockpit directly from the Panels view.
+func (s *Server) SetTestMode(on bool) {
+	s.testMode = on
+}
+
+// TestMode reports whether the live mapping test is on.
+func (s *Server) TestMode() bool {
+	return s.testMode
 }
 
 // SetModules installs the DCS module inventory read from the installation. It is
@@ -171,7 +210,34 @@ func (s *Server) SetScripts(st dcsdata.ScriptStatus) {
 // where the whole manager is exposed beyond loopback.
 func (s *Server) Handler() http.Handler {
 	mux := s.routes()
-	return s.originGuard(s.tokenGuard(mux))
+	return s.originGuard(s.tokenGuard(s.debugMiddleware(mux)))
+}
+
+// debugMiddleware records every API request (method, path, status) when debug is
+// on. It is the "what is the UI actually asking for?" view, and it costs a no-op
+// string check when debug is off.
+func (s *Server) debugMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.debug == nil || !s.debug.Enabled() {
+			next.ServeHTTP(w, r)
+			return
+		}
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: 200}
+		next.ServeHTTP(rec, r)
+		s.debug.Infof("http", "%s %s -> %d (%s)", r.Method, r.URL.RequestURI(), rec.status, time.Since(start).Round(time.Millisecond))
+	})
+}
+
+// statusRecorder captures the status code for the debug log.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
 }
 
 // originGuard protects an API that has a destructive endpoint and no
@@ -289,7 +355,14 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/dcsbios", s.handleDCSBIOS)
 	mux.HandleFunc("/api/mappings", s.handleMappings)
 	mux.HandleFunc("/api/mappings/safety", s.handleMappingSafety)
+	mux.HandleFunc("/api/mappings/outputs", s.handleOutputsSafety)
+	mux.HandleFunc("/api/mappings/test", s.handleMappingTest)
+	mux.HandleFunc("/api/aircraft", s.handleAircraft)
 	mux.HandleFunc("/api/controls", s.handleControls)
+	mux.HandleFunc("/api/display/preview", s.handleDisplayPreview)
+	mux.HandleFunc("/api/display/test", s.handleDisplayTest)
+	mux.HandleFunc("/api/debug", s.handleDebug)
+	mux.HandleFunc("/api/log", s.handleLog)
 	mux.Handle("/", s.webHandler())
 	return mux
 }

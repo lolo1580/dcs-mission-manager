@@ -466,14 +466,20 @@ func Restore(archivePath, savedGames string, dryRun bool) (RestoreResult, error)
 		return res, nil
 	}
 
-	// Safety copy of what is about to be overwritten.
+	// Safety copy of what is about to be overwritten. It is mandatory: a restore
+	// replaces live DCS files, and continuing without the ability to go back would
+	// leave the user worse off than before, with no way to undo. An archive that
+	// declares no category (so nothing to back up) is the only case it is skipped.
 	if len(man.Categories) > 0 {
 		safety := strings.TrimSuffix(archivePath, ".zip") + ".prerestore.zip"
-		if cats, sErr := Resolve(man.Categories); sErr == nil {
-			if cErr := createTo(savedGames, safety, cats, man.AppVersion); cErr == nil {
-				res.SafetyBackup = safety
-			}
+		cats, sErr := Resolve(man.Categories)
+		if sErr != nil {
+			return res, fmt.Errorf("refusing to restore: cannot resolve the backup categories: %w", sErr)
 		}
+		if cErr := createTo(savedGames, safety, cats, man.AppVersion); cErr != nil {
+			return res, fmt.Errorf("refusing to restore: the safety backup failed: %w", cErr)
+		}
+		res.SafetyBackup = safety
 	}
 
 	for _, t := range targets {

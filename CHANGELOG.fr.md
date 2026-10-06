@@ -9,6 +9,91 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Corrigé
+
+- **Une restauration ne se poursuit plus si sa copie de secours échoue.** Restaurer
+  remplace des fichiers DCS en service, donc le `*.prerestore.zip` préalable est
+  désormais obligatoire : s'il ne peut pas être écrit (ou si ses catégories ne se
+  résolvent pas), la restauration est refusée avec une erreur et rien n'est écrasé.
+- **Les molettes des panneaux respectent leur sens.** Les deux crans d'une molette
+  signalent le même front « actif », donc l'ancien mapping envoyait le même argument
+  dans les deux sens et une molette de trim ou la molette du LCD PZ70 ne pouvait
+  tourner que d'un côté. Le signe vient désormais de la direction (`variable_step` :
+  ±pas, `fixed_step` : INC/DEC).
+- **L'onglet Aérodromes n'affiche plus les cartes d'un champ précédemment
+  sélectionné.** Une réponse lente pour un aérodrome choisi avant est ignorée si elle
+  arrive après celui affiché.
+- **La recherche du champ le plus proche est filtrée par le théâtre sélectionné.**
+  Elle balayait tous les théâtres, donc un champ absent de la carte courante pouvait
+  apparaître en premier.
+
+### Ajouté
+
+- **Les LED des panneaux sont pilotées depuis DCS-BIOS.** Les voyants de train du
+  PZ55 et les LED des boutons du pilote automatique du PZ70 reflètent désormais le
+  cockpit, lus sur les valeurs exportées par DCS-BIOS (les voyants de train sont
+  bicolores : vert pour train sorti et verrouillé, rouge pour non sûr). C'est la
+  moitié manquante du pont des panneaux — `mapping` envoyait déjà un mouvement
+  d'interrupteur dans le cockpit — et l'équivalent Go des `outputBindings` des
+  profils d'origine. Les liaisons de sortie vivent dans les mêmes profils par
+  appareil que les entrées et se modifient dans l'onglet Panneaux ; les profils de
+  départ portent les voyants de train (F-16C, F-5E-3, F/A-18C, M-2000C) et les LED
+  du pilote automatique du M-2000C. Elles ont leur **propre interrupteur** (voir
+  plus bas), indépendant de l'envoi des commandes, et un fichier de profils écrit
+  avant l'existence des sorties est complété en mémoire depuis les profils de départ
+  (une liste vide explicite est respectée).
+
+- **Un test des associations en direct dans l'onglet Panneaux.** Active-le, puis
+  actionne un interrupteur ou un bouton : chaque changement s'affiche avec la
+  commande DCS-BIOS que l'association enverrait — de quoi vérifier un mapping sans
+  voler. Le test peut aussi envoyer l'entrée à DCS-BIOS tant qu'il est actif (pour
+  que le cockpit réagisse), indépendamment de l'interrupteur d'envoi des commandes ;
+  comme lui, il se réinitialise au redémarrage.
+
+- **Un mode debug dans les Paramètres.** Un interrupteur active un journal en
+  direct des actions du gestionnaire : chaque requête API, chaque entrée de panneau
+  et la commande qu'elle produit, les changements d'état DCS-BIOS, les transitions de
+  mission et les transferts de débrief. Les lignes sont diffusées dans un
+  sous-onglet **Débogage** des Paramètres (plus récentes en haut, colorées par
+  niveau) et recopiées dans `data/dcsmanager.log` / la console. Désactivé par
+  défaut, activable au démarrage par `DCSMANAGER_DEBUG=1` ; l'interrupteur est
+  `GET/POST /api/debug` et le journal `GET /api/log`.
+
+- **L'appareil peut désormais être choisi à la main dans l'onglet Panneaux.** Les
+  associations sont par appareil et n'apparaissaient auparavant que lorsque DCS-BIOS
+  signalait l'appareil actif — donc rien n'était modifiable ni testable DCS fermé,
+  exactement au moment où l'on règle un mapping. Un sélecteur liste chaque appareil
+  ayant un profil (`GET /api/aircraft`) et charge ses associations sans mission ;
+  DCS-BIOS continue de prendre le dessus tant qu'un appareil est actif.
+
+- **Les sorties des panneaux ont leur propre interrupteur, et le pilote construit un
+  rapport complet unique.** Piloter les LED n'exige plus d'armer l'envoi des
+  commandes (qui écrit les entrées du pilote dans l'appareil) : l'interrupteur des
+  sorties (`POST /api/mappings/outputs`) ne fait que lire DCS-BIOS et écrire sur les
+  panneaux. Le pilote est rappelé à **chaque** trame DCS-BIOS (et plus seulement sur
+  un changement d'état), fusionne les voyants de train du PZ55 et le masque de
+  voyants + les lignes LCD du PZ70 (à venir) en un seul rapport, n'écrit que s'il
+  change, et vide son cache à la reconnexion d'un panneau ou au changement d'appareil
+  pour redessiner. Le profil gagne aussi une section `displays` validée (LCD : mode,
+  ligne, source, index d'export, échelle/décalage, unité), pas encore utilisée par
+  l'interface.
+
+- **Un éditeur d'affichage PZ70 dans l'onglet Panneaux.** Une section « Affichage
+  PZ70 » lie une ligne du LCD à une valeur exportée par DCS-BIOS, par position du
+  sélecteur (ALT/VS/IAS/HDG/CRS) : choix du contrôle source, de l'index d'export, d'une
+  échelle/décalage et d'une unité. Un **Aperçu** résout l'association contre la mémoire
+  DCS-BIOS en direct et montre la valeur brute, la valeur convertie et le texte LCD
+  exact (`POST /api/display/preview`) ; un **test matériel** écrit les nombres choisis
+  sur les deux lignes pour vérifier chaque cellule et le signe sur le vrai panneau
+  (`POST /api/display/test`). Les deux sont indépendants de l'envoi des commandes.
+
+- **Profils de départ LCD pour le M-2000C et le F-5E-3.** Chacun affiche le cap (HDG)
+  et la course (CRS) sélectionnés — les références que ces appareils exportent
+  réellement en entier (les angles du HSI, normalisés 0..1 donc mis à l'échelle par
+  360/65535 degrés). Le F-16 et le F/A-18 exportent leurs valeurs sélectionnées en
+  texte, que cette version ne lit pas : ils n'ont pas d'affichage ; le mode reste à
+  remplir par l'opérateur après validation du panneau.
+
 ### Modifié
 
 - **L'interface est une coquille barre latérale + bandeau.** La navigation quitte

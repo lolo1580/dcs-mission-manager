@@ -15,8 +15,14 @@ export const aerodromeCharts = writable([]);
 export const chartsError = writable('');
 export const viewingChart = writable(null);
 
+// Monotonic id per chart load, so a slow response for a previous airfield cannot
+// replace the charts of the one now selected (the classic "A then B, A answers
+// last" race).
+let chartsSeq = 0;
+
 /** Loads the charts available for one airfield, matched by ICAO and name. */
 export async function loadAerodromeCharts(a) {
+  const seq = ++chartsSeq;
   chartsError.set('');
   aerodromeCharts.set([]);
   if (!a) return;
@@ -28,8 +34,12 @@ export async function loadAerodromeCharts(a) {
     const res = await fetch(`/api/charts?${q}`);
     if (!res.ok) throw new Error(`${res.status}`);
     const body = await res.json();
+    // A slow response for a previously selected airfield must not replace the
+    // charts of the one now shown.
+    if (seq !== chartsSeq) return;
     aerodromeCharts.set(body.charts ?? []);
   } catch (e) {
+    if (seq !== chartsSeq) return;
     chartsError.set(tNow('error.charts', { detail: e.message }));
   }
 }
@@ -84,7 +94,8 @@ export async function loadNearest() {
     return false;
   }
   try {
-    const res = await fetch(`/api/aerodromes?lat=${own.lat}&lng=${own.lng}`);
+    const th = get(theatre);
+    const res = await fetch(`/api/aerodromes?lat=${own.lat}&lng=${own.lng}&theatre=${encodeURIComponent(th)}`);
     if (!res.ok) throw new Error(`${res.status}`);
     const body = await res.json();
     aerodromes.set(body.aerodromes ?? []);

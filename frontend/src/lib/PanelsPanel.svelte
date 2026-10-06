@@ -18,23 +18,42 @@
   } from './panels.js';
   import {
     bindings,
+    outputs,
+    displays,
     sendingEnabled,
+    outputsEnabled,
+    testMode,
+    mappingEvents,
+    displayPreview,
     mappingsError,
     mappingAircraft,
+    aircraftList,
     controls,
     controlsAvailable,
     loadMappings,
+    loadAircraft,
     setSending,
+    setOutputs,
+    setTestMode,
     addBinding,
     removeBinding,
+    addOutput,
+    removeOutput,
+    addDisplay,
+    removeDisplay,
+    previewDisplay,
+    testDisplay,
   } from './mappings.js';
   import { t } from './i18n.js';
 
   onMount(async () => {
     await loadPanels();
-    // The bindings are per aircraft, and the aircraft comes from DCS-BIOS. Load
-    // them once the link has told us which one is current.
-    if ($biosState.aircraft) loadMappings($biosState.aircraft);
+    await loadAircraft();
+    // The bindings are per aircraft. Prefer the one DCS-BIOS reports as active;
+    // when DCS is not running (no link), fall back to the first profile so the
+    // mappings can still be edited and tested without a mission loaded.
+    const want = $biosState.aircraft || $aircraftList[0] || '';
+    if (want) loadMappings(want);
   });
 
   // The Refresh button reloads everything on this tab: the panels, the link, and
@@ -42,14 +61,24 @@
   // saved through the API invisible until the aircraft changed.
   async function refreshAll() {
     await loadPanels();
+    await loadAircraft();
     if ($biosState.aircraft) await loadMappings($biosState.aircraft);
   }
 
-  // When the active aircraft changes, reload its bindings.
+  // When the active aircraft changes, reload its bindings — but only if the user
+  // has not picked another one manually below.
   let lastAircraft = '';
-  $: if ($biosState.aircraft !== lastAircraft) {
+  $: if ($biosState.aircraft && $biosState.aircraft !== lastAircraft) {
     lastAircraft = $biosState.aircraft;
-    if (lastAircraft) loadMappings(lastAircraft);
+    loadMappings($biosState.aircraft);
+  }
+
+  // The operator can pick the aircraft by hand: needed to edit or test a profile
+  // when DCS (and so DCS-BIOS) is not running, which is exactly when a mapping is
+  // set up.
+  function pickAircraft(e) {
+    const name = e.currentTarget.value;
+    if (name) loadMappings(name);
   }
 
   const KIND_KEYS = {
@@ -119,6 +148,110 @@
       newInterface = '';
     }
   }
+
+  // LED output targets per panel, and the colours the PZ55's bicolour indicators
+  // accept (the PZ70's are single-colour). Kept in step with internal/panel.
+  const PANEL_OUTPUTS = {
+    pz55: [
+      'LIGHT_GEAR_UPPER', 'LIGHT_GEAR_LEFT', 'LIGHT_GEAR_RIGHT',
+    ],
+    pz70: [
+      'LIGHT_AP', 'LIGHT_HDG', 'LIGHT_NAV', 'LIGHT_IAS', 'LIGHT_ALT', 'LIGHT_VS',
+      'LIGHT_APR', 'LIGHT_REV',
+    ],
+  };
+  const COLORS = ['green', 'red', 'yellow'];
+
+  let outPanel = 'pz55';
+  let outTarget = '';
+  let outCommand = '';
+  let outColor = 'green';
+
+  $: outputTargetList = PANEL_OUTPUTS[outPanel] ?? [];
+
+  // The PZ55's gear indicators are bicolour; the PZ70's are single-colour, so its
+  // colour picker is not offered.
+  $: colorChoices = outPanel === 'pz55' ? COLORS : ['green'];
+
+  // Keep the target valid when the panel changes.
+  $: if (outTarget && !outputTargetList.includes(outTarget)) {
+    outTarget = '';
+  }
+
+  async function submitOutput() {
+    if (!outTarget || !outCommand) return;
+    const ok = await addOutput({
+      model: outPanel,
+      target: outTarget,
+      command: outCommand,
+      color: outColor,
+    });
+    if (ok) {
+      outTarget = '';
+      outCommand = '';
+    }
+  }
+
+  // --- PZ70 LCD display editor ---------------------------------------------
+  // A display binding answers one selector mode (ALT/VS/IAS/HDG/CRS) on one LCD line.
+  const DISPLAY_MODES = ['ALT', 'VS', 'IAS', 'HDG', 'CRS'];
+  const DISPLAY_LINES = ['upper', 'lower'];
+
+  let dispMode = 'ALT';
+  let dispLine = 'upper';
+  let dispCommand = '';
+  let dispExport = 0;
+  let dispScale = 1;
+  let dispOffset = 0;
+  let dispUnit = '';
+
+  // The controls the source picker offers: any control with an integer export
+  // (read-only displays, gauges, selected values), even if it also has inputs.
+  $: exportControls = $controls.filter((c) => (c.outputs ?? []).some((o) => (o.type ?? 'integer') === 'integer'));
+
+  // Reset the export index when the source changes, so it never points past the
+  // new control's outputs.
+  $: chosenSource = exportControls.find((c) => c.identifier === dispCommand) ?? null;
+  $: exportCount = chosenSource ? (chosenSource.outputs ?? []).length : 0;
+  $: if (dispExport >= exportCount) dispExport = 0;
+
+  async function submitDisplay() {
+    if (!dispCommand) return;
+    const ok = await addDisplay({
+      model: 'pz70',
+      mode: dispMode,
+      line: dispLine,
+      command: dispCommand,
+      export: Number(dispExport) || 0,
+      scale: Number(dispScale) || 0,
+      offset: Number(dispOffset) || 0,
+      unit: dispUnit,
+    });
+    if (ok) {
+      dispCommand = '';
+      dispExport = 0;
+      dispUnit = '';
+    }
+  }
+
+  function previewCurrent() {
+    previewDisplay({
+      aircraft: $mappingAircraft,
+      command: dispCommand,
+      export: Number(dispExport) || 0,
+      scale: Number(dispScale) || 0,
+      offset: Number(dispOffset) || 0,
+      line: dispLine,
+    });
+  }
+
+  // Hardware test: write known numbers to the two lines. 12345 / -1234 exercises
+  // every cell and the minus sign.
+  let testUpper = 12345;
+  let testLower = -1234;
+  async function runHardwareTest() {
+    await testDisplay({ upper: Number(testUpper), lower: Number(testLower) });
+  }
 </script>
 
 <section class="panels">
@@ -168,8 +301,23 @@
         </span>
       </h3>
 
-      {#if !$biosState.aircraft}
-        <p class="empty">{$t('panels.mappingsNeedAircraft')}</p>
+      <p class="hint">{$t('panels.mappingsHint')}</p>
+
+      {#if $aircraftList.length > 0}
+        <label class="pick">
+          {$t('panels.aircraftPick')}
+          <select value={$mappingAircraft} on:change={pickAircraft}>
+            {#each $aircraftList as a (a)}
+              <option value={a}>{a}</option>
+            {/each}
+          </select>
+        </label>
+      {:else}
+        <p class="empty">{$t('panels.noProfiles')}</p>
+      {/if}
+
+      {#if !$mappingAircraft}
+        <p class="empty">{$t('panels.pickAircraft')}</p>
       {:else if !$controlsAvailable}
         <p class="empty">{$t('panels.noMetadata', { aircraft: $mappingAircraft })}</p>
       {:else}
@@ -229,7 +377,7 @@
           </select>
           <select bind:value={newCommand} aria-label={$t('panels.col.command')}>
             <option value="">{$t('panels.pickCommand')}</option>
-            {#each $controls as c (c.identifier)}
+            {#each $controls.filter((c) => c.inputs && c.inputs.length > 0) as c (c.identifier)}
               <option value={c.identifier}>{c.identifier}</option>
             {/each}
           </select>
@@ -248,6 +396,198 @@
           >
             {$t('panels.add')}
           </button>
+        </div>
+
+        <div class="test">
+          <label class="toggle test-toggle">
+            <input type="checkbox" checked={$testMode} on:change={(e) => setTestMode(e.currentTarget.checked)} />
+            {$t('panels.testMode')}
+          </label>
+          <p class="hint">{$t('panels.testHint')}</p>
+
+          {#if $mappingEvents.length === 0}
+            <p class="empty">{$t('panels.noTestEvents')}</p>
+          {:else}
+            <ul class="test-log" aria-label={$t('panels.testLog')}>
+              {#each $mappingEvents as e}
+                <li>
+                  <span class="dev">{e.model === 'pz55' ? 'PZ55' : 'PZ70'}</span>
+                  <span class="ctl mono">{e.control}</span>
+                  <span class="arrow">→</span>
+                  {#if e.commands && e.commands.length}
+                    <span class="mono">{e.commands.map((c) => c.trim().replace(/\s+/, ' = ')).join(', ')}</span>
+                  {:else}
+                    <span class="msg">{$t('panels.testNoBinding')}</span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    <div class="block">
+      <h3>
+        {$t('panels.outputs')}
+        <span class="badge" class:on={$outputsEnabled}>
+          {$outputsEnabled ? $t('panels.sendingOn') : $t('panels.sendingOff')}
+        </span>
+      </h3>
+      <p class="hint">{$t('panels.outputsHint')}</p>
+
+      {#if !$mappingAircraft}
+        <p class="empty">{$t('panels.pickAircraft')}</p>
+      {:else if !$controlsAvailable}
+        <p class="empty">{$t('panels.noMetadata', { aircraft: $mappingAircraft })}</p>
+      {:else}
+        <label class="toggle safety">
+          <input type="checkbox" checked={$outputsEnabled} on:change={(e) => setOutputs(e.currentTarget.checked)} />
+          {$t('panels.outputsEnable')}
+        </label>
+        <p class="hint">{$t('panels.outputsSwitchHint')}</p>
+
+        {#if $outputs.length === 0}
+          <p class="empty">{$t('panels.noOutputs')}</p>
+        {:else}
+          <table class="bindings">
+            <thead>
+              <tr>
+                <th>{$t('panels.col.panel')}</th>
+                <th>{$t('panels.col.target')}</th>
+                <th>{$t('panels.col.source')}</th>
+                <th>{$t('panels.col.color')}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each $outputs as o (o.model + '/' + o.target)}
+                <tr>
+                  <td>{modelLabel(o.model)}</td>
+                  <td class="mono">{o.target}</td>
+                  <td class="mono">{o.command}</td>
+                  <td>{o.color ? $t(`panels.color.${o.color}`) : '—'}</td>
+                  <td class="actions">
+                    <button class="remove" on:click={() => removeOutput(o.model, o.target)} title={$t('panels.remove')}>×</button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+
+        <div class="add">
+          <select bind:value={outPanel} aria-label={$t('panels.col.panel')}>
+            <option value="pz55">PZ55</option>
+            <option value="pz70">PZ70</option>
+          </select>
+          <select bind:value={outTarget} aria-label={$t('panels.col.target')}>
+            <option value="">{$t('panels.pickTarget')}</option>
+            {#each outputTargetList as tgt (tgt)}
+              <option value={tgt}>{tgt}</option>
+            {/each}
+          </select>
+          <select bind:value={outCommand} aria-label={$t('panels.col.source')}>
+            <option value="">{$t('panels.pickSource')}</option>
+            {#each $controls as c (c.identifier)}
+              {#if !c.inputs || c.inputs.length === 0}
+                <option value={c.identifier}>{c.identifier}</option>
+              {/if}
+            {/each}
+          </select>
+          <select bind:value={outColor} aria-label={$t('panels.col.color')} disabled={colorChoices.length === 1}>
+            {#each colorChoices as c (c)}
+              <option value={c}>{$t(`panels.color.${c}`)}</option>
+            {/each}
+          </select>
+          <button class="add-btn" on:click={submitOutput} disabled={!outTarget || !outCommand}>
+            {$t('panels.addOutput')}
+          </button>
+        </div>
+      {/if}
+    </div>
+
+    <div class="block">
+      <h3>{$t('panels.displays')}</h3>
+      <p class="hint">{$t('panels.displaysHint')}</p>
+
+      {#if !$mappingAircraft}
+        <p class="empty">{$t('panels.pickAircraft')}</p>
+      {:else if !$controlsAvailable}
+        <p class="empty">{$t('panels.noMetadata', { aircraft: $mappingAircraft })}</p>
+      {:else}
+        {#if $displays.length === 0}
+          <p class="empty">{$t('panels.noDisplays')}</p>
+        {:else}
+          <table class="bindings">
+            <thead>
+              <tr>
+                <th>{$t('panels.col.mode')}</th>
+                <th>{$t('panels.col.line')}</th>
+                <th>{$t('panels.col.source')}</th>
+                <th>{$t('panels.col.conversion')}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each $displays as d (d.mode + '/' + d.line)}
+                <tr>
+                  <td class="mono">{d.mode}</td>
+                  <td>{$t('panels.line.' + d.line)}</td>
+                  <td class="mono">{d.command}</td>
+                  <td class="mono">×{(d.scale ?? 0) || 1}{(d.offset ? (d.offset > 0 ? ' +' : ' ') + d.offset : '')}{#if d.unit}<span class="tag">{d.unit}</span>{/if}</td>
+                  <td class="actions">
+                    <button class="remove" on:click={() => removeDisplay(d.mode, d.line)} title={$t('panels.remove')}>×</button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+
+        <div class="add">
+          <select bind:value={dispMode} aria-label={$t('panels.col.mode')}>
+            {#each DISPLAY_MODES as m (m)}
+              <option value={m}>{m}</option>
+            {/each}
+          </select>
+          <select bind:value={dispLine} aria-label={$t('panels.col.line')}>
+            {#each DISPLAY_LINES as l (l)}
+              <option value={l}>{$t('panels.line.' + l)}</option>
+            {/each}
+          </select>
+          <select bind:value={dispCommand} aria-label={$t('panels.col.source')}>
+            <option value="">{$t('panels.pickSource')}</option>
+            {#each exportControls as c (c.identifier)}
+              <option value={c.identifier}>{c.identifier}</option>
+            {/each}
+          </select>
+          <input class="num" type="number" min="0" bind:value={dispExport} title={$t('panels.exportIndex')} placeholder="0" />
+          <input class="num" type="number" step="any" bind:value={dispScale} title={$t('panels.scale')} placeholder="1" />
+          <input class="num" type="number" step="any" bind:value={dispOffset} title={$t('panels.offset')} placeholder="0" />
+          <input class="num wide" type="text" bind:value={dispUnit} title={$t('panels.unit')} placeholder={$t('panels.unit')} />
+          <button class="add-btn" on:click={submitDisplay} disabled={!dispCommand}>{$t('panels.addDisplay')}</button>
+          <button class="add-btn" on:click={previewCurrent} disabled={!dispCommand}>{$t('panels.preview')}</button>
+        </div>
+
+        {#if $displayPreview}
+          <p class="line preview">
+            {#if $displayPreview.available}
+              <span class="seg">{dispMode}</span>
+              <span class="lcd">{$displayPreview.text}</span>
+              <span class="muted">{$t('panels.previewRaw')} {$displayPreview.raw} → {$displayPreview.value}</span>
+            {:else}
+              <span class="muted">{$t('panels.previewUnavailable', { reason: $displayPreview.reason })}</span>
+            {/if}
+          </p>
+        {/if}
+
+        <div class="hwtest">
+          <span class="muted">{$t('panels.hwTest')}</span>
+          <input class="num" type="number" bind:value={testUpper} title={$t('panels.line.upper')} />
+          <input class="num" type="number" bind:value={testLower} title={$t('panels.line.lower')} />
+          <button class="add-btn" on:click={runHardwareTest}>{$t('panels.hwTestRun')}</button>
+          <span class="muted">{$t('panels.hwTestHint')}</span>
         </div>
       {/if}
     </div>
@@ -423,8 +763,32 @@
     margin: 0.25rem 0 0.5rem;
     font-size: 0.72rem;
     color: var(--muted);
-    max-width: 70ch;
+    max-width: 80ch;
     line-height: 1.5;
+  }
+
+  .pick {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .pick select {
+    padding: 0.24rem 0.4rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+
+  .pick select:focus {
+    outline: none;
+    border-color: var(--blue);
   }
 
   table.bindings {
@@ -507,6 +871,66 @@
     border-color: var(--blue);
   }
 
+  .add input.num,
+  .hwtest input.num {
+    width: 5.5rem;
+    padding: 0.26rem 0.4rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.74rem;
+  }
+
+  .add input.num.wide {
+    width: 9rem;
+  }
+
+  .add input.num:focus,
+  .hwtest input.num:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+
+  .preview {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.4rem 0 0;
+  }
+
+  .seg {
+    font-size: 0.7rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0 0.4rem;
+  }
+
+  .lcd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    letter-spacing: 0.12em;
+    color: var(--green);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.1rem 0.5rem;
+    white-space: pre;
+  }
+
+  .hwtest {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border);
+    font-size: 0.74rem;
+    max-width: 820px;
+  }
+
   .add-btn {
     padding: 0.28rem 0.6rem;
     font-size: 0.74rem;
@@ -524,6 +948,49 @@
   .add-btn:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  /* Live mapping test: a switch under the bindings, and the resolved commands. */
+  .test {
+    margin-top: 0.8rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed var(--border);
+    max-width: 820px;
+  }
+
+  .toggle.test-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .test-log {
+    list-style: none;
+    margin: 0.4rem 0 0;
+    padding: 0;
+    font-size: 0.76rem;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .test-log li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.15rem 0.3rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .test-log li:first-child {
+    border-top: none;
+  }
+
+  .arrow {
+    color: var(--muted);
+    flex: none;
   }
 
   .card {

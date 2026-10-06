@@ -5,6 +5,8 @@
  */
 import { writable, get } from 'svelte/store';
 import { pushPanelEvent, biosState } from './panels.js';
+import { pushMappingEvent } from './mappings.js';
+import { pushDebugLine } from './debug.js';
 
 /** All units as received from the backend. */
 export const units = writable([]);
@@ -47,6 +49,18 @@ export function connect() {
       }
       if (msg.type === 'dcsbios' && msg.state) {
         biosState.set(msg.state);
+        return;
+      }
+
+      // The live mapping test: what a panel input resolves to.
+      if (msg.type === 'mapping') {
+        pushMappingEvent(msg);
+        return;
+      }
+
+      // A debug line, when debug logging is on.
+      if (msg.type === 'log' && msg.line) {
+        pushDebugLine(msg.line);
         return;
       }
 

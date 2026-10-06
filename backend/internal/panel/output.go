@@ -2,6 +2,7 @@ package panel
 
 import (
 	"strconv"
+	"strings"
 )
 
 // GearLight is one of the PZ55's three landing-gear indicator colours.
@@ -18,11 +19,122 @@ const (
 	GearYellow
 )
 
+// DisplayLine identifies one of the PZ70's two LCD lines.
+type DisplayLine int
+
+const (
+	// LineUpper is the top line: five digits, no sign.
+	LineUpper DisplayLine = iota
+	// LineLower is the bottom line: ten characters, room for a minus.
+	LineLower
+)
+
+// DisplayModes are the PZ70 selector positions a display binding can answer to,
+// matching the panel's own control ids.
+var DisplayModes = []string{"ALT", "VS", "IAS", "HDG", "CRS"}
+
+// displayModeSet is the lookup form of DisplayModes (case-insensitive).
+var displayModeSet = func() map[string]bool {
+	m := map[string]bool{}
+	for _, mode := range DisplayModes {
+		m[strings.ToUpper(mode)] = true
+	}
+	return m
+}()
+
+// ValidDisplayMode reports whether mode is a PZ70 selector position.
+func ValidDisplayMode(mode string) bool {
+	return displayModeSet[strings.ToUpper(mode)]
+}
+
+// ValidDisplayLine reports whether line names an LCD line ("upper" or "lower").
+func ValidDisplayLine(line string) bool {
+	return strings.EqualFold(line, "upper") || strings.EqualFold(line, "lower")
+}
+
 // GearLights is the PZ55's landing-gear indicator state, one per wheel.
 type GearLights struct {
 	Upper GearLight
 	Left  GearLight
 	Right GearLight
+}
+
+// Output targets: which indicator on which panel an output binding drives,
+// independent of the aircraft. They are the stable names a profile stores.
+const (
+	// PZ55 landing-gear indicators.
+	TargetGearUpper = "LIGHT_GEAR_UPPER"
+	TargetGearLeft  = "LIGHT_GEAR_LEFT"
+	TargetGearRight = "LIGHT_GEAR_RIGHT"
+	// PZ70 autopilot button lights.
+	TargetAP  = "LIGHT_AP"
+	TargetHDG = "LIGHT_HDG"
+	TargetNAV = "LIGHT_NAV"
+	TargetIAS = "LIGHT_IAS"
+	TargetALT = "LIGHT_ALT"
+	TargetVS  = "LIGHT_VS"
+	TargetAPR = "LIGHT_APR"
+	TargetREV = "LIGHT_REV"
+)
+
+// GearLightFor turns a stored colour name into a GearLight. An unknown or empty
+// colour is green, the common case for a gear-down indicator.
+func GearLightFor(color string) GearLight {
+	switch strings.ToLower(color) {
+	case "red":
+		return GearRed
+	case "yellow":
+		return GearYellow
+	case "off":
+		return GearOff
+	default:
+		return GearGreen
+	}
+}
+
+// gearTargets maps the PZ55 gear targets to the struct field they set.
+var gearTargets = map[string]func(*GearLights, GearLight){
+	TargetGearUpper: func(g *GearLights, c GearLight) { g.Upper = c },
+	TargetGearLeft:  func(g *GearLights, c GearLight) { g.Left = c },
+	TargetGearRight: func(g *GearLights, c GearLight) { g.Right = c },
+}
+
+// pz70TargetLights maps the PZ70 light targets to their bit.
+var pz70TargetLights = map[string]PZ70Lights{
+	TargetAP:  PZ70LightAP,
+	TargetHDG: PZ70LightHDG,
+	TargetNAV: PZ70LightNAV,
+	TargetIAS: PZ70LightIAS,
+	TargetALT: PZ70LightALT,
+	TargetVS:  PZ70LightVS,
+	TargetAPR: PZ70LightAPR,
+	TargetREV: PZ70LightREV,
+}
+
+// GearTarget reports whether target is a PZ55 gear indicator, returning the
+// setter for it.
+func GearTarget(target string) (func(*GearLights, GearLight), bool) {
+	set, ok := gearTargets[strings.ToUpper(target)]
+	return set, ok
+}
+
+// PZ70LightTarget reports whether target is a PZ70 button light, returning its bit.
+func PZ70LightTarget(target string) (PZ70Lights, bool) {
+	bit, ok := pz70TargetLights[strings.ToUpper(target)]
+	return bit, ok
+}
+
+// ValidTarget reports whether target names an indicator that model has.
+func ValidTarget(model Model, target string) bool {
+	switch model {
+	case PZ55:
+		_, ok := gearTargets[strings.ToUpper(target)]
+		return ok
+	case PZ70:
+		_, ok := pz70TargetLights[strings.ToUpper(target)]
+		return ok
+	}
+	return false
 }
 
 // PZ70Lights is the PZ70's autopilot button illumination, one bit per button.
@@ -120,6 +232,24 @@ func writeDisplay(report []byte, value, position int, supportsMinus bool) {
 		}
 		position--
 	}
+}
+
+// FormatPZ70Line renders, as text, what a PZ70 line would show for a value. It
+// mirrors EncodePZ70Panel exactly (abs and five digits on the top line, signed and
+// ten characters on the bottom), so a preview in the interface is what the panel
+// displays rather than an approximation. Unused cells are spaces.
+func FormatPZ70Line(line DisplayLine, value int) string {
+	if line == LineUpper {
+		return padLeft(strconv.Itoa(clamp(abs(value), 0, 99999)), 5)
+	}
+	return padLeft(strconv.Itoa(clamp(value, -9999, 99999)), 10)
+}
+
+func padLeft(s string, width int) string {
+	if len(s) >= width {
+		return s
+	}
+	return strings.Repeat(" ", width-len(s)) + s
 }
 
 func clamp(v, lo, hi int) int {

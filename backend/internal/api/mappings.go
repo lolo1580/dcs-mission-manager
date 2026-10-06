@@ -24,12 +24,14 @@ func (s *Server) handleMappings(w http.ResponseWriter, r *http.Request) {
 		if aircraft == "" {
 			writeJSON(w, http.StatusOK, map[string]any{
 				"enabled": s.mappings.Enabled(),
+				"outputs": s.mappings.OutputsEnabled(),
 			})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"profile": s.mappings.Profile(aircraft),
 			"enabled": s.mappings.Enabled(),
+			"outputs": s.mappings.OutputsEnabled(),
 		})
 
 	case http.MethodPost, http.MethodPut:
@@ -38,13 +40,26 @@ func (s *Server) handleMappings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var body struct {
-			Bindings []mapping.Binding `json:"bindings"`
+			Bindings []mapping.Binding        `json:"bindings"`
+			Outputs  []mapping.OutputBinding  `json:"outputs"`
+			Displays []mapping.DisplayBinding `json:"displays"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "malformed body"})
 			return
 		}
-		if err := s.mappings.SetProfile(mapping.Profile{Aircraft: aircraft, Bindings: body.Bindings}); err != nil {
+		// Outputs and displays drive the panels' LEDs and LCD. A client that does not
+		// know one of them omits the field: keep what exists rather than wiping it.
+		existing := s.mappings.Profile(aircraft)
+		outputs := existing.Outputs
+		if body.Outputs != nil {
+			outputs = body.Outputs
+		}
+		displays := existing.Displays
+		if body.Displays != nil {
+			displays = body.Displays
+		}
+		if err := s.mappings.SetProfile(mapping.Profile{Aircraft: aircraft, Bindings: body.Bindings, Outputs: outputs, Displays: displays}); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
@@ -129,6 +144,130 @@ func (s *Server) handleControls(w http.ResponseWriter, r *http.Request) {
 		"controls":   controls,
 		"count":      len(controls),
 	})
+}
+
+// LoadCatalog returns an aircraft's DCS-BIOS catalogue, caching it. It is the
+// public form of controlsFor, so other parts of the manager (the LED driver) read
+// the same metadata without each loading its own copy.
+func (s *Server) LoadCatalog(aircraft string) (*biosmeta.Catalog, error) {
+	return s.controlsFor(aircraft)
+}
+
+// handleOutputsSafety turns the panel outputs (LEDs, LCD) on or off. It is separate
+// from the command-sending switch: outputs only read DCS-BIOS and write the panels,
+// they never command the aircraft, so turning them on needs no transport.
+func (s *Server) handleOutputsSafety(w http.ResponseWriter, r *http.Request) {
+	if s.mappings == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "mappings unavailable"})
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use POST"})
+		return
+	}
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "malformed body"})
+		return
+	}
+	s.mappings.SetOutputsEnabled(body.Enabled)
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": s.mappings.OutputsEnabled()})
+}
+
+// handleMappingTest turns the live mapping test on or off. It is a separate
+// endpoint from the sending switch: the test can send to DCS-BIOS to verify a
+// binding, and it resets on restart.
+func (s *Server) handleMappingTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use POST"})
+		return
+	}
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "malformed body"})
+		return
+	}
+	s.SetTestMode(body.Enabled)
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": s.TestMode()})
+}
+
+// handleAircraft lists the aircraft names that have a profile to edit.
+func (s *Server) handleAircraft(w http.ResponseWriter, _ *http.Request) {
+	if s.mappings == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"aircraft": []any{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"aircraft": s.mappings.Aircraft()})
+}
+
+// handleDebug reports and toggles the runtime debug switch.
+//
+// GET returns the state and the recorded lines; POST sets it. POST is a separate
+// call from GET so a page load never flips it.
+func (s *Server) handleDebug(w http.ResponseWriter, r *http.Request) {
+	if s.debug == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": false, "lines": []any{}, "available": false})
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{
+			"enabled":   s.debug.Enabled(),
+			"available": true,
+			"lines":     s.debug.Lines(),
+		})
+	case http.MethodPost:
+		var body struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "malformed body"})
+			return
+		}
+		s.debug.SetEnabled(body.Enabled)
+		s.debug.Infof("debug", "debug logging %s", onOff(body.Enabled))
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": s.debug.Enabled()})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use GET or POST"})
+	}
+}
+
+// handleLog returns the in-memory debug log, or clears it. GET is the log the UI
+// shows next to the switch; POST with {"clear":true} empties it.
+func (s *Server) handleLog(w http.ResponseWriter, r *http.Request) {
+	if s.debug == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": false, "lines": []any{}})
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{
+			"enabled": s.debug.Enabled(),
+			"lines":   s.debug.Lines(),
+		})
+	case http.MethodPost:
+		var body struct {
+			Clear bool `json:"clear"`
+		}
+		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body)
+		if body.Clear {
+			s.debug.Clear()
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": s.debug.Enabled(), "lines": s.debug.Lines()})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use GET or POST"})
+	}
+}
+
+func onOff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
 }
 
 // controlsFor returns an aircraft's catalogue, caching it.
