@@ -16,11 +16,21 @@
 // Output bindings (gear lights and autopilot button LEDs) are carried too, for
 // the aircraft the original profiles covered. The PZ55's three gear lights are
 // bicolour (green for down-and-locked, red for unsafe); the PZ70's autopilot
-// lights are single-colour. The PZ70 LCD is not part of the binding model yet, so
-// it is not reproduced.
+// lights are single-colour. Selected numeric HSI references are provided for the
+// PZ70 LCD where the aircraft exports them. Explicit set_state positions avoid
+// treating three-position switches as binary endpoints.
 package mapping
 
-import "dcsmanager/internal/panel"
+import (
+	"dcsmanager/internal/panel"
+	_ "embed"
+	"encoding/json"
+)
+
+//go:embed additional-profiles.json
+var additionalProfiles []byte
+
+func stateValue(value int) *int { return &value }
 
 // setState is the interface a two-position selector accepts, and what a panel
 // switch drives: the switch position becomes the selector position.
@@ -53,11 +63,26 @@ func starterProfiles() []starterProfile {
 		{
 			aircraft: "FA-18C_hornet",
 			bindings: []Binding{
-				{Model: panel.PZ55, Control: "MASTER_BAT", Command: "BATTERY_SW", Interface: setState},
+				{Model: panel.PZ55, Control: "MASTER_BAT", Command: "BATTERY_SW", Interface: setState, StateOn: stateValue(0), StateOff: stateValue(1)},
+				{Model: panel.PZ55, Control: "DE_ICE", Command: "ENG_ANTIICE_SW", Interface: setState, StateOn: stateValue(0), StateOff: stateValue(1)},
+				{Model: panel.PZ55, Control: "PITOT_HEAT", Command: "PITOT_HEAT_SW", Interface: setState},
+				{Model: panel.PZ55, Control: "LIGHTS_PANEL", Command: "INST_PNL_DIMMER", Interface: setState, StateOn: stateValue(65535), StateOff: stateValue(0)},
+				{Model: panel.PZ55, Control: "LIGHTS_NAV", Command: "POSITION_DIMMER", Interface: setState, StateOn: stateValue(65535), StateOff: stateValue(0)},
+				{Model: panel.PZ55, Control: "LIGHTS_LANDING", Command: "LDG_TAXI_SW", Interface: setState},
+				{Model: panel.PZ55, Control: "ENGINE_LEFT", Command: "ENGINE_CRANK_SW", Interface: setState, StateOn: stateValue(0)},
+				{Model: panel.PZ55, Control: "ENGINE_RIGHT", Command: "ENGINE_CRANK_SW", Interface: setState, StateOn: stateValue(2)},
+				{Model: panel.PZ55, Control: "ENGINE_OFF", Command: "ENGINE_CRANK_SW", Interface: setState, StateOn: stateValue(1)},
+				{Model: panel.PZ55, Control: "ENGINE_BOTH", Command: "ENGINE_CRANK_SW", Interface: setState, StateOn: stateValue(1)},
 				{Model: panel.PZ55, Control: "GEAR_UP", Command: "GEAR_LEVER", Interface: setState, Invert: true},
 				{Model: panel.PZ55, Control: "GEAR_DOWN", Command: "GEAR_LEVER", Interface: setState},
-				{Model: panel.PZ70, Control: "FLAPS_UP", Command: "FLAP_SW", Interface: setState, Invert: true},
-				{Model: panel.PZ70, Control: "FLAPS_DOWN", Command: "FLAP_SW", Interface: setState},
+				{Model: panel.PZ70, Control: "FLAPS_UP", Command: "FLAP_SW", Interface: "fixed_step", Invert: true},
+				{Model: panel.PZ70, Control: "FLAPS_DOWN", Command: "FLAP_SW", Interface: "fixed_step"},
+				{Model: panel.PZ70, Control: "PITCH_TRIM", Command: "DCSM_PITCH_TRIM", Interface: "variable_step", Invert: true},
+				{Model: panel.PZ70, Control: "AP_BUTTON", Command: "UFC_AP", Interface: setState},
+				{Model: panel.PZ70, Control: "IAS_BUTTON", Command: "THROTTLE_ATC_SW", Interface: setState},
+				{Model: panel.PZ70, Control: "REV_BUTTON", Command: "STICK_PADDLE_SW", Interface: setState},
+				{Model: panel.PZ70, Control: "LCD_WHEEL", Mode: "HDG", Command: "LEFT_DDI_HDG_SW", Interface: setState, StateOn: stateValue(2), StateOff: stateValue(0), PulseReset: stateValue(1)},
+				{Model: panel.PZ70, Control: "LCD_WHEEL", Mode: "CRS", Command: "LEFT_DDI_CRS_SW", Interface: setState, StateOn: stateValue(2), StateOff: stateValue(0), PulseReset: stateValue(1)},
 			},
 			outputs: []OutputBinding{
 				{Model: panel.PZ55, Target: panel.TargetGearLeft, Command: "FLP_LG_LEFT_GEAR_LT", Color: "green"},
@@ -68,7 +93,7 @@ func starterProfiles() []starterProfile {
 		{
 			aircraft: "F-16C_50",
 			bindings: []Binding{
-				{Model: panel.PZ55, Control: "MASTER_BAT", Command: "FUEL_MASTER_SW", Interface: setState},
+				{Model: panel.PZ55, Control: "MASTER_BAT", Command: "MAIN_PWR_SW", Interface: setState, StateOn: stateValue(1), StateOff: stateValue(2)},
 				{Model: panel.PZ55, Control: "GEAR_UP", Command: "GEAR_HANDLE", Interface: setState, Invert: true},
 				{Model: panel.PZ55, Control: "GEAR_DOWN", Command: "GEAR_HANDLE", Interface: setState},
 				{Model: panel.PZ70, Control: "PITCH_TRIM", Command: "PITCH_TRIM", Interface: "variable_step"},
@@ -110,8 +135,10 @@ func starterProfiles() []starterProfile {
 				{Model: panel.PZ55, Control: "FUEL_PUMP", Command: "L_BOOSTPUMP", Interface: setState},
 				{Model: panel.PZ55, Control: "GEAR_UP", Command: "LG_LEVER_SWITCH", Interface: setState, Invert: true},
 				{Model: panel.PZ55, Control: "GEAR_DOWN", Command: "LG_LEVER_SWITCH", Interface: setState},
-				{Model: panel.PZ70, Control: "FLAPS_UP", Command: "FLAPS", Interface: setState, Invert: true},
-				{Model: panel.PZ70, Control: "FLAPS_DOWN", Command: "FLAPS", Interface: setState},
+				{Model: panel.PZ70, Control: "FLAPS_UP", Command: "FLAPS", Interface: setState, StateOn: stateValue(1)},
+				{Model: panel.PZ70, Control: "FLAPS_DOWN", Command: "FLAPS", Interface: setState, StateOn: stateValue(2)},
+				{Model: panel.PZ70, Control: "LCD_WHEEL", Mode: "HDG", Command: "HSI_HDG_KNOB", Interface: "variable_step"},
+				{Model: panel.PZ70, Control: "LCD_WHEEL", Mode: "CRS", Command: "HSI_CRS_KNOB", Interface: "variable_step"},
 			},
 			outputs: []OutputBinding{
 				{Model: panel.PZ55, Target: panel.TargetGearLeft, Command: "LEFT_LIGHT", Color: "green"},
@@ -134,5 +161,10 @@ func Starter() []Profile {
 	for _, d := range defs {
 		out = append(out, Profile{Aircraft: d.aircraft, Bindings: d.bindings, Outputs: d.outputs, Displays: d.displays})
 	}
+	var extra []Profile
+	if err := json.Unmarshal(additionalProfiles, &extra); err != nil {
+		panic("invalid built-in panel profiles: " + err.Error())
+	}
+	out = append(out, extra...)
 	return out
 }

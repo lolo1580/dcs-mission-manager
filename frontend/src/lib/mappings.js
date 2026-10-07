@@ -56,6 +56,10 @@ export async function loadMappings(aircraft) {
   mappingsError.set('');
   try {
     mappingAircraft.set(aircraft);
+	bindings.set([]);
+	outputs.set([]);
+	displays.set([]);
+	controlsAvailable.set(false);
     const getJSON = async (url) => {
       const r = await fetch(url);
       if (!r.ok) throw new Error(`${url}: ${r.status}`);
@@ -182,14 +186,15 @@ export async function saveDisplays(list) {
 }
 
 /** Adds an LCD display binding, refusing a duplicate mode+line like the backend. */
-export async function addDisplay(binding) {
+export async function addDisplay(binding, previous = null) {
   const current = get(displays);
+  const kept = previous ? current.filter(d => !(d.mode === previous.mode && d.line === previous.line)) : current;
   const same = (d) => d.mode === binding.mode && d.line === binding.line;
-  if (current.some(same)) {
+  if (kept.some(same)) {
     mappingsError.set(tNow('error.displayDuplicate'));
     return false;
   }
-  return saveDisplays([...current, binding]);
+  return saveDisplays([...kept, binding]);
 }
 
 /** Removes an LCD display binding by its mode and line. */
@@ -235,9 +240,9 @@ export async function testDisplay({ upper, lower }) {
  * field is sent, so a change to one never depends on the server remembering the
  * others.
  */
-async function saveProfile({ bindings: nextBindings, outputs: nextOutputs, displays: nextDisplays }) {
+export async function saveProfile({ bindings: nextBindings, outputs: nextOutputs, displays: nextDisplays }) {
   const aircraft = get(mappingAircraft);
-  if (!aircraft) return false;
+  if (!aircraft || get(mappingsLoading)) return false;
   mappingsError.set('');
   try {
     const res = await fetch(`/api/mappings?aircraft=${encodeURIComponent(aircraft)}`, {
@@ -251,6 +256,7 @@ async function saveProfile({ bindings: nextBindings, outputs: nextOutputs, displ
       return false;
     }
     const body = await res.json();
+    if (aircraft !== get(mappingAircraft) || get(mappingsLoading)) return true;
     bindings.set(body.profile?.bindings ?? []);
     outputs.set(body.profile?.outputs ?? []);
     displays.set(body.profile?.displays ?? []);
@@ -262,29 +268,32 @@ async function saveProfile({ bindings: nextBindings, outputs: nextOutputs, displ
 }
 
 /** Adds a binding, refusing a duplicate control like the backend does. */
-export async function addBinding(binding) {
+export async function addBinding(binding, previous = null) {
   const current = get(bindings);
-  if (current.some((b) => b.model === binding.model && b.control === binding.control)) {
+  const key = b => `${b.model}/${b.control}/${(b.mode || '').toUpperCase()}`;
+  const kept = previous ? current.filter(b => key(b) !== key(previous)) : current;
+  if (kept.some((b) => key(b) === key(binding))) {
     mappingsError.set(tNow('error.mappingDuplicate'));
     return false;
   }
-  return saveMappings([...current, binding]);
+  return saveMappings([...kept, binding]);
 }
 
 /** Removes a binding by its control key. */
-export async function removeBinding(model, control) {
+export async function removeBinding(model, control, mode = '') {
   const current = get(bindings);
-  return saveMappings(current.filter((b) => !(b.model === model && b.control === control)));
+  return saveMappings(current.filter((b) => !(b.model === model && b.control === control && (b.mode || '') === mode)));
 }
 
 /** Adds an LED output binding, refusing a duplicate target like the backend does. */
-export async function addOutput(binding) {
+export async function addOutput(binding, previous = null) {
   const current = get(outputs);
-  if (current.some((o) => o.model === binding.model && o.target === binding.target)) {
+  const kept = previous ? current.filter(o => !(o.model === previous.model && o.target === previous.target)) : current;
+  if (kept.some((o) => o.model === binding.model && o.target === binding.target)) {
     mappingsError.set(tNow('error.mappingDuplicate'));
     return false;
   }
-  return saveOutputs([...current, binding]);
+  return saveOutputs([...kept, binding]);
 }
 
 /** Removes an LED output binding by its panel and target. */

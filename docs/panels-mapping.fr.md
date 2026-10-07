@@ -1,5 +1,7 @@
 # Schéma des panneaux PZ55 et PZ70 et fonctionnement du mapping
 
+> Analyse initiale : plusieurs limites ont depuis été corrigées. Voir [l’état actuel et les essais](integration-panels.fr.md).
+
 Cette analyse décrit le code actuel du DCS Mission Manager. Elle repose sur la lecture du projet et de la documentation Logitech ; le fonctionnement sur les panneaux physiques reste à vérifier en session DCS.
 
 ## Les deux panneaux

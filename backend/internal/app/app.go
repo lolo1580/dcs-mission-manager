@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -43,6 +44,7 @@ import (
 	"dcsmanager/internal/live"
 	"dcsmanager/internal/mapping"
 	"dcsmanager/internal/model"
+	"dcsmanager/internal/panelplugin"
 	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/source"
 	"dcsmanager/internal/state"
@@ -374,8 +376,21 @@ func Run(onReady func(addr string)) error {
 
 	// The binding store sends DCS-BIOS commands when a panel control moves. It
 	// starts disabled on every run: sending into a live cockpit is opt-in.
+	plugin := panelplugin.New()
+	if err := plugin.Start(panelplugin.Address); err != nil {
+		log.Printf("panel plugin: %v", err)
+	}
+	defer plugin.Close()
+	srv.SetPanelPlugin(plugin)
 	mappings := mapping.NewStore(mappingPath(cfg), func(line string) error {
 		identifier, value := parseCommandLine(line)
+		if identifier == panelplugin.TrimCommand {
+			err := plugin.SendTrim(bios.State().Aircraft, fmt.Sprint(value))
+			if err != nil {
+				dbg.Warnf("panel-plugin", "%v", err)
+			}
+			return err
+		}
 		return bios.SendCommand(identifier, value)
 	})
 
@@ -389,6 +404,12 @@ func Run(onReady func(addr string)) error {
 		}
 		switch e.Kind {
 		case panelservice.KindInput:
+			for _, mode := range []string{"ALT", "VS", "IAS", "HDG", "CRS"} {
+				if e.Active["KNOB_"+mode] {
+					e.Input.Mode = mode
+					break
+				}
+			}
 			// Show what the input maps to, whether or not sending is armed, so a
 			// binding can be checked without moving a real cockpit.
 			aircraft := bios.State().Aircraft
@@ -459,6 +480,22 @@ func Run(onReady func(addr string)) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	// Poll output freshness as well as frames, so a silent DCS-BIOS link clears
+	// stale values and profile edits take effect without a new cockpit event.
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if d := ledDriver.Load(); d != nil {
+					d.Sync()
+				}
+			}
+		}
+	}()
 	go srv.RunBroadcast(ctx, time.Second)
 
 	// ---- Tracking: positions, losses and sortie analysis -------------------

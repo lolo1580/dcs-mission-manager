@@ -31,6 +31,7 @@ func setup(t *testing.T) (*Installer, string) {
 
 	luaDir := filepath.Join(root, "dcs-lua")
 	mustWrite(t, filepath.Join(luaDir, "Export.lua"), distExport)
+	mustWrite(t, filepath.Join(luaDir, "PanelCommands.lua"), "return function() return {} end\n")
 	mustWrite(t, filepath.Join(luaDir, "Hooks", "dcsmanager.lua"), distHooks)
 	mustWrite(t, filepath.Join(luaDir, "Config", "dcsmanager.cfg"), distConfig)
 
@@ -224,6 +225,19 @@ func TestUninstallRemovesBlockAndKeepsRest(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(sg, "Scripts", "Hooks", "dcsmanager.lua")); !os.IsNotExist(err) {
 		t.Fatal("Hooks/dcsmanager.lua should be removed")
+	}
+	if _, err := os.Stat(filepath.Join(sg, "Scripts", "DCSManager", "PanelCommands.lua")); !os.IsNotExist(err) {
+		t.Fatal("panel plugin should be removed")
+	}
+	if _, err := os.Stat(filepath.Join(sg, "Config", "dcsmanager.cfg")); err != nil {
+		t.Fatal("user config should remain")
+	}
+	for _, r := range results {
+		if r.DestRel == filepath.Join("Scripts", "DCSManager", "PanelCommands.lua") {
+			if data, err := os.ReadFile(r.Backup); err != nil || !strings.Contains(string(data), "return function") {
+				t.Fatal("panel plugin backup missing")
+			}
+		}
 	}
 
 	found := false

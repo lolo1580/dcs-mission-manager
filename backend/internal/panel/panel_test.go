@@ -196,7 +196,7 @@ func TestEncodePZ70PanelLeavesUnsetDisplay(t *testing.T) {
 }
 
 // TestFormatPZ70Line checks the preview text matches the LCD layout: five digits
-// (abs, no sign) on top, ten characters with a minus on the bottom, right-aligned
+// (abs, no sign) on top, five characters with a minus on the bottom, right-aligned
 // with leading spaces.
 func TestFormatPZ70Line(t *testing.T) {
 	cases := []struct {
@@ -207,8 +207,8 @@ func TestFormatPZ70Line(t *testing.T) {
 		{LineUpper, 12345, "12345"},
 		{LineUpper, 7, "    7"},
 		{LineUpper, -42, "   42"}, // the top line has no sign
-		{LineLower, -1234, "     -1234"},
-		{LineLower, 300, "       300"},
+		{LineLower, -1234, "-1234"},
+		{LineLower, 300, "  300"},
 	}
 	for _, c := range cases {
 		if got := FormatPZ70Line(c.line, c.value); got != c.want {

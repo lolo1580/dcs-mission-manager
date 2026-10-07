@@ -240,6 +240,14 @@ func (c *Client) applyFrame(f Frame) bool {
 	// The active aircraft name is what a cockpit tool watches most.
 	name := readString(c.mem, AcftNameAddress, AcftNameLength)
 	if name != c.aircraft {
+		// Aircraft modules reuse export addresses. Discard old cockpit values,
+		// then retain only values actually supplied in the new aircraft's frame.
+		for address := range c.mem {
+			if address >= AcftNameLength {
+				delete(c.mem, address)
+			}
+		}
+		f.Apply(c.mem)
 		c.aircraft = name
 		return true
 	}

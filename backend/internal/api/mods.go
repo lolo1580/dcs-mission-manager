@@ -6,7 +6,9 @@ import "net/http"
 // files (installed / outdated / missing), the tools merged into Export.lua, and
 // other tools' hook files.
 func (s *Server) handleScripts(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.scripts)
+	s.scriptInstallMu.Lock()
+	defer s.scriptInstallMu.Unlock()
+	writeJSON(w, http.StatusOK, s.scriptStatusNow())
 }
 
 // handleMods returns the mods installed under Saved Games\DCS\Mods.

@@ -13,6 +13,9 @@
     modsTotalBytes,
     installNeedsAttention,
     loadInstall,
+    installScripts,
+    scriptsInstalling,
+    scriptInstallResult,
     fmtSize,
   } from './install.js';
   import { t } from './i18n.js';
@@ -28,6 +31,7 @@
     merged: 'install.state.merged',
     created: 'install.state.created',
     unchanged: 'install.state.unchanged',
+    updated: 'install.state.updated',
   };
 
   function stateLabel(state) {
@@ -38,7 +42,7 @@
 <section class="install">
   <header>
     <h2>{$t('install.title')}</h2>
-    <button class="refresh" on:click={loadInstall} disabled={$installLoading}>
+    <button class="refresh" on:click={loadInstall} disabled={$installLoading || $scriptsInstalling}>
       {$t('stats.refresh')}
     </button>
   </header>
@@ -54,6 +58,22 @@
 
     <div class="block">
       <h3>{$t('install.scripts')}</h3>
+      <p class="line">{$t('install.scriptFolder')}: <span class="path">{$scriptStatus.savedGames || $t('install.folderMissing')}</span></p>
+      <p class="line muted">{$t('install.autoHint')}</p>
+      <button on:click={installScripts} disabled={!$scriptStatus.savedGames || $scriptsInstalling || $installLoading}>
+        {$t($scriptsInstalling ? 'install.installing' : 'install.autoInstall')}
+      </button>
+      {#if $scriptInstallResult?.restartRequired}<p class="attention">{$t('install.installSuccess')}</p>{/if}
+      {#if $scriptInstallResult?.results?.length}
+        <ul aria-label={$t('install.installDetails')}>
+          {#each $scriptInstallResult.results as result}
+            <li><span class="path">{result.destRel}</span> · {stateLabel(result.action)}
+              {#if result.backup}<p class="path">{$t('install.backup')}: {result.backup}</p>{/if}
+              {#if result.note}<p class="note">{result.note}</p>{/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
       <table class="managed">
         <tbody>
           {#each $scriptStatus.managed ?? [] as m (m.destRel)}

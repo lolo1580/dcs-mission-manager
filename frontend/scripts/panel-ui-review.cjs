@@ -1,0 +1,47 @@
+// Run after panel-ui-fixture.cjs and opening Settings > Panels.
+async (page) => {
+  page.setDefaultTimeout(5000);
+  await page.setViewportSize({width:1280,height:900});
+  const runtimeErrors = [];
+  const onError = error => runtimeErrors.push(error.message);
+  page.on('pageerror', onError);
+  await page.getByRole('button',{name:'Paramètres',exact:true}).click();
+  await page.getByRole('button',{name:'Panneaux',exact:true}).click();
+  const assert = (ok, reason) => { if (!ok) throw new Error(reason); };
+  await page.getByRole('button', {name:/^AP (AP|HEADING)$/, exact:true}).click();
+  assert(['AP','HEADING'].includes(await page.getByRole('combobox',{name:'Commande DCS-BIOS',exact:true}).inputValue()), 'Existing AP binding was not loaded');
+  await page.getByRole('searchbox',{name:'Rechercher une commande…'}).fill('heading');
+  await page.getByRole('combobox',{name:'Commande DCS-BIOS',exact:true}).selectOption('HEADING');
+  assert(await page.getByRole('combobox',{name:'Interface',exact:true}).inputValue() === 'variable_step', 'Interface did not follow command');
+  await page.getByRole('button',{name:'Enregistrer',exact:true}).click();
+  await page.getByRole('button',{name:'AP HEADING',exact:true}).waitFor();
+  await page.getByRole('button',{name:'HDG',exact:true}).click();
+  await page.getByRole('button',{name:/Molette ↔ · HDG/}).click();
+  assert(await page.getByRole('combobox',{name:'Position du sélecteur',exact:true}).inputValue() === 'HDG', 'Wheel mode not selected');
+  await page.getByRole('combobox',{name:'Commande DCS-BIOS',exact:true}).selectOption('HEADING');
+  await page.getByRole('button',{name:'Associer',exact:true}).click();
+  await page.getByRole('button',{name:/Molette ↔ · HDG HEADING/}).waitFor();
+  await page.getByTitle('Configurer le voyant AP',{exact:true}).click();
+  assert(await page.getByRole('combobox',{name:'Voyant',exact:true}).inputValue() === 'LIGHT_AP', 'LED target not selected');
+  await page.getByRole('combobox',{name:'Contrôle DCS-BIOS',exact:true}).selectOption('AP');
+  await page.getByRole('button',{name:'Associer le voyant',exact:true}).click();
+  await page.getByRole('button',{name:'HDG · haute Non attribué',exact:true}).click();
+  await page.getByRole('combobox',{name:'Contrôle DCS-BIOS',exact:true}).selectOption('HEADING');
+  await page.getByRole('button',{name:'Associer l’affichage',exact:true}).click();
+  await page.getByRole('button',{name:'HDG · haute HEADING',exact:true}).waitFor();
+  await page.getByRole('button',{name:'PZ55 Switch Panel',exact:true}).click();
+  await page.getByRole('button',{name:'Train ↑ Non attribué',exact:true}).click();
+  assert(await page.getByRole('combobox',{name:'Contrôle',exact:true}).inputValue() === 'GEAR_UP', 'PZ55 gear target not selected');
+  await page.getByRole('combobox',{name:'Appareil :',exact:true}).selectOption('Demo_B');
+  await page.getByRole('button',{name:'PZ70 Multi Panel',exact:true}).click();
+  await page.getByRole('button',{name:'AP Non attribué',exact:true}).waitFor();
+  await page.getByRole('combobox',{name:'Appareil :',exact:true}).selectOption('Demo_A');
+  await page.getByRole('button',{name:'AP HEADING',exact:true}).waitFor();
+  await page.screenshot({path:'output/playwright/panels-desktop.png'});
+  await page.setViewportSize({width:760,height:900});
+  await page.screenshot({path:'output/playwright/panels-narrow.png'});
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Horizontal page overflow');
+  page.off('pageerror', onError);
+  assert(runtimeErrors.length === 0, 'Browser runtime errors: ' + runtimeErrors.join('; '));
+  return 'PASS: edit, search, mode wheel, LED, LCD, PZ55, aircraft isolation, persistence, narrow viewport';
+}

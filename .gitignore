@@ -9,6 +9,10 @@
 /frontend/node_modules/
 /frontend/dist/
 
+# Local browser review artifacts
+/.playwright-cli/
+/output/playwright/
+
 # Generated frontend assets embedded in Go. The `dist/.gitkeep` placeholder is
 # committed so that `go build` works before the frontend has been built.
 /backend/internal/api/dist/*

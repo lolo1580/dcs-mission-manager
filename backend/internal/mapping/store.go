@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"dcsmanager/internal/biosmeta"
 	"dcsmanager/internal/panel"
@@ -32,7 +33,12 @@ type Binding struct {
 	Interface string `json:"interface"`
 	// Invert flips the active state, for a switch whose "on" means the opposite of
 	// the command's "on".
-	Invert bool `json:"invert,omitempty"`
+	Invert   bool   `json:"invert,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+	StateOn  *int   `json:"state_on,omitempty"`
+	StateOff *int   `json:"state_off,omitempty"`
+	// PulseReset releases a spring-centred cockpit switch after an encoder pulse.
+	PulseReset *int `json:"pulse_reset,omitempty"`
 }
 
 // Profile is the set of bindings for one aircraft.
@@ -84,12 +90,26 @@ type OutputBinding struct {
 	Command string `json:"command"`
 	// Color is the colour shown when the exported value is non-zero (green, red,
 	// yellow). The PZ55's indicators are bicolour; the PZ70's are single-colour.
-	Color string `json:"color,omitempty"`
+	Color string       `json:"color,omitempty"`
+	Rules []OutputRule `json:"rules,omitempty"`
+}
+
+// OutputRule is evaluated in order; the first match determines the light colour.
+type OutputRule struct {
+	Command  string `json:"command"`
+	Export   int    `json:"export"`
+	Operator string `json:"operator"`
+	Value    int    `json:"value"`
+	Color    string `json:"color"`
 }
 
 // Key identifies the control a binding is attached to.
 func (b Binding) Key() string {
-	return string(b.Model) + "/" + b.Control
+	key := string(b.Model) + "/" + b.Control
+	if b.Mode != "" {
+		key += "/" + strings.ToUpper(b.Mode)
+	}
+	return key
 }
 
 // Store holds the profiles and applies them. It is safe for concurrent use.
@@ -209,6 +229,9 @@ func (s *Store) Profile(aircraft string) Profile {
 	}
 	copy(out.Bindings, p.Bindings)
 	copy(out.Outputs, p.Outputs)
+	for i := range out.Outputs {
+		out.Outputs[i].Rules = append([]OutputRule(nil), p.Outputs[i].Rules...)
+	}
 	copy(out.Displays, p.Displays)
 	return out
 }
@@ -225,6 +248,22 @@ func (s *Store) SetProfile(p Profile) error {
 	// the first, and the panel would look broken.
 	seen := map[string]bool{}
 	for i, b := range p.Bindings {
+		for _, value := range []*int{b.StateOn, b.StateOff, b.PulseReset} {
+			if value != nil && (b.Interface != "set_state" || *value < 0 || *value > 65535) {
+				return fmt.Errorf("mapping: custom positions require set_state and values 0..65535")
+			}
+		}
+		if b.PulseReset != nil && b.Control != "LCD_WHEEL" && b.Control != "PITCH_TRIM" {
+			return fmt.Errorf("mapping: pulse reset requires an encoder")
+		}
+		if b.Model != panel.PZ55 && b.Model != panel.PZ70 {
+			return fmt.Errorf("mapping: unknown input model")
+		}
+		switch b.Interface {
+		case "action", "set_state", "fixed_step", "variable_step":
+		default:
+			return fmt.Errorf("mapping: unknown command interface")
+		}
 		if b.Control == "" || b.Command == "" {
 			return fmt.Errorf("mapping: a binding needs both a control and a command")
 		}
@@ -239,6 +278,9 @@ func (s *Store) SetProfile(p Profile) error {
 			return fmt.Errorf("mapping: invalid characters in binding %q", b.Control)
 		}
 		k := b.Key()
+		if b.Mode != "" && (b.Model != panel.PZ70 || b.Control != "LCD_WHEEL" || !validMode(b.Mode)) {
+			return fmt.Errorf("mapping: mode is only valid for the PZ70 LCD wheel")
+		}
 		if seen[k] {
 			return fmt.Errorf("mapping: %s is bound twice", k)
 		}
@@ -251,13 +293,27 @@ func (s *Store) SetProfile(p Profile) error {
 	// per indicator so the second cannot silently shadow the first.
 	seenOut := map[string]bool{}
 	for i, o := range p.Outputs {
+		if len(o.Rules) > 16 {
+			return fmt.Errorf("mapping: too many LED rules")
+		}
+		for _, rule := range o.Rules {
+			if !validToken(rule.Command, 96) || rule.Export < 0 || rule.Export > 64 || !validColor(rule.Color) ||
+				(o.Model == panel.PZ70 && rule.Color != "green" && rule.Color != "off") {
+				return fmt.Errorf("mapping: invalid LED rule")
+			}
+			switch rule.Operator {
+			case "eq", "ne", "gt", "lt", "ge", "le":
+			default:
+				return fmt.Errorf("mapping: invalid LED comparison")
+			}
+		}
 		if o.Target == "" || o.Command == "" {
 			return fmt.Errorf("mapping: an output needs both a target and a command")
 		}
 		if i >= maxBindings {
 			return fmt.Errorf("mapping: too many outputs (max %d)", maxBindings)
 		}
-		if !validToken(o.Target, 64) || !validToken(o.Command, 96) || !validToken(o.Color, 16) {
+		if !validToken(o.Target, 64) || !validToken(o.Command, 96) || (o.Color != "" && !validColor(o.Color)) {
 			return fmt.Errorf("mapping: invalid characters in output %q", o.Target)
 		}
 		if o.Model != panel.PZ55 && o.Model != panel.PZ70 {
@@ -383,11 +439,14 @@ func (s *Store) Apply(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []
 	}
 
 	var sent []string
-	for _, line := range commandsFor(p, ev, cat) {
-		if err := send(line); err != nil {
+	for _, command := range commandPlan(p, ev, cat) {
+		if command.delay > 0 {
+			time.Sleep(command.delay)
+		}
+		if err := send(command.line); err != nil {
 			continue
 		}
-		sent = append(sent, line)
+		sent = append(sent, command.line)
 	}
 	return sent
 }
@@ -404,11 +463,14 @@ func (s *Store) ApplyForced(aircraft string, ev panel.Event, cat *biosmeta.Catal
 		return nil
 	}
 	var sent []string
-	for _, line := range commandsFor(p, ev, cat) {
-		if err := send(line); err != nil {
+	for _, command := range commandPlan(p, ev, cat) {
+		if command.delay > 0 {
+			time.Sleep(command.delay)
+		}
+		if err := send(command.line); err != nil {
 			continue
 		}
-		sent = append(sent, line)
+		sent = append(sent, command.line)
 	}
 	return sent
 }
@@ -432,8 +494,40 @@ func (s *Store) Simulate(aircraft string, ev panel.Event, cat *biosmeta.Catalog)
 // this control is bound to".
 func commandsFor(p *Profile, ev panel.Event, cat *biosmeta.Catalog) []string {
 	var out []string
+	for _, command := range commandPlan(p, ev, cat) {
+		out = append(out, command.line)
+	}
+	return out
+}
+
+type plannedCommand struct {
+	line  string
+	delay time.Duration
+}
+
+func commandPlan(p *Profile, ev panel.Event, cat *biosmeta.Catalog) []plannedCommand {
+	var out []plannedCommand
+	contextual := false
+	for _, b := range p.Bindings {
+		if b.Model == ev.Model && strings.EqualFold(b.Control, ev.Control.ID) && b.Mode != "" && strings.EqualFold(b.Mode, ev.Mode) {
+			contextual = true
+		}
+	}
 	for _, b := range p.Bindings {
 		if b.Model != ev.Model || !strings.EqualFold(b.Control, ev.Control.ID) {
+			continue
+		}
+		if b.Mode != "" && !strings.EqualFold(b.Mode, ev.Mode) || b.Mode == "" && contextual {
+			continue
+		}
+		// A selector's old position going inactive is not its new position.
+		// The spring-centred flaps rocker must not undo a positional command
+		// when released. Action controls still receive their release.
+		id := strings.ToUpper(ev.Control.ID)
+		position := strings.HasPrefix(id, "ENGINE_") || strings.HasPrefix(id, "GEAR_") || strings.HasPrefix(id, "KNOB_")
+		flaps := id == "FLAPS_UP" || id == "FLAPS_DOWN"
+		if !ev.Active && (position || (flaps && b.Interface != string(biosmeta.Action)) ||
+			(ev.Control.Kind == panel.Button && (b.Interface == string(biosmeta.FixedStep) || b.Interface == string(biosmeta.VariableStep)))) {
 			continue
 		}
 		active := ev.Active
@@ -466,14 +560,45 @@ func commandsFor(p *Profile, ev panel.Event, cat *biosmeta.Catalog) []string {
 		var value int
 		var ok bool
 		if ev.Control.Kind == panel.EncoderPulse {
-			value, ok = biosmeta.ArgForEncoder(biosmeta.Interface(b.Interface), step, max, ev.Control.Clockwise)
+			direction := ev.Control.Clockwise
+			if b.Invert {
+				direction = !direction
+			}
+			value, ok = biosmeta.ArgForEncoder(biosmeta.Interface(b.Interface), step, max, direction)
+			active = direction
 		} else {
 			value, ok = biosmeta.ArgForInterface(biosmeta.Interface(b.Interface), max, active)
 		}
 		if !ok {
 			continue
 		}
-		out = append(out, fmt.Sprintf("%s %d\n", b.Command, value))
+		if b.PulseReset != nil && (ev.Control.Kind != panel.EncoderPulse || (cat != nil && *b.PulseReset > max)) {
+			continue
+		}
+		if b.Interface == string(biosmeta.SetState) {
+			custom := b.StateOff
+			if active {
+				custom = b.StateOn
+			}
+			if custom != nil {
+				if cat != nil && *custom > max {
+					continue
+				}
+				value = *custom
+			}
+		}
+		if b.Interface == string(biosmeta.FixedStep) {
+			argument := "INC"
+			if value == 2 {
+				argument = "DEC"
+			}
+			out = append(out, plannedCommand{line: fmt.Sprintf("%s %s\n", b.Command, argument)})
+		} else {
+			out = append(out, plannedCommand{line: fmt.Sprintf("%s %d\n", b.Command, value)})
+			if b.PulseReset != nil {
+				out = append(out, plannedCommand{line: fmt.Sprintf("%s %d\n", b.Command, *b.PulseReset), delay: 50 * time.Millisecond})
+			}
+		}
 	}
 	return out
 }

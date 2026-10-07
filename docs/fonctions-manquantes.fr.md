@@ -1,5 +1,7 @@
 # Fonctions manquantes ou incomplètes — 6 octobre 2026
 
+> Inventaire historique avant la reprise des panneaux. Certaines fonctions, notamment le LCD configurable et l’inversion à l’ajout, sont maintenant présentes. Voir [l’état actuel de l’intégration](integration-panels.fr.md).
+
 ## Périmètre
 
 Inventaire établi à partir du code actuel, de l’interface Svelte, des routes API et de la documentation du projet. Aucune fonctionnalité n’a été développée pendant cette revue.

@@ -1,0 +1,98 @@
+{
+  "aircraft": "A-10C",
+  "bindings": [
+    {
+      "model": "pz55",
+      "control": "MASTER_BAT",
+      "command": "EPP_BATTERY_PWR",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "PITOT_HEAT",
+      "command": "ENVCP_PITOT_HEAT",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_UP",
+      "command": "GEAR_LEVER",
+      "interface": "set_state",
+      "state_on": 1
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_DOWN",
+      "command": "GEAR_LEVER",
+      "interface": "set_state",
+      "state_on": 0
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_UP",
+      "command": "FLAPS_SWITCH",
+      "interface": "fixed_step"
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_DOWN",
+      "command": "FLAPS_SWITCH",
+      "interface": "fixed_step",
+      "invert": true
+    },
+    {
+      "model": "pz70",
+      "control": "LCD_WHEEL",
+      "command": "HSI_HDG_KNOB",
+      "interface": "variable_step",
+      "mode": "HDG"
+    },
+    {
+      "model": "pz70",
+      "control": "LCD_WHEEL",
+      "command": "HSI_CRS_KNOB",
+      "interface": "variable_step",
+      "mode": "CRS"
+    }
+  ],
+  "outputs": [
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_UPPER",
+      "command": "GEAR_N_SAFE",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_LEFT",
+      "command": "GEAR_L_SAFE",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_RIGHT",
+      "command": "GEAR_R_SAFE",
+      "color": "green"
+    }
+  ],
+  "displays": [
+    {
+      "model": "pz70",
+      "mode": "HDG",
+      "line": "upper",
+      "command": "HSI_HDG_BUG",
+      "export": 0,
+      "scale": 0.005493247882810712,
+      "unit": "deg"
+    },
+    {
+      "model": "pz70",
+      "mode": "CRS",
+      "line": "upper",
+      "command": "HSI_CRS",
+      "export": 0,
+      "scale": 0.005493247882810712,
+      "unit": "deg"
+    }
+  ]
+}

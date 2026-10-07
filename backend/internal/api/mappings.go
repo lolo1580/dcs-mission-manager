@@ -284,6 +284,7 @@ func (s *Server) controlsFor(aircraft string) (*biosmeta.Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
+	cat = biosmeta.WithPanelPlugin(cat)
 	s.controls[aircraft] = cat
 	return cat, nil
 }

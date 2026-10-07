@@ -12,6 +12,26 @@ export const mods = writable([]);
 export const scriptStatus = writable(null);
 export const installError = writable('');
 export const installLoading = writable(false);
+export const scriptsInstalling = writable(false);
+export const scriptInstallResult = writable(null);
+
+export async function installScripts() {
+  scriptsInstalling.set(true);
+  installError.set('');
+  scriptInstallResult.set(null);
+  try {
+    const response = await fetch('/api/scripts/install', {method: 'POST'});
+    const body = await response.json();
+    // Keep partial actions/backups visible if an installation fails midway.
+    scriptInstallResult.set(body);
+    if (!response.ok) throw new Error(body.error || response.status);
+    scriptStatus.set(body.scripts);
+  } catch (error) {
+    installError.set(error.message);
+  } finally {
+    scriptsInstalling.set(false);
+  }
+}
 
 export async function loadInstall() {
   installLoading.set(true);

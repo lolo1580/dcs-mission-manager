@@ -4,7 +4,8 @@
    * the DCS-BIOS link it listens to. This is the cockpit-hardware side, absorbed
    * from the DCS Panel Manager.
    */
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import PanelBoard from './PanelBoard.svelte';
   import {
     panels,
     panelsSupported,
@@ -26,6 +27,7 @@
     mappingEvents,
     displayPreview,
     mappingsError,
+    mappingsLoading,
     mappingAircraft,
     aircraftList,
     controls,
@@ -43,8 +45,19 @@
     removeDisplay,
     previewDisplay,
     testDisplay,
+    saveProfile,
   } from './mappings.js';
   import { t } from './i18n.js';
+
+  let pluginState = {connected: false, aircraft: '', accepted: 0};
+  async function loadPlugin() {
+    try {
+      const r = await fetch('/api/panels/plugin');
+      if (!r.ok) throw new Error('plugin status unavailable');
+      pluginState = await r.json();
+    } catch (_) { pluginState = {connected: false, aircraft: '', accepted: 0}; }
+  }
+  onMount(() => { loadPlugin(); const timer = setInterval(loadPlugin, 2000); return () => clearInterval(timer); });
 
   onMount(async () => {
     await loadPanels();
@@ -62,15 +75,17 @@
   async function refreshAll() {
     await loadPanels();
     await loadAircraft();
-    if ($biosState.aircraft) await loadMappings($biosState.aircraft);
+    const aircraft = $mappingAircraft || $biosState.aircraft;
+    if (aircraft) await loadMappings(aircraft);
   }
 
   // When the active aircraft changes, reload its bindings — but only if the user
   // has not picked another one manually below.
   let lastAircraft = '';
+  let manualAircraft = false;
   $: if ($biosState.aircraft && $biosState.aircraft !== lastAircraft) {
     lastAircraft = $biosState.aircraft;
-    loadMappings($biosState.aircraft);
+    if (!manualAircraft) loadMappings($biosState.aircraft);
   }
 
   // The operator can pick the aircraft by hand: needed to edit or test a profile
@@ -78,6 +93,7 @@
   // set up.
   function pickAircraft(e) {
     const name = e.currentTarget.value;
+    manualAircraft = true;
     if (name) loadMappings(name);
   }
 
@@ -107,6 +123,112 @@
   let newControl = '';
   let newCommand = '';
   let newInterface = '';
+  let newInvert = false;
+  let newMode = '';
+  let customStates = false;
+  let stateOn = 1;
+  let stateOff = 0;
+  let pulseEnabled = false;
+  let pulseReset = 1;
+  let editingBinding = null;
+  let editingOutput = null;
+  let editingDisplay = null;
+  let ruleRows = [];
+  let importPreview = null;
+  let profileNotice = '';
+  let editorAircraft = '';
+  let boardModel = 'pz70';
+  let boardMode = 'ALT';
+  let editorTab = 'input';
+  let selected = '';
+  let commandSearch = '';
+  let sourceSearch = '';
+  let inputEditor;
+  let outputEditor;
+  let lcdEditor;
+  $: commandChoices = $controls.filter(c => c.inputs?.length && matchesSearch(c, commandSearch));
+  $: sourceChoices = $controls.filter(c => c.outputs?.length && matchesSearch(c, sourceSearch));
+  function matchesSearch(c, query) {
+    return `${c.identifier} ${c.description || ''} ${c.category || ''}`.toLowerCase().includes(query.trim().toLowerCase());
+  }
+  function commandLabel(c) { return c.description ? `${c.description} — ${c.identifier}` : c.identifier; }
+  async function selectControl({ detail: choice }) {
+    boardModel = choice.model; editorTab = choice.kind;
+    commandSearch = ''; sourceSearch = '';
+    if (choice.kind === 'input') {
+      selected = `input/${choice.id}/${choice.mode}`;
+      const b = $bindings.find(b => b.model === choice.model && b.control === choice.id && (b.mode || '').toUpperCase() === choice.mode);
+      if (b) editBinding(b);
+      else {
+        editingBinding = null; newPanel = choice.model; newControl = choice.id; newMode = choice.mode;
+        newCommand = ''; newInterface = ''; newInvert = false;
+        customStates = false; stateOn = 1; stateOff = 0;
+        pulseEnabled = false; pulseReset = 1;
+      }
+    } else if (choice.kind === 'output') {
+      selected = `output/${choice.id}`;
+      const o = $outputs.find(o => o.model === choice.model && o.target === choice.id);
+      if (o) editOutput(o);
+      else { editingOutput = null; outPanel = choice.model; outTarget = choice.id; outCommand = ''; outColor = 'green'; ruleRows = []; }
+    } else {
+      selected = `display/${choice.mode}/${choice.id}`;
+      const d = $displays.find(d => d.mode.toUpperCase() === choice.mode && d.line === choice.id);
+      if (d) editDisplay(d);
+      else { editingDisplay = null; dispMode = choice.mode; dispLine = choice.id; dispCommand = ''; dispExport = 0; dispScale = 1; dispOffset = 0; dispUnit = ''; }
+    }
+    await tick();
+    const editor = choice.kind === 'input' ? inputEditor : choice.kind === 'output' ? outputEditor : lcdEditor;
+    editor?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    editor?.querySelector('input[type="search"]')?.focus({ preventScroll: true });
+  }
+  $: if ($mappingAircraft !== editorAircraft) {
+    editorAircraft = $mappingAircraft;
+    editingBinding = null; editingOutput = null; editingDisplay = null;
+    selected = ''; commandSearch = ''; sourceSearch = '';
+    newControl = ''; newCommand = ''; newMode = ''; newInvert = false;
+    customStates = false;
+    outTarget = ''; outCommand = ''; ruleRows = []; dispCommand = '';
+  }
+  function editBinding(b) {
+    commandSearch = '';
+    editingBinding = b; newPanel = b.model; newControl = b.control;
+    newCommand = b.command; newInterface = b.interface; newInvert = !!b.invert; newMode = b.mode || '';
+    customStates = b.state_on != null || b.state_off != null;
+    stateOn = b.state_on ?? ($controls.find(c => c.identifier === b.command)?.inputs?.find(i => i.interface === 'set_state')?.max_value ?? 1);
+    stateOff = b.state_off ?? 0;
+    pulseEnabled = b.pulse_reset != null;
+    pulseReset = b.pulse_reset ?? 1;
+  }
+  function editOutput(o) {
+    sourceSearch = '';
+    editingOutput = o; outPanel = o.model; outTarget = o.target; outCommand = o.command; outColor = o.color || 'green';
+    ruleRows = (o.rules || []).map(r => ({ ...r }));
+  }
+  function editDisplay(d) {
+    sourceSearch = '';
+    editingDisplay = d; dispMode = d.mode; dispLine = d.line; dispCommand = d.command;
+    dispExport = d.export || 0; dispScale = d.scale || 1; dispOffset = d.offset || 0; dispUnit = d.unit || '';
+  }
+  function exportProfile() {
+    const profile = { aircraft: $mappingAircraft, bindings: $bindings, outputs: $outputs, displays: $displays };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = `${$mappingAircraft}-panels.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function readProfile(event) {
+    importPreview = null; profileNotice = '';
+    try {
+      const file = event.currentTarget.files[0];
+      if (!file) return;
+      if (file.size > 1024 * 1024) throw new Error($t('panels.invalidProfile'));
+      const p = JSON.parse(await file.text());
+      if (!p || !Array.isArray(p.bindings) || !Array.isArray(p.outputs) || (p.displays != null && !Array.isArray(p.displays))) throw new Error($t('panels.invalidProfile'));
+      importPreview = { aircraft: p.aircraft || '', bindings: p.bindings, outputs: p.outputs, displays: p.displays || [] };
+    } catch (e) { profileNotice = e.message; }
+  }
+  async function importProfile() {
+    if (importPreview && await saveProfile(importPreview)) { importPreview = null; await loadAircraft(); }
+  }
 
   /** The panel controls of the chosen panel model, for the picker. */
   const PANEL_CONTROLS = {
@@ -136,16 +258,36 @@
 
   async function submitBinding() {
     if (!newControl || !newCommand || !newInterface) return;
+    const usePulse = pulseEnabled && newInterface === 'set_state' && ['LCD_WHEEL', 'PITCH_TRIM'].includes(newControl);
+    if (usePulse && (!Number.isInteger(pulseReset) || pulseReset < 0 || pulseReset > (chosenControl?.inputs?.find(i => i.interface === 'set_state')?.max_value ?? 65535))) {
+      mappingsError.set($t('panels.invalidStates', {maximum: chosenControl?.inputs?.find(i => i.interface === 'set_state')?.max_value ?? 65535}));
+      return;
+    }
+    if (newInterface === 'set_state' && customStates) {
+      const maximum = chosenControl?.inputs?.find(i => i.interface === 'set_state')?.max_value ?? 65535;
+      if (![stateOn, stateOff].every(value => Number.isInteger(value) && value >= 0 && value <= maximum)) {
+        mappingsError.set($t('panels.invalidStates', {maximum}));
+        return;
+      }
+    }
     const ok = await addBinding({
       model: newPanel,
       control: newControl,
       command: newCommand,
       interface: newInterface,
-    });
+      invert: newInvert,
+      mode: newPanel === 'pz70' && newControl === 'LCD_WHEEL' ? newMode : '',
+      ...(newInterface === 'set_state' && customStates ? {state_on: Number(stateOn), state_off: Number(stateOff)} : {}),
+      ...(usePulse ? {pulse_reset: Number(pulseReset)} : {}),
+    }, editingBinding);
     if (ok) {
       newControl = '';
       newCommand = '';
       newInterface = '';
+      newInvert = false;
+      newMode = ''; editingBinding = null;
+      pulseEnabled = false;
+      customStates = false;
     }
   }
 
@@ -185,10 +327,12 @@
       target: outTarget,
       command: outCommand,
       color: outColor,
-    });
+      rules: ruleRows.map(r => ({ ...r, export: Number(r.export), value: Number(r.value) })),
+    }, editingOutput);
     if (ok) {
       outTarget = '';
       outCommand = '';
+      editingOutput = null; ruleRows = [];
     }
   }
 
@@ -226,11 +370,12 @@
       scale: Number(dispScale) || 0,
       offset: Number(dispOffset) || 0,
       unit: dispUnit,
-    });
+    }, editingDisplay);
     if (ok) {
       dispCommand = '';
       dispExport = 0;
       dispUnit = '';
+      editingDisplay = null;
     }
   }
 
@@ -264,6 +409,17 @@
       {$t('stats.refresh')}
     </button>
   </header>
+  <div class="block">
+    <button on:click={exportProfile} disabled={!$mappingAircraft || $mappingsLoading}>{$t('panels.exportProfile')}</button>
+    <label>{$t('panels.importProfile')} <input type="file" accept=".json,application/json" on:change={readProfile} /></label>
+    {#if profileNotice}<p class="error">{profileNotice}</p>{/if}
+    {#if importPreview}
+      <p>{importPreview.aircraft} → {$mappingAircraft}: {importPreview.bindings.length} {$t('panels.mappings')}, {importPreview.outputs.length} LED, {importPreview.displays.length} LCD</p>
+      <p>{$t('panels.replaceWarning')}</p>
+      <button disabled={!$mappingAircraft || $mappingsLoading} on:click={importProfile}>{$t('panels.applyImport')}</button>
+      <button on:click={() => importPreview = null}>{$t('panels.cancel')}</button>
+    {/if}
+  </div>
 
   {#if $panelsError}
     <p class="error">{$panelsError}</p>
@@ -272,6 +428,14 @@
   {#if !$panelsSupported}
     <p class="empty">{$t('panels.unsupported')}</p>
   {:else}
+    <div class="block">
+      <h3>{$t('panels.plugin.title')} <span class="badge" class:on={pluginState.connected}>{$t(pluginState.connected ? 'panels.connected' : 'panels.disconnected')}</span></h3>
+      <p class="hint">{$t('panels.plugin.hint')}</p>
+      <p>{pluginState.aircraft || $t('panels.noAircraft')} · {pluginState.accepted} {$t('panels.plugin.accepted')}</p>
+      {#if pluginState.error}<p class="error">{pluginState.error}</p>{/if}
+      {#if !pluginState.connected}<p class="hint">{$t('panels.plugin.install')}</p>{/if}
+    </div>
+    {#if !$biosState.aircraft}<p class="hint">{$t('panels.noAircraftInputWarning')}</p>{/if}
     <div class="block">
       <h3>
         {$t(($biosState.available ? 'panels.bios' : 'panels.biosUnavailable'))}
@@ -293,7 +457,27 @@
       {/if}
     </div>
 
-    <div class="block">
+    <div class="workspace">
+      {#if $aircraftList.length > 0}
+        <label class="pick">{$t('panels.aircraftPick')}
+          <select value={$mappingAircraft} on:change={pickAircraft}>{#each $aircraftList as a}<option value={a}>{a}</option>{/each}</select>
+        </label>
+      {:else}<p class="empty">{$t('panels.noProfiles')}</p>{/if}
+      <div class="toolbar">
+        <button class:chosen={boardModel === 'pz55'} on:click={() => {boardModel = 'pz55'; selected = '';}}>PZ55 Switch Panel</button>
+        <button class:chosen={boardModel === 'pz70'} on:click={() => {boardModel = 'pz70'; selected = '';}}>PZ70 Multi Panel</button>
+      </div>
+      <PanelBoard model={boardModel} mode={boardMode} bindings={$bindings} outputs={$outputs} displays={$displays} {selected}
+        disabled={!$mappingAircraft || $mappingsLoading || !$controlsAvailable} on:select={selectControl} on:mode={e => boardMode = e.detail} />
+      <nav class="toolbar" aria-label={$t('panels.configuration')}>
+        {#each ['input','output','display','diagnostics'] as tab}
+          <button class:chosen={editorTab === tab} on:click={() => editorTab = tab}>{$t('panels.tab.' + tab)}</button>
+        {/each}
+      </nav>
+      {#if $mappingsLoading}<p class="hint">{$t('panels.loadingProfile')}</p>{/if}
+    </div>
+
+    <div class="block" class:hidden={editorTab !== 'input'}>
       <h3>
         {$t('panels.mappings')}
         <span class="badge" class:on={$sendingEnabled}>
@@ -302,19 +486,6 @@
       </h3>
 
       <p class="hint">{$t('panels.mappingsHint')}</p>
-
-      {#if $aircraftList.length > 0}
-        <label class="pick">
-          {$t('panels.aircraftPick')}
-          <select value={$mappingAircraft} on:change={pickAircraft}>
-            {#each $aircraftList as a (a)}
-              <option value={a}>{a}</option>
-            {/each}
-          </select>
-        </label>
-      {:else}
-        <p class="empty">{$t('panels.noProfiles')}</p>
-      {/if}
 
       {#if !$mappingAircraft}
         <p class="empty">{$t('panels.pickAircraft')}</p>
@@ -335,6 +506,8 @@
           <p class="error">{$mappingsError}</p>
         {/if}
 
+        <details class="profile-list">
+          <summary>{$t('panels.showBindings')} ({$bindings.length})</summary>
         {#if $bindings.length === 0}
           <p class="empty">{$t('panels.noMappings')}</p>
         {:else}
@@ -349,22 +522,25 @@
               </tr>
             </thead>
             <tbody>
-              {#each $bindings as b (b.model + '/' + b.control)}
+              {#each $bindings as b (b.model + '/' + b.control + '/' + (b.mode || ''))}
                 <tr>
                   <td>{modelLabel(b.model)}</td>
-                  <td class="mono">{b.control}</td>
+                  <td class="mono">{b.control} {b.mode || ''}</td>
                   <td class="mono">{b.command}{#if b.invert}<span class="tag">{$t('panels.inverted')}</span>{/if}</td>
                   <td class="mono">{b.interface}</td>
                   <td class="actions">
-                    <button class="remove" on:click={() => removeBinding(b.model, b.control)} title={$t('panels.remove')}>×</button>
+                    <button on:click={() => editBinding(b)}>{$t('panels.edit')}</button>
+                    <button class="remove" on:click={() => removeBinding(b.model, b.control, b.mode || '')} title={$t('panels.remove')}>×</button>
                   </td>
                 </tr>
               {/each}
             </tbody>
           </table>
         {/if}
+        </details>
 
-        <div class="add">
+        <div class="editor-heading">{$t(editingBinding ? 'panels.editExisting' : 'panels.newBinding')} {newControl} {newMode}</div>
+        <div class="add" bind:this={inputEditor}>
           <select bind:value={newPanel} aria-label={$t('panels.col.panel')}>
             <option value="pz55">PZ55</option>
             <option value="pz70">PZ70</option>
@@ -375,10 +551,12 @@
               <option value={c}>{c}</option>
             {/each}
           </select>
+          <input type="search" bind:value={commandSearch} placeholder={$t('panels.searchCommand')} aria-label={$t('panels.searchCommand')} />
           <select bind:value={newCommand} aria-label={$t('panels.col.command')}>
             <option value="">{$t('panels.pickCommand')}</option>
-            {#each $controls.filter((c) => c.inputs && c.inputs.length > 0) as c (c.identifier)}
-              <option value={c.identifier}>{c.identifier}</option>
+            {#if newCommand && !commandChoices.some(c => c.identifier === newCommand)}<option value={newCommand}>{newCommand}</option>{/if}
+            {#each commandChoices as c (c.identifier)}
+              <option value={c.identifier}>{commandLabel(c)}</option>
             {/each}
           </select>
           <select bind:value={newInterface} aria-label={$t('panels.col.interface')} disabled={!availableInterfaces.length}>
@@ -394,8 +572,25 @@
             on:click={submitBinding}
             disabled={!newControl || !newCommand || !newInterface}
           >
-            {$t('panels.add')}
+            {$t(editingBinding ? 'panels.save' : 'panels.add')}
           </button>
+          <label><input type="checkbox" bind:checked={newInvert} /> {$t('panels.inverted')}</label>
+          {#if newInterface === 'set_state'}
+            {#if ['LCD_WHEEL', 'PITCH_TRIM'].includes(newControl)}
+              <label><input type="checkbox" bind:checked={pulseEnabled} /> {$t('panels.pulseReset')}</label>
+              {#if pulseEnabled}<label>{$t('panels.pulseResetValue')} <input type="number" min="0" max={chosenControl?.inputs?.find(i => i.interface === 'set_state')?.max_value ?? 65535} bind:value={pulseReset} /></label>{/if}
+            {/if}
+            <label><input type="checkbox" bind:checked={customStates} /> {$t('panels.customStates')}</label>
+            {#if customStates}
+              <label>{$t('panels.stateOn')} <input type="number" min="0" max={chosenControl?.inputs?.find(i => i.interface === 'set_state')?.max_value ?? 65535} bind:value={stateOn} /></label>
+              <label>{$t('panels.stateOff')} <input type="number" min="0" max={chosenControl?.inputs?.find(i => i.interface === 'set_state')?.max_value ?? 65535} bind:value={stateOff} /></label>
+              <p class="hint">{$t('panels.customStatesHint')}</p>
+            {/if}
+          {/if}
+          {#if newPanel === 'pz70' && newControl === 'LCD_WHEEL'}
+            <label>{$t('panels.mode')} <select bind:value={newMode}><option value="">{$t('panels.allModes')}</option>{#each DISPLAY_MODES as mode}<option value={mode}>{mode}</option>{/each}</select></label>
+          {/if}
+          {#if editingBinding}<span>{$t('panels.edit')}: {editingBinding.control}</span><button on:click={() => { editingBinding = null; newControl = ''; newMode = ''; }}>{$t('panels.cancel')}</button>{/if}
         </div>
 
         <div class="test">
@@ -427,7 +622,7 @@
       {/if}
     </div>
 
-    <div class="block">
+    <div class="block" class:hidden={editorTab !== 'output'}>
       <h3>
         {$t('panels.outputs')}
         <span class="badge" class:on={$outputsEnabled}>
@@ -447,6 +642,8 @@
         </label>
         <p class="hint">{$t('panels.outputsSwitchHint')}</p>
 
+        <details class="profile-list">
+          <summary>{$t('panels.showOutputs')} ({$outputs.length})</summary>
         {#if $outputs.length === 0}
           <p class="empty">{$t('panels.noOutputs')}</p>
         {:else}
@@ -466,8 +663,9 @@
                   <td>{modelLabel(o.model)}</td>
                   <td class="mono">{o.target}</td>
                   <td class="mono">{o.command}</td>
-                  <td>{o.color ? $t(`panels.color.${o.color}`) : '—'}</td>
+                  <td>{o.color ? $t(`panels.color.${o.color}`) : '—'} {#if o.rules?.length}({o.rules.length}){/if}</td>
                   <td class="actions">
+                    <button on:click={() => editOutput(o)}>{$t('panels.edit')}</button>
                     <button class="remove" on:click={() => removeOutput(o.model, o.target)} title={$t('panels.remove')}>×</button>
                   </td>
                 </tr>
@@ -475,8 +673,10 @@
             </tbody>
           </table>
         {/if}
+        </details>
 
-        <div class="add">
+        <div class="editor-heading">{$t(editingOutput ? 'panels.editExisting' : 'panels.newBinding')} {outTarget}</div>
+        <div class="add" bind:this={outputEditor}>
           <select bind:value={outPanel} aria-label={$t('panels.col.panel')}>
             <option value="pz55">PZ55</option>
             <option value="pz70">PZ70</option>
@@ -487,12 +687,12 @@
               <option value={tgt}>{tgt}</option>
             {/each}
           </select>
+          <input type="search" bind:value={sourceSearch} placeholder={$t('panels.searchSource')} aria-label={$t('panels.searchSource')} />
           <select bind:value={outCommand} aria-label={$t('panels.col.source')}>
             <option value="">{$t('panels.pickSource')}</option>
-            {#each $controls as c (c.identifier)}
-              {#if !c.inputs || c.inputs.length === 0}
-                <option value={c.identifier}>{c.identifier}</option>
-              {/if}
+            {#if outCommand && !sourceChoices.some(c => c.identifier === outCommand)}<option value={outCommand}>{outCommand}</option>{/if}
+            {#each sourceChoices as c (c.identifier)}
+              <option value={c.identifier}>{commandLabel(c)}</option>
             {/each}
           </select>
           <select bind:value={outColor} aria-label={$t('panels.col.color')} disabled={colorChoices.length === 1}>
@@ -501,13 +701,26 @@
             {/each}
           </select>
           <button class="add-btn" on:click={submitOutput} disabled={!outTarget || !outCommand}>
-            {$t('panels.addOutput')}
+            {$t(editingOutput ? 'panels.save' : 'panels.addOutput')}
           </button>
         </div>
+        <p>{$t('panels.ruleHint')}</p>
+        {#each ruleRows as rule, i}
+          <div class="add">
+            <select bind:value={rule.command} aria-label={$t('panels.col.source')}>{#each exportControls as c}<option value={c.identifier}>{c.identifier}</option>{/each}</select>
+            <label>{$t('panels.exportIndex')} <input type="number" min="0" bind:value={rule.export} /></label>
+            <select bind:value={rule.operator} aria-label={$t('panels.comparison')}>{#each ['eq','ne','gt','lt','ge','le'] as op}<option value={op}>{op}</option>{/each}</select>
+            <input type="number" bind:value={rule.value} aria-label={$t('panels.ruleValue')} />
+            <select bind:value={rule.color} aria-label={$t('panels.col.color')}>{#each (outPanel === 'pz55' ? ['green','red','yellow','off'] : ['green','off']) as color}<option value={color}>{color}</option>{/each}</select>
+            <button on:click={() => ruleRows = ruleRows.filter((_, index) => index !== i)}>×</button>
+          </div>
+        {/each}
+        <button disabled={ruleRows.length >= 16} on:click={() => ruleRows = [...ruleRows, {command: outCommand || exportControls[0]?.identifier || '', export: 0, operator: 'eq', value: 1, color: outPanel === 'pz55' ? 'green' : 'green'}]}>{$t('panels.addRule')}</button>
+        {#if editingOutput}<span>{$t('panels.edit')}: {editingOutput.target}</span><button on:click={() => {editingOutput = null; ruleRows = []; outTarget = '';}}>{$t('panels.cancel')}</button>{/if}
       {/if}
     </div>
 
-    <div class="block">
+    <div class="block" class:hidden={editorTab !== 'display'}>
       <h3>{$t('panels.displays')}</h3>
       <p class="hint">{$t('panels.displaysHint')}</p>
 
@@ -516,6 +729,8 @@
       {:else if !$controlsAvailable}
         <p class="empty">{$t('panels.noMetadata', { aircraft: $mappingAircraft })}</p>
       {:else}
+        <details class="profile-list">
+          <summary>{$t('panels.showDisplays')} ({$displays.length})</summary>
         {#if $displays.length === 0}
           <p class="empty">{$t('panels.noDisplays')}</p>
         {:else}
@@ -537,6 +752,7 @@
                   <td class="mono">{d.command}</td>
                   <td class="mono">×{(d.scale ?? 0) || 1}{(d.offset ? (d.offset > 0 ? ' +' : ' ') + d.offset : '')}{#if d.unit}<span class="tag">{d.unit}</span>{/if}</td>
                   <td class="actions">
+                    <button on:click={() => editDisplay(d)}>{$t('panels.edit')}</button>
                     <button class="remove" on:click={() => removeDisplay(d.mode, d.line)} title={$t('panels.remove')}>×</button>
                   </td>
                 </tr>
@@ -544,8 +760,10 @@
             </tbody>
           </table>
         {/if}
+        </details>
 
-        <div class="add">
+        <div class="editor-heading">{$t(editingDisplay ? 'panels.editExisting' : 'panels.newBinding')} {dispMode} · {$t('panels.line.' + dispLine)}</div>
+        <div class="add" bind:this={lcdEditor}>
           <select bind:value={dispMode} aria-label={$t('panels.col.mode')}>
             {#each DISPLAY_MODES as m (m)}
               <option value={m}>{m}</option>
@@ -556,17 +774,20 @@
               <option value={l}>{$t('panels.line.' + l)}</option>
             {/each}
           </select>
+          <input type="search" bind:value={sourceSearch} placeholder={$t('panels.searchSource')} aria-label={$t('panels.searchSource')} />
           <select bind:value={dispCommand} aria-label={$t('panels.col.source')}>
             <option value="">{$t('panels.pickSource')}</option>
-            {#each exportControls as c (c.identifier)}
-              <option value={c.identifier}>{c.identifier}</option>
+            {#if dispCommand && !exportControls.some(c => c.identifier === dispCommand && matchesSearch(c, sourceSearch))}<option value={dispCommand}>{dispCommand}</option>{/if}
+            {#each exportControls.filter(c => matchesSearch(c, sourceSearch)) as c (c.identifier)}
+              <option value={c.identifier}>{commandLabel(c)}</option>
             {/each}
           </select>
           <input class="num" type="number" min="0" bind:value={dispExport} title={$t('panels.exportIndex')} placeholder="0" />
           <input class="num" type="number" step="any" bind:value={dispScale} title={$t('panels.scale')} placeholder="1" />
           <input class="num" type="number" step="any" bind:value={dispOffset} title={$t('panels.offset')} placeholder="0" />
           <input class="num wide" type="text" bind:value={dispUnit} title={$t('panels.unit')} placeholder={$t('panels.unit')} />
-          <button class="add-btn" on:click={submitDisplay} disabled={!dispCommand}>{$t('panels.addDisplay')}</button>
+          <button class="add-btn" on:click={submitDisplay} disabled={!dispCommand}>{$t(editingDisplay ? 'panels.save' : 'panels.addDisplay')}</button>
+          {#if editingDisplay}<span>{$t('panels.edit')}: {editingDisplay.mode}/{editingDisplay.line}</span><button on:click={() => {editingDisplay = null; dispCommand = '';}}>{$t('panels.cancel')}</button>{/if}
           <button class="add-btn" on:click={previewCurrent} disabled={!dispCommand}>{$t('panels.preview')}</button>
         </div>
 
@@ -592,7 +813,7 @@
       {/if}
     </div>
 
-    <div class="block">
+    <div class="block" class:hidden={editorTab !== 'diagnostics'}>
       <h3>{$t('panels.devices')}</h3>
       {#if $panels.length === 0}
         <p class="empty">{$t('panels.none')}</p>
@@ -619,7 +840,7 @@
       {/if}
     </div>
 
-    <div class="block">
+    <div class="block" class:hidden={editorTab !== 'diagnostics'}>
       <h3>
         {$t('panels.monitor')}
         <span class="count">{$panelEvents.length}</span>
@@ -654,6 +875,15 @@
 </section>
 
 <style>
+  .block > button, .add > button:not(.add-btn), .actions > button:not(.remove) { padding:.4rem .7rem; border:1px solid var(--border); border-radius:6px; color:var(--text); background:var(--bg); cursor:pointer; }
+  .hidden { display:none; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:.4rem; margin:.7rem 0; }
+  .toolbar button { padding:.5rem .8rem; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--text); cursor:pointer; }
+  .toolbar .chosen { border-color:var(--blue); background:var(--bg-hover, var(--bg)); box-shadow:inset 0 -3px var(--blue); }
+  .profile-list { margin:.6rem 0; }
+  summary { cursor:pointer; color:var(--muted); font-size:.8rem; padding:.4rem 0; }
+  .editor-heading { margin:.7rem 0; font-size:.85rem; font-weight:600; }
+  input[type="search"] { min-width:180px; padding:.5rem; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:5px; }
   .panels {
     display: flex;
     flex-direction: column;

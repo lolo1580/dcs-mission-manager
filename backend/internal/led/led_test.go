@@ -85,7 +85,7 @@ func pz55Device() panelservice.DeviceInfo {
 // TestSyncDoesNothingWhenDisabled locks the opt-in rule: no LED is lit while
 // sending is off.
 func TestSyncDoesNothingWhenDisabled(t *testing.T) {
-	bios := &fakeBios{mem: map[uint16]byte{testAddr: 1}, state: dcsbios.State{Aircraft: "TestJet"}}
+	bios := &fakeBios{mem: map[uint16]byte{testAddr: 1}, state: dcsbios.State{Aircraft: "TestJet", Connected: true}}
 	panels := &fakePanels{devices: []panelservice.DeviceInfo{pz55Device()}, writes: map[string][][]byte{}}
 	store := mapping.NewStore(filepath.Join(t.TempDir(), "mappings.json"), func(string) error { return nil })
 	if err := store.SetProfile(gearProfile()); err != nil {
@@ -104,7 +104,7 @@ func TestSyncDoesNothingWhenDisabled(t *testing.T) {
 // TestSyncLightsGearFromExportedValue checks a set bit lights the indicator and a
 // cleared bit turns it off, and that an unchanged value is not written twice.
 func TestSyncLightsGearFromExportedValue(t *testing.T) {
-	bios := &fakeBios{mem: map[uint16]byte{testAddr: 1}, state: dcsbios.State{Aircraft: "TestJet"}}
+	bios := &fakeBios{mem: map[uint16]byte{testAddr: 1}, state: dcsbios.State{Aircraft: "TestJet", Connected: true}}
 	panels := &fakePanels{devices: []panelservice.DeviceInfo{pz55Device()}, writes: map[string][][]byte{}}
 	store := mapping.NewStore(filepath.Join(t.TempDir(), "mappings.json"), func(string) error { return nil })
 	if err := store.SetProfile(gearProfile()); err != nil {
@@ -151,7 +151,7 @@ func TestSyncPZ70Lights(t *testing.T) {
 			{Model: panel.PZ70, Target: panel.TargetALT, Command: "AP_ALT_VERT", Color: "green"},
 		},
 	}
-	bios := &fakeBios{mem: map[uint16]byte{testAddr: 1}, state: dcsbios.State{Aircraft: "TestJet"}}
+	bios := &fakeBios{mem: map[uint16]byte{testAddr: 1}, state: dcsbios.State{Aircraft: "TestJet", Connected: true}}
 	panels := &fakePanels{
 		devices: []panelservice.DeviceInfo{{Path: "pz70-1", VendorID: panel.VendorID, ProductID: panel.ProductPZ70}},
 		writes:  map[string][][]byte{},

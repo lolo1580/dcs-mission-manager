@@ -2,6 +2,8 @@
 
 Date : 6 octobre 2026.
 
+> État mis à jour : plusieurs étapes sont maintenant intégrées au code. Consulter [la reprise et la validation des panneaux](integration-panels.fr.md) pour l’état actuel ; le présent document reste le plan de référence.
+
 Ce document prépare l’implémentation. Il complète [le schéma des panneaux](panels-mapping.fr.md), [les fonctions manquantes](fonctions-manquantes.fr.md) et [le rapport de bugs](audit-bugs-general.fr.md).
 
 ## État (mis à jour)

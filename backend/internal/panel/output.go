@@ -156,9 +156,9 @@ const (
 // PZ70Panel is the whole output state of a Multi Panel: the two display lines and
 // the button lights.
 type PZ70Panel struct {
-	// UpperDisplay is the top line, when set. Nil leaves it untouched.
+	// UpperDisplay is the top line. Nil blanks it in the complete report.
 	UpperDisplay *int
-	// LowerDisplay is the bottom line, when set. Nil leaves it untouched.
+	// LowerDisplay is the bottom line. Nil blanks it in the complete report.
 	LowerDisplay *int
 	// Lights is which buttons are lit.
 	Lights PZ70Lights
@@ -209,7 +209,7 @@ func EncodePZ70Panel(p PZ70Panel) []byte {
 		writeDisplay(report, clamp(abs(*p.UpperDisplay), 0, 99999), 5, false)
 	}
 	if p.LowerDisplay != nil {
-		// Ten characters, with room for a minus: the bottom line shows a
+		// Five characters, with room for a minus: the bottom line shows a
 		// vertical speed or a trim value.
 		writeDisplay(report, clamp(*p.LowerDisplay, -9999, 99999), 10, true)
 	}
@@ -236,13 +236,13 @@ func writeDisplay(report []byte, value, position int, supportsMinus bool) {
 
 // FormatPZ70Line renders, as text, what a PZ70 line would show for a value. It
 // mirrors EncodePZ70Panel exactly (abs and five digits on the top line, signed and
-// ten characters on the bottom), so a preview in the interface is what the panel
+// five characters on the bottom), so a preview in the interface is what the panel
 // displays rather than an approximation. Unused cells are spaces.
 func FormatPZ70Line(line DisplayLine, value int) string {
 	if line == LineUpper {
 		return padLeft(strconv.Itoa(clamp(abs(value), 0, 99999)), 5)
 	}
-	return padLeft(strconv.Itoa(clamp(value, -9999, 99999)), 10)
+	return padLeft(strconv.Itoa(clamp(value, -9999, 99999)), 5)
 }
 
 func padLeft(s string, width int) string {

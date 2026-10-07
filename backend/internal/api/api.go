@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"dcsmanager/internal/aerodrome"
@@ -26,6 +27,7 @@ import (
 	"dcsmanager/internal/debuglog"
 	"dcsmanager/internal/live"
 	"dcsmanager/internal/mapping"
+	"dcsmanager/internal/panelplugin"
 	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
@@ -90,26 +92,29 @@ type Commander interface {
 
 // Server wires the session stores to the HTTP handlers.
 type Server struct {
-	cfg        config.Config
-	store      *state.Store
-	live       *live.Store
-	db         db.Store
-	stats      *stats.Service
-	aerodromes *aerodrome.Catalog
-	charts     *charts.Catalog
-	modules    dcsdata.ModuleInventory
-	logbook    dcsdata.Logbook
-	mods       []dcsdata.InstalledMod
-	scripts    dcsdata.ScriptStatus
-	panels     *panelservice.Service
-	bios       *dcsbios.Client
-	mappings   *mapping.Store
-	controls   map[string]*biosmeta.Catalog
-	controlsMu sync.Mutex
-	commander  Commander
-	hub        *hub
-	theatres   []theatre.Theatre
-	chartsDir  string
+	cfg             config.Config
+	store           *state.Store
+	live            *live.Store
+	db              db.Store
+	stats           *stats.Service
+	aerodromes      *aerodrome.Catalog
+	charts          *charts.Catalog
+	modules         dcsdata.ModuleInventory
+	logbook         dcsdata.Logbook
+	mods            []dcsdata.InstalledMod
+	scripts         dcsdata.ScriptStatus
+	scriptInstallMu sync.Mutex
+	dcsRunning      func() (bool, error)
+	panels          *panelservice.Service
+	panelPlugin     *panelplugin.Client
+	bios            *dcsbios.Client
+	mappings        *mapping.Store
+	controls        map[string]*biosmeta.Catalog
+	controlsMu      sync.Mutex
+	commander       Commander
+	hub             *hub
+	theatres        []theatre.Theatre
+	chartsDir       string
 	// localOnly is true when the server is bound to the loopback interface, in
 	// which case it also refuses requests whose Host is not local (DNS
 	// rebinding).
@@ -117,7 +122,7 @@ type Server struct {
 	// testMode, when on, lets panel inputs reach DCS-BIOS regardless of the sending
 	// switch, so the mapping can be checked live in the Panels test view. Off by
 	// default and off again on restart.
-	testMode bool
+	testMode atomic.Bool
 	// debug is the runtime debug switch and in-memory log. It may be nil (some
 	// tests build a Server without it), so every use goes through helpers below.
 	debug *debuglog.Logger
@@ -172,12 +177,12 @@ func (s *Server) SetLocalOnly(local bool) {
 // sent to DCS-BIOS even when command sending is not armed, so the mapping can be
 // verified against the cockpit directly from the Panels view.
 func (s *Server) SetTestMode(on bool) {
-	s.testMode = on
+	s.testMode.Store(on)
 }
 
 // TestMode reports whether the live mapping test is on.
 func (s *Server) TestMode() bool {
-	return s.testMode
+	return s.testMode.Load()
 }
 
 // SetModules installs the DCS module inventory read from the installation. It is
@@ -351,7 +356,9 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/backup/download/", s.handleBackupDownload)
 	mux.HandleFunc("/api/mods", s.handleMods)
 	mux.HandleFunc("/api/scripts", s.handleScripts)
+	mux.HandleFunc("/api/scripts/install", s.handleScriptInstall)
 	mux.HandleFunc("/api/panels", s.handlePanels)
+	mux.HandleFunc("/api/panels/plugin", s.handlePanelPlugin)
 	mux.HandleFunc("/api/dcsbios", s.handleDCSBIOS)
 	mux.HandleFunc("/api/mappings", s.handleMappings)
 	mux.HandleFunc("/api/mappings/safety", s.handleMappingSafety)

@@ -43,6 +43,7 @@ type Target struct {
 func DefaultTargets() []Target {
 	return []Target{
 		{Source: "Export.lua", DestRel: filepath.Join("Scripts", "Export.lua"), NeedsBlock: true},
+		{Source: "PanelCommands.lua", DestRel: filepath.Join("Scripts", "DCSManager", "PanelCommands.lua"), NeedsBlock: false},
 		{Source: filepath.Join("Hooks", "dcsmanager.lua"), DestRel: filepath.Join("Scripts", "Hooks", "dcsmanager.lua"), NeedsBlock: false},
 		{Source: filepath.Join("Config", "dcsmanager.cfg"), DestRel: filepath.Join("Config", "dcsmanager.cfg"), NeedsBlock: false},
 	}
@@ -403,6 +404,7 @@ func (in *Installer) backup(dest string, content []byte) (string, error) {
 //
 //   - the marked block is stripped from Export.lua (the rest is preserved);
 //   - Hooks/dcsmanager.lua is deleted;
+//   - DCSManager/PanelCommands.lua is backed up and deleted;
 //   - Config/dcsmanager.cfg is left alone (it holds the user's address/ports).
 func (in *Installer) Uninstall() ([]Result, error) {
 	var results []Result
@@ -462,6 +464,22 @@ func (in *Installer) Uninstall() ([]Result, error) {
 		})
 	}
 
+	panelRel := filepath.Join("Scripts", "DCSManager", "PanelCommands.lua")
+	panelPath := filepath.Join(in.SavedGames, panelRel)
+	if existing, err := os.ReadFile(panelPath); err == nil {
+		backup, err := in.backup(panelPath, existing)
+		if err != nil {
+			return results, err
+		}
+		if !in.DryRun {
+			if err := os.Remove(panelPath); err != nil {
+				return results, err
+			}
+		}
+		results = append(results, Result{DestRel: panelRel, Action: "removed", Backup: backup})
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return results, err
+	}
 	return results, nil
 }
 

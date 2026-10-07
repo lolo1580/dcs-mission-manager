@@ -1,0 +1,98 @@
+{
+  "aircraft": "F-5E-3",
+  "bindings": [
+    {
+      "model": "pz55",
+      "control": "MASTER_BAT",
+      "command": "SW_BATTERY",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "FUEL_PUMP",
+      "command": "L_BOOSTPUMP",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_UP",
+      "command": "LG_LEVER_SWITCH",
+      "interface": "set_state",
+      "invert": true
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_DOWN",
+      "command": "LG_LEVER_SWITCH",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_UP",
+      "command": "FLAPS",
+      "interface": "set_state",
+      "state_on": 1
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_DOWN",
+      "command": "FLAPS",
+      "interface": "set_state",
+      "state_on": 2
+    },
+    {
+      "model": "pz70",
+      "control": "LCD_WHEEL",
+      "command": "HSI_HDG_KNOB",
+      "interface": "variable_step",
+      "mode": "HDG"
+    },
+    {
+      "model": "pz70",
+      "control": "LCD_WHEEL",
+      "command": "HSI_CRS_KNOB",
+      "interface": "variable_step",
+      "mode": "CRS"
+    }
+  ],
+  "outputs": [
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_LEFT",
+      "command": "LEFT_LIGHT",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_UPPER",
+      "command": "NOSE_LIGHT",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_RIGHT",
+      "command": "RIGHT_LIGHT",
+      "color": "green"
+    }
+  ],
+  "displays": [
+    {
+      "model": "pz70",
+      "mode": "HDG",
+      "line": "upper",
+      "command": "HSI_HDG",
+      "export": 0,
+      "scale": 0.005493247882810712,
+      "unit": "deg"
+    },
+    {
+      "model": "pz70",
+      "mode": "CRS",
+      "line": "upper",
+      "command": "HSI_CRS",
+      "export": 0,
+      "scale": 0.005493247882810712,
+      "unit": "deg"
+    }
+  ]
+}

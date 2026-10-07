@@ -1,0 +1,76 @@
+{
+  "aircraft": "M-2000C",
+  "bindings": [
+    {
+      "model": "pz55",
+      "control": "MASTER_BAT",
+      "command": "MAIN_BATT_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "FUEL_PUMP",
+      "command": "ENG_FUEL_L_PUMP_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_UP",
+      "command": "LDG_LEV",
+      "interface": "set_state",
+      "invert": true
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_DOWN",
+      "command": "LDG_LEV",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "AP_BUTTON",
+      "command": "AP_MASTER_BTN",
+      "interface": "action"
+    }
+  ],
+  "outputs": [
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_UPPER",
+      "command": "LANDING_GEAR_LEVER_LIGHT",
+      "color": "red"
+    },
+    {
+      "model": "pz70",
+      "target": "LIGHT_AP",
+      "command": "AP_MASTER_VERT",
+      "color": "green"
+    },
+    {
+      "model": "pz70",
+      "target": "LIGHT_ALT",
+      "command": "AP_ALT_VERT",
+      "color": "green"
+    }
+  ],
+  "displays": [
+    {
+      "model": "pz70",
+      "mode": "HDG",
+      "line": "upper",
+      "command": "HSI_HDG",
+      "export": 0,
+      "scale": 0.005493247882810712,
+      "unit": "deg"
+    },
+    {
+      "model": "pz70",
+      "mode": "CRS",
+      "line": "upper",
+      "command": "HSI_D_NEEDLE",
+      "export": 0,
+      "scale": 0.005493247882810712,
+      "unit": "deg"
+    }
+  ]
+}

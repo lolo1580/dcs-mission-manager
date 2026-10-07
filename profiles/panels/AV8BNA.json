@@ -1,0 +1,116 @@
+{
+  "aircraft": "AV8BNA",
+  "bindings": [
+    {
+      "model": "pz55",
+      "control": "MASTER_BAT",
+      "command": "BATT_SW",
+      "interface": "set_state",
+      "state_on": 2,
+      "state_off": 1
+    },
+    {
+      "model": "pz55",
+      "control": "FUEL_PUMP",
+      "command": "FUEL_PUMP_L",
+      "interface": "set_state",
+      "state_on": 2,
+      "state_off": 1
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_UP",
+      "command": "LG_LEVER",
+      "interface": "set_state",
+      "invert": true
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_DOWN",
+      "command": "LG_LEVER",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_UP",
+      "command": "FLAP_MODE",
+      "interface": "fixed_step",
+      "invert": true
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_DOWN",
+      "command": "FLAP_MODE",
+      "interface": "fixed_step"
+    }
+  ],
+  "outputs": [
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_UPPER",
+      "command": "NOSE_GEAR_G",
+      "color": "green",
+      "rules": [
+        {
+          "command": "NOSE_GEAR_Y",
+          "export": 0,
+          "operator": "eq",
+          "value": 1,
+          "color": "yellow"
+        },
+        {
+          "command": "NOSE_GEAR_G",
+          "export": 0,
+          "operator": "eq",
+          "value": 1,
+          "color": "green"
+        }
+      ]
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_LEFT",
+      "command": "LEFT_GEAR_G",
+      "color": "green",
+      "rules": [
+        {
+          "command": "LEFT_GEAR_Y",
+          "export": 0,
+          "operator": "eq",
+          "value": 1,
+          "color": "yellow"
+        },
+        {
+          "command": "LEFT_GEAR_G",
+          "export": 0,
+          "operator": "eq",
+          "value": 1,
+          "color": "green"
+        }
+      ]
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_RIGHT",
+      "command": "RIGHT_GEAR_G",
+      "color": "green",
+      "rules": [
+        {
+          "command": "RIGHT_GEAR_Y",
+          "export": 0,
+          "operator": "eq",
+          "value": 1,
+          "color": "yellow"
+        },
+        {
+          "command": "RIGHT_GEAR_G",
+          "export": 0,
+          "operator": "eq",
+          "value": 1,
+          "color": "green"
+        }
+      ]
+    }
+  ],
+  "displays": []
+}

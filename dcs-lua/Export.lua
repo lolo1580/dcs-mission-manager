@@ -49,6 +49,7 @@ do
   local prevStart = LuaExportStart
   local prevStop = LuaExportStop
   local prevActivity = LuaExportActivityNextEvent
+  local prevBefore = LuaExportBeforeNextFrame
 
   ---------------------------------------------------------------------------
   -- Configuration
@@ -92,6 +93,15 @@ do
 
   local conn
   local nextWorldAt
+  local panelCommands
+  if lfs and lfs.writedir then
+    local ok, factory = pcall(dofile, lfs.writedir() .. "Scripts/DCSManager/PanelCommands.lua")
+    if ok and type(factory) == "function" then
+      panelCommands = factory(socket, say)
+    else
+      say("panel command plugin missing or invalid; reinstall Lua scripts")
+    end
+  end
 
   -- Largest UDP payload we will build. LuaSocket's send() fails outright when a
   -- datagram exceeds the socket limit, and DCS's build has no setpayloadsize to
@@ -318,6 +328,7 @@ do
   function LuaExportStart()
     if prevStart then pcall(prevStart) end
     if not enabled then return end
+    if panelCommands then panelCommands.start() end
     local ok = connect()
     if ok then
       say("export enabled (" .. host .. ":" .. tostring(udpPort) .. ")")
@@ -327,8 +338,17 @@ do
   end
 
   function LuaExportStop()
+    if panelCommands then panelCommands.stop() end
     if conn then pcall(function() conn:close() end) end
     if prevStop then pcall(prevStop) end
+  end
+
+  function LuaExportBeforeNextFrame()
+    if prevBefore then pcall(prevBefore) end
+    if enabled and panelCommands then
+      local ok, err = pcall(panelCommands.frame)
+      if not ok then say("panel command frame failed: " .. tostring(err)); panelCommands.stop() end
+    end
   end
 
   function LuaExportActivityNextEvent(t)

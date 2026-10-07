@@ -1,6 +1,9 @@
 package mapping
 
-import "testing"
+import (
+	"dcsmanager/internal/panel"
+	"testing"
+)
 
 // TestSetProfileValidation locks the fix that an unauthenticated API cannot grow
 // mappings.json unboundedly nor push arbitrary bytes toward DCS-BIOS: aircraft,
@@ -35,7 +38,7 @@ func TestSetProfileValidation(t *testing.T) {
 
 	// A valid profile is still accepted.
 	if err := s.SetProfile(Profile{Aircraft: "F-16C_50", Bindings: []Binding{
-		{Control: "GEAR_DOWN", Command: "GEAR_LEVER", Interface: "set_state"},
+		{Model: panel.PZ55, Control: "GEAR_DOWN", Command: "GEAR_LEVER", Interface: "set_state"},
 	}}); err != nil {
 		t.Fatalf("valid profile rejected: %v", err)
 	}

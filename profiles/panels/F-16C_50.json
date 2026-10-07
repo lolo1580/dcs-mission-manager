@@ -1,0 +1,53 @@
+{
+  "aircraft": "F-16C_50",
+  "bindings": [
+    {
+      "model": "pz55",
+      "control": "MASTER_BAT",
+      "command": "MAIN_PWR_SW",
+      "interface": "set_state",
+      "state_on": 1,
+      "state_off": 2
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_UP",
+      "command": "GEAR_HANDLE",
+      "interface": "set_state",
+      "invert": true
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_DOWN",
+      "command": "GEAR_HANDLE",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "PITCH_TRIM",
+      "command": "PITCH_TRIM",
+      "interface": "variable_step"
+    }
+  ],
+  "outputs": [
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_LEFT",
+      "command": "LIGHT_GEAR_L",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_UPPER",
+      "command": "LIGHT_GEAR_N",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_RIGHT",
+      "command": "LIGHT_GEAR_R",
+      "color": "green"
+    }
+  ],
+  "displays": null
+}

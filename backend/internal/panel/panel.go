@@ -72,6 +72,8 @@ type Control struct {
 
 // Event is one state change decoded from a report.
 type Event struct {
+	// Mode is the current PZ70 selector position for contextual wheel bindings.
+	Mode string
 	// Device is the panel it came from, as the caller identifies it (a serial or
 	// an index); the decoder does not invent one.
 	Device string
@@ -103,7 +105,7 @@ func Controls(m Model) []Control {
 // one event rather than two.
 func Decode(device string, model Model, prev, cur []byte) []Event {
 	defs, ok := definitions[model]
-	if !ok || len(cur) < 3 {
+	if !ok || len(cur) < 3 || prev == nil {
 		return nil
 	}
 	var out []Event
@@ -172,7 +174,7 @@ var definitions = map[Model][]Control{
 		button(0, 7, "AP_BUTTON"), button(1, 0, "HDG_BUTTON"),
 		button(1, 1, "NAV_BUTTON"), button(1, 2, "IAS_BUTTON"), button(1, 3, "ALT_BUTTON"),
 		button(1, 4, "VS_BUTTON"), button(1, 5, "APR_BUTTON"), button(1, 6, "REV_BUTTON"),
-		button(1, 7, "AUTO_THROTTLE"), button(2, 0, "FLAPS_UP"), button(2, 1, "FLAPS_DOWN"),
+		bit(1, 7, "AUTO_THROTTLE"), button(2, 0, "FLAPS_UP"), button(2, 1, "FLAPS_DOWN"),
 		encoder(2, 2, "PITCH_TRIM", false), encoder(2, 3, "PITCH_TRIM", true),
 	},
 }

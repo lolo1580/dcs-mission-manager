@@ -48,7 +48,7 @@ if (!luaparse) {
   process.exit(0);
 }
 
-const files = ['dcs-lua/Export.lua', 'dcs-lua/Hooks/dcsmanager.lua'];
+const files = ['dcs-lua/Export.lua', 'dcs-lua/PanelCommands.lua', 'dcs-lua/Hooks/dcsmanager.lua'];
 let failed = false;
 
 for (const rel of files) {

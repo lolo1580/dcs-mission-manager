@@ -38,7 +38,7 @@ func (c Command) Line() string {
 func ArgForInterface(iface Interface, maxValue int, active bool) (int, bool) {
 	switch iface {
 	case FixedStep:
-		// INC is 0, DEC is 2 in DCS-BIOS.
+		// Internal direction markers; mapping renders them as INC and DEC on wire.
 		if active {
 			return 0, true
 		}
@@ -74,7 +74,7 @@ func ArgForInterface(iface Interface, maxValue int, active bool) (int, bool) {
 //
 // The conventions come from DCS-BIOS' own control modules:
 //
-//   - FixedStep: 0 or 1 steps one way, 2 the other. The panel protocol reports a
+//   - FixedStep: internal marker 0 steps one way, 2 the other; the wire uses INC/DEC. The panel protocol reports a
 //     two-state switch, so "on" steps forward and "off" steps back.
 //   - SetState: the absolute position, clamped to the control's maximum.
 //   - Action: 1 presses, 0 releases.
@@ -117,7 +117,7 @@ func ArgForInput(ctl Control, iface Interface, active bool) (int, bool) {
 //
 // Unlike a switch, both directions of a wheel produce the same "active" edge, so
 // the sign must come from the direction. DCS-BIOS convention: variable_step is
-// +step turning one way and -step the other; fixed_step is 0 (INC) and 2 (DEC).
+// +step turning one way and -step the other; fixed_step markers 0/2 become INC/DEC.
 // An interface the control does not accept yields ok=false.
 func ArgForEncoder(iface Interface, suggestedStep, maxValue int, clockwise bool) (int, bool) {
 	switch iface {

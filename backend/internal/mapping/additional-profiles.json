@@ -1,0 +1,54 @@
+[
+  {
+    "aircraft": "A-10C",
+    "bindings": [
+      {"model":"pz55","control":"MASTER_BAT","command":"EPP_BATTERY_PWR","interface":"set_state"},
+      {"model":"pz55","control":"PITOT_HEAT","command":"ENVCP_PITOT_HEAT","interface":"set_state"},
+      {"model":"pz55","control":"GEAR_UP","command":"GEAR_LEVER","interface":"set_state","state_on":1},
+      {"model":"pz55","control":"GEAR_DOWN","command":"GEAR_LEVER","interface":"set_state","state_on":0},
+      {"model":"pz70","control":"FLAPS_UP","command":"FLAPS_SWITCH","interface":"fixed_step"},
+      {"model":"pz70","control":"FLAPS_DOWN","command":"FLAPS_SWITCH","interface":"fixed_step","invert":true},
+      {"model":"pz70","control":"LCD_WHEEL","mode":"HDG","command":"HSI_HDG_KNOB","interface":"variable_step"},
+      {"model":"pz70","control":"LCD_WHEEL","mode":"CRS","command":"HSI_CRS_KNOB","interface":"variable_step"}
+    ],
+    "outputs": [
+      {"model":"pz55","target":"LIGHT_GEAR_UPPER","command":"GEAR_N_SAFE","color":"green"},
+      {"model":"pz55","target":"LIGHT_GEAR_LEFT","command":"GEAR_L_SAFE","color":"green"},
+      {"model":"pz55","target":"LIGHT_GEAR_RIGHT","command":"GEAR_R_SAFE","color":"green"}
+    ],
+    "displays": [
+      {"model":"pz70","mode":"HDG","line":"upper","command":"HSI_HDG_BUG","export":0,"scale":0.005493247882810712,"unit":"deg"},
+      {"model":"pz70","mode":"CRS","line":"upper","command":"HSI_CRS","export":0,"scale":0.005493247882810712,"unit":"deg"}
+    ]
+  },
+  {
+    "aircraft":"JF-17",
+    "bindings":[
+      {"model":"pz55","control":"MASTER_BAT","command":"BATT_SW","interface":"set_state"},
+      {"model":"pz55","control":"FUEL_PUMP","command":"FUEL_PUMP_SW","interface":"set_state"},
+      {"model":"pz55","control":"GEAR_UP","command":"GEAR_LEVER","interface":"set_state","invert":true},
+      {"model":"pz55","control":"GEAR_DOWN","command":"GEAR_LEVER","interface":"set_state"},
+      {"model":"pz70","control":"FLAPS_UP","command":"FLAP_SW","interface":"set_state","invert":true},
+      {"model":"pz70","control":"FLAPS_DOWN","command":"FLAP_SW","interface":"set_state"}
+    ],
+    "outputs":[{"model":"pz55","target":"LIGHT_GEAR_UPPER","command":"GEAR_LEVER_L","color":"red"}],
+    "displays":[]
+  },
+  {
+    "aircraft":"AV8BNA",
+    "bindings":[
+      {"model":"pz55","control":"MASTER_BAT","command":"BATT_SW","interface":"set_state","state_on":2,"state_off":1},
+      {"model":"pz55","control":"FUEL_PUMP","command":"FUEL_PUMP_L","interface":"set_state","state_on":2,"state_off":1},
+      {"model":"pz55","control":"GEAR_UP","command":"LG_LEVER","interface":"set_state","invert":true},
+      {"model":"pz55","control":"GEAR_DOWN","command":"LG_LEVER","interface":"set_state"},
+      {"model":"pz70","control":"FLAPS_UP","command":"FLAP_MODE","interface":"fixed_step","invert":true},
+      {"model":"pz70","control":"FLAPS_DOWN","command":"FLAP_MODE","interface":"fixed_step"}
+    ],
+    "outputs":[
+      {"model":"pz55","target":"LIGHT_GEAR_UPPER","command":"NOSE_GEAR_G","color":"green","rules":[{"command":"NOSE_GEAR_Y","export":0,"operator":"eq","value":1,"color":"yellow"},{"command":"NOSE_GEAR_G","export":0,"operator":"eq","value":1,"color":"green"}]},
+      {"model":"pz55","target":"LIGHT_GEAR_LEFT","command":"LEFT_GEAR_G","color":"green","rules":[{"command":"LEFT_GEAR_Y","export":0,"operator":"eq","value":1,"color":"yellow"},{"command":"LEFT_GEAR_G","export":0,"operator":"eq","value":1,"color":"green"}]},
+      {"model":"pz55","target":"LIGHT_GEAR_RIGHT","command":"RIGHT_GEAR_G","color":"green","rules":[{"command":"RIGHT_GEAR_Y","export":0,"operator":"eq","value":1,"color":"yellow"},{"command":"RIGHT_GEAR_G","export":0,"operator":"eq","value":1,"color":"green"}]}
+    ],
+    "displays":[]
+  }
+]

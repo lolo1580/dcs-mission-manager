@@ -1,0 +1,52 @@
+{
+  "aircraft": "JF-17",
+  "bindings": [
+    {
+      "model": "pz55",
+      "control": "MASTER_BAT",
+      "command": "BATT_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "FUEL_PUMP",
+      "command": "FUEL_PUMP_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_UP",
+      "command": "GEAR_LEVER",
+      "interface": "set_state",
+      "invert": true
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_DOWN",
+      "command": "GEAR_LEVER",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_UP",
+      "command": "FLAP_SW",
+      "interface": "set_state",
+      "invert": true
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_DOWN",
+      "command": "FLAP_SW",
+      "interface": "set_state"
+    }
+  ],
+  "outputs": [
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_UPPER",
+      "command": "GEAR_LEVER_L",
+      "color": "red"
+    }
+  ],
+  "displays": []
+}

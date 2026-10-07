@@ -1,0 +1,169 @@
+{
+  "aircraft": "FA-18C_hornet",
+  "bindings": [
+    {
+      "model": "pz55",
+      "control": "MASTER_BAT",
+      "command": "BATTERY_SW",
+      "interface": "set_state",
+      "state_on": 0,
+      "state_off": 1
+    },
+    {
+      "model": "pz55",
+      "control": "DE_ICE",
+      "command": "ENG_ANTIICE_SW",
+      "interface": "set_state",
+      "state_on": 0,
+      "state_off": 1
+    },
+    {
+      "model": "pz55",
+      "control": "PITOT_HEAT",
+      "command": "PITOT_HEAT_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "LIGHTS_PANEL",
+      "command": "INST_PNL_DIMMER",
+      "interface": "set_state",
+      "state_on": 65535,
+      "state_off": 0
+    },
+    {
+      "model": "pz55",
+      "control": "LIGHTS_NAV",
+      "command": "POSITION_DIMMER",
+      "interface": "set_state",
+      "state_on": 65535,
+      "state_off": 0
+    },
+    {
+      "model": "pz55",
+      "control": "LIGHTS_LANDING",
+      "command": "LDG_TAXI_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz55",
+      "control": "ENGINE_LEFT",
+      "command": "ENGINE_CRANK_SW",
+      "interface": "set_state",
+      "state_on": 0
+    },
+    {
+      "model": "pz55",
+      "control": "ENGINE_RIGHT",
+      "command": "ENGINE_CRANK_SW",
+      "interface": "set_state",
+      "state_on": 2
+    },
+    {
+      "model": "pz55",
+      "control": "ENGINE_OFF",
+      "command": "ENGINE_CRANK_SW",
+      "interface": "set_state",
+      "state_on": 1
+    },
+    {
+      "model": "pz55",
+      "control": "ENGINE_BOTH",
+      "command": "ENGINE_CRANK_SW",
+      "interface": "set_state",
+      "state_on": 1
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_UP",
+      "command": "GEAR_LEVER",
+      "interface": "set_state",
+      "invert": true
+    },
+    {
+      "model": "pz55",
+      "control": "GEAR_DOWN",
+      "command": "GEAR_LEVER",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_UP",
+      "command": "FLAP_SW",
+      "interface": "fixed_step",
+      "invert": true
+    },
+    {
+      "model": "pz70",
+      "control": "FLAPS_DOWN",
+      "command": "FLAP_SW",
+      "interface": "fixed_step"
+    },
+    {
+      "model": "pz70",
+      "control": "PITCH_TRIM",
+      "command": "DCSM_PITCH_TRIM",
+      "interface": "variable_step",
+      "invert": true
+    },
+    {
+      "model": "pz70",
+      "control": "AP_BUTTON",
+      "command": "UFC_AP",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "IAS_BUTTON",
+      "command": "THROTTLE_ATC_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "REV_BUTTON",
+      "command": "STICK_PADDLE_SW",
+      "interface": "set_state"
+    },
+    {
+      "model": "pz70",
+      "control": "LCD_WHEEL",
+      "command": "LEFT_DDI_HDG_SW",
+      "interface": "set_state",
+      "mode": "HDG",
+      "state_on": 2,
+      "state_off": 0,
+      "pulse_reset": 1
+    },
+    {
+      "model": "pz70",
+      "control": "LCD_WHEEL",
+      "command": "LEFT_DDI_CRS_SW",
+      "interface": "set_state",
+      "mode": "CRS",
+      "state_on": 2,
+      "state_off": 0,
+      "pulse_reset": 1
+    }
+  ],
+  "outputs": [
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_LEFT",
+      "command": "FLP_LG_LEFT_GEAR_LT",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_UPPER",
+      "command": "FLP_LG_NOSE_GEAR_LT",
+      "color": "green"
+    },
+    {
+      "model": "pz55",
+      "target": "LIGHT_GEAR_RIGHT",
+      "command": "FLP_LG_RIGHT_GEAR_LT",
+      "color": "green"
+    }
+  ],
+  "displays": null
+}

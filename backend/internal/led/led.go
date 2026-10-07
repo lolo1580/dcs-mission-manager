@@ -126,17 +126,19 @@ func (d *Driver) Sync() bool {
 	if d.store == nil || !d.store.OutputsEnabled() {
 		return false
 	}
-	aircraft := d.bios.State().Aircraft
-	if aircraft == "" {
-		return false
+	state := d.bios.State()
+	aircraft := state.Aircraft
+	if !state.Connected {
+		aircraft = ""
 	}
 	p := d.store.Profile(aircraft)
-	if len(p.Outputs) == 0 && len(p.Displays) == 0 {
-		return false
-	}
-	cat, err := d.loadMeta(aircraft)
-	if err != nil {
-		return false
+	var cat *biosmeta.Catalog
+	if aircraft != "" && (len(p.Outputs) != 0 || len(p.Displays) != 0) {
+		var err error
+		cat, err = d.loadMeta(aircraft)
+		if err != nil {
+			p.Outputs, p.Displays = nil, nil
+		}
 	}
 	devices := d.panels.Devices()
 	if len(devices) == 0 {
@@ -146,8 +148,11 @@ func (d *Driver) Sync() bool {
 
 	// The selector, read once: it decides which display mode's values are shown.
 	sel := ""
-	if d.switchPos != nil {
-		sel = normalizeMode(d.switchPos())
+	d.mu.Lock()
+	reader := d.switchPos
+	d.mu.Unlock()
+	if reader != nil {
+		sel = normalizeMode(reader())
 	}
 
 	d.mu.Lock()
@@ -158,23 +163,48 @@ func (d *Driver) Sync() bool {
 	// its lights and its two display lines into one report the same way.
 	gear := map[string]*panel.GearLights{}
 	pz70 := map[string]*panel.PZ70Panel{}
+	// Always build a blank baseline, including when a mode/source/profile was
+	// removed. Otherwise an old LCD value or LED remains on the physical panel.
+	for _, dev := range devices {
+		switch model, _ := panel.ModelFor(dev.VendorID, dev.ProductID); model {
+		case panel.PZ55:
+			gear[dev.Path] = &panel.GearLights{}
+		case panel.PZ70:
+			panelFor(pz70, dev.Path)
+		}
+	}
 
 	for _, o := range p.Outputs {
-		ctrl, ok := cat.ByID(o.Command)
-		if !ok || len(ctrl.Outputs) == 0 {
-			continue
+		color := panel.GearOff
+		if len(o.Rules) > 0 {
+			for _, rule := range o.Rules {
+				ctrl, ok := cat.ByID(rule.Command)
+				if !ok || rule.Export < 0 || rule.Export >= len(ctrl.Outputs) {
+					continue
+				}
+				value, available := ReadExportInt(ctrl.Outputs[rule.Export], mem)
+				if available && matchRule(value, rule) {
+					color = panel.GearLightFor(rule.Color)
+					break
+				}
+			}
+		} else {
+			ctrl, ok := cat.ByID(o.Command)
+			if !ok || len(ctrl.Outputs) == 0 {
+				continue
+			}
+			on := outputOn(ctrl.Outputs[0], mem)
+			if on {
+				color = panel.GearLightFor(o.Color)
+			}
 		}
-		on := outputOn(ctrl.Outputs[0], mem)
+		on := color != panel.GearOff
 
 		switch o.Model {
 		case panel.PZ55:
 			set, ok := panel.GearTarget(o.Target)
 			if !ok {
 				continue
-			}
-			color := panel.GearOff
-			if on {
-				color = panel.GearLightFor(o.Color)
 			}
 			for _, dev := range devices {
 				if model, _ := panel.ModelFor(dev.VendorID, dev.ProductID); model != panel.PZ55 {
@@ -221,6 +251,9 @@ func (d *Driver) Sync() bool {
 			continue // no value yet: leave the line empty rather than show garbage
 		}
 		shown := Convert(value, disp)
+		if shown > 99999 || shown < 0 && displayLine(disp.Line) == panel.LineUpper || shown < -9999 {
+			continue // do not silently turn a negative altitude into its absolute value
+		}
 		for _, dev := range devices {
 			if model, _ := panel.ModelFor(dev.VendorID, dev.ProductID); model != panel.PZ70 {
 				continue
@@ -265,6 +298,24 @@ func (d *Driver) Sync() bool {
 		written = true
 	}
 	return written
+}
+
+func matchRule(value int, rule mapping.OutputRule) bool {
+	switch rule.Operator {
+	case "eq":
+		return value == rule.Value
+	case "ne":
+		return value != rule.Value
+	case "gt":
+		return value > rule.Value
+	case "lt":
+		return value < rule.Value
+	case "ge":
+		return value >= rule.Value
+	case "le":
+		return value <= rule.Value
+	}
+	return false
 }
 
 // panelFor returns the PZ70 output being built for a device, creating it on first
@@ -326,6 +377,9 @@ func displayLine(line string) panel.DisplayLine {
 // and shift, which is what DCS-BIOS uses to pack several values into one word. It
 // is exported so the API can preview a display binding's raw value.
 func ReadExportInt(out biosmeta.Output, mem map[uint16]byte) (int, bool) {
+	if out.Type != "" && out.Type != "integer" || out.Address < 0 || out.Address > 65535 || out.ShiftBy < 0 || out.ShiftBy > 15 {
+		return 0, false
+	}
 	addr := uint16(out.Address)
 	lo, ok := mem[addr]
 	if !ok {
@@ -336,6 +390,9 @@ func ReadExportInt(out biosmeta.Output, mem map[uint16]byte) (int, bool) {
 	if hi, ok := mem[addr+1]; ok {
 		v = binary.LittleEndian.Uint16([]byte{lo, hi})
 	} else {
+		if out.Mask > 255 || out.MaxValue > 255 {
+			return 0, false // a partially received word is not a usable value
+		}
 		v = uint16(lo)
 	}
 	if mask := uint16(out.Mask); mask != 0 {

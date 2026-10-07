@@ -103,6 +103,7 @@ func TestStarterProfilesMatchDCSBIOS(t *testing.T) {
 			t.Errorf("%s: no metadata: %v", p.Aircraft, err)
 			continue
 		}
+		cat = biosmeta.WithPanelPlugin(cat)
 		for _, b := range p.Bindings {
 			ctl, ok := cat.ByID(b.Command)
 			if !ok {
@@ -121,6 +122,12 @@ func TestStarterProfilesMatchDCSBIOS(t *testing.T) {
 		// An output binding reads a control's exported value, so the control must
 		// exist and carry an output to read.
 		for _, o := range p.Outputs {
+			for _, rule := range o.Rules {
+				ctl, ok := cat.ByID(rule.Command)
+				if !ok || rule.Export < 0 || rule.Export >= len(ctl.Outputs) || ctl.Outputs[rule.Export].Type != "integer" {
+					t.Errorf("%s: invalid LED rule source %s", p.Aircraft, rule.Command)
+				}
+			}
 			ctl, ok := cat.ByID(o.Command)
 			if !ok {
 				t.Errorf("%s: %s is not a control of the aircraft", p.Aircraft, o.Command)
@@ -273,7 +280,11 @@ func TestStarterGearLeverDirections(t *testing.T) {
 		if len(rec.lines) != 1 {
 			t.Fatalf("%s: gear up sent %v, want one command", p.Aircraft, rec.lines)
 		}
-		if !strings.HasSuffix(rec.lines[0], " 0\n") {
+		upSuffix := " 0\n"
+		if p.Aircraft == "A-10C" {
+			upSuffix = " 1\n"
+		}
+		if !strings.HasSuffix(rec.lines[0], upSuffix) {
 			t.Errorf("%s: gear up sent %q, want position 0", p.Aircraft, rec.lines[0])
 		}
 
@@ -282,7 +293,11 @@ func TestStarterGearLeverDirections(t *testing.T) {
 		if len(rec.lines) != 1 {
 			t.Fatalf("%s: gear down sent %v, want one command", p.Aircraft, rec.lines)
 		}
-		if !strings.HasSuffix(rec.lines[0], " 1\n") {
+		downSuffix := " 1\n"
+		if p.Aircraft == "A-10C" {
+			downSuffix = " 0\n"
+		}
+		if !strings.HasSuffix(rec.lines[0], downSuffix) {
 			t.Errorf("%s: gear down sent %q, want position 1", p.Aircraft, rec.lines[0])
 		}
 	}
