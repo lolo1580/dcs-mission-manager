@@ -54,6 +54,31 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 > Aérodromes (aérodrome le plus proche), et reste stockée en base pour qu'une future
 > vue d'analyse dispose d'un historique. Le gestionnaire s'axe désormais sur les
 > débriefs, les statistiques et les aérodromes.
+### Panneaux et installation Lua
+
+Les PZ55/PZ70 sont lus directement en HID, **sans vJoy ni pilote Windows supplémentaire**.
+L’éditeur visuel propose molette selon le contexte, positions personnalisées,
+règles LED, sources LCD et import/export portable. Sept profils sont fournis :
+F/A-18C, F-16C, F-5E-3, M-2000C, A-10C, JF-17 et AV-8B. Le Hornet possède
+20 attributions et trois sources LED de train.
+
+Les attributions restent dans DCS Manager ; aucun périphérique supplémentaire
+n’apparaît dans le menu Commandes de DCS. DCS-BIOS reste nécessaire aux commandes
+existantes et aux LED. Le trim F/A-18C utilise notre plugin Lua sur UDP local 7780,
+avec file limitée, accusés de réception et relâchement automatique. Certaines
+touches restent sans attribution ; le LCD est facultatif.
+**Le mouvement physique du trim, les LED et le multijoueur restent à vérifier dans
+DCS.** Un accusé confirme uniquement l’absence d’erreur de l’appel Lua.
+
+Fermer DCS, puis ouvrir **Paramètres → Installation DCS → Installer / mettre à jour
+les scripts**. L’installateur détecte Saved Games, installe les quatre fichiers
+embarqués, conserve les autres exports et les réglages existants, et affiche les
+sauvegardes. Il refuse l’installation si DCS.exe tourne. Relancer DCS après
+l’installation. Pendant le développement, utiliser `dcsmanager-panels.exe`.
+
+Voir la [bibliothèque de profils](profiles/panels/README.fr.md) et
+[l’installation, les tests et le retour arrière du plugin](docs/plugin-panels-dcs.fr.md).
+
 ### Statistiques avancées (prévues)
 
 - **Fiche pilote & carrière** — kills/morts/KD, éjections, crashes, temps de vol, par **UCID**
@@ -121,7 +146,7 @@ côté de la base), puisqu'un exécutable lancé au double-clic n'a pas de conso
 
 ### Côté développement / manager
 
-- **Go 1.22+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
+- **Go 1.25+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
 - **Node.js 20+** — <https://nodejs.org/> (uniquement pour builder le frontend)
 - **Git**
 
@@ -149,16 +174,16 @@ go run ./backend/cmd/dcsmanager
 Par défaut, le backend écoute :
 
 - `127.0.0.1:7776` en **UDP** (positions)
-- `0.0.0.0:8080` en **HTTP** (Web UI + flux temps réel `GET /api/events` en SSE)
+- `127.0.0.1:8080` en **HTTP** en mode `serve` (Web UI + SSE) ; le mode fenêtre peut choisir un port libre
 
 Le manager s'ouvre alors dans une **fenêtre native**. En mode `serve`, il n'ouvre pas
 de fenêtre et l'interface est à consulter sur <http://localhost:8080>.
 
 ### 2. Installer les scripts Lua dans DCS
 
-Copie les fichiers de `dcs-lua/` vers ton dossier Saved Games — voir
-[Installation des scripts Lua](#installation-des-scripts-lua-dans-dcs). Le PoC n'a besoin
-que de `Export.lua` et de `Config/dcsmanager.cfg`.
+Ferme DCS, puis ouvre **Paramètres → Installation DCS → Installer / mettre à jour les scripts**.
+Voir [Installation des scripts Lua](#installation-des-scripts-lua-dans-dcs)
+pour les fichiers installés et l’alternative en ligne de commande.
 
 ### 3. Lancer DCS et une mission
 
@@ -223,17 +248,30 @@ Les scripts se placent dans le dossier *Saved Games* de DCS :
 ├─ Config\
 │   └─ dcsmanager.cfg          ← configuration de l'adresse backend
 └─ Scripts\
-    ├─ Export.lua         ← positions (live map) ; à MERGER avec l'existant
+    ├─ Export.lua             ← télémétrie et plugin panels ; fusion avec les exports existants
+    ├─ DCSManager\
+    │   └─ PanelCommands.lua  ← récepteur trim F/A-18C (UDP 127.0.0.1:7780)
     └─ Hooks\
         └─ dcsmanager.lua      ← événements, joueurs, chat (Phases 2+)
 ```
 
-1. Copie `dcs-lua/Config/dcsmanager.cfg` dans `Saved Games\DCS\Config\`.
-2. Si `Saved Games\DCS\Scripts\Export.lua` existe déjà : fais-en une copie
-   (`Export.lua.bak-AAAAMMJJ`), puis ajoute le bloc `do ... end` fourni dans
-   `dcs-lua/Export.lua` **à la fin** du fichier existant.
-3. Sinon, copie simplement `dcs-lua/Export.lua`.
-4. Redémarre DCS.
+1. Ferme DCS et lance l’application à jour.
+2. Ouvre **Paramètres → Installation DCS**, vérifie le dossier détecté, puis clique
+   **Installer / mettre à jour les scripts**. Exports et configuration existants
+   sont conservés ; les fichiers modifiés sont sauvegardés. L’état s’actualise immédiatement.
+3. Lance DCS et charge une mission. DCS-BIOS s’installe séparément pour les panels.
+
+Alternative PowerShell depuis le dossier de l’exécutable :
+
+```powershell
+.\dcsmanager.exe install-lua --saved-games "$env:USERPROFILE\Saved Games\DCS" --dry-run
+.\dcsmanager.exe install-lua --saved-games "$env:USERPROFILE\Saved Games\DCS"
+```
+
+La commande peut mettre à jour une configuration existante, avec sauvegarde ;
+le bouton dans l’application la conserve. Utiliser `dcsmanager-panels.exe` pour la
+version de développement. Si la détection échoue, définir `DCSMANAGER_SAVED_GAMES`
+avant de lancer l’application.
 
 ---
 

@@ -11,6 +11,13 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- Le premier rapport USB initialise les panels sans envoyer de commande cockpit.
+  Correction des positions d’encodeur, des valeurs INC/DEC de `fixed_step`, de
+  l’édition selon le contexte et des réponses tardives d’avion/profil. Mode test atomique.
+- Correction des positions batterie/antigivrage Hornet, des volets progressifs
+  et de l’attribution batterie F-16. Lecture du nom d’avion dans la mémoire
+  DCS-BIOS assemblée et tests de régression du rafraîchissement LED/LCD.
+
 - **Une restauration ne se poursuit plus si sa copie de secours échoue.** Restaurer
   remplace des fichiers DCS en service, donc le `*.prerestore.zip` préalable est
   désormais obligatoire : s'il ne peut pas être écrit (ou si ses catégories ne se
@@ -29,10 +36,27 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- Éditeur visuel PZ55/PZ70 : molette selon ALT/VS/IAS/HDG/CRS, positions
+  personnalisées, impulsions avec recentrage, règles LED conditionnelles et
+  import/export portable. Profils A-10C, JF-17 et AV-8B ajoutés : sept avions
+  dans la bibliothèque ; Hornet avec 20 entrées et trois sources LED de train.
+- Plugin Lua DCS Manager pour le trim F/A-18C : UDP local, vérification
+  avion/session, file limitée, accusés de réception et relâchement automatique.
+  Sans vJoy ni pilote Windows supplémentaire ; les autres entrées et LED restent
+  DCS-BIOS. Diagnostic connexion/erreur dans Panneaux. Validation physique et
+  multijoueur restantes ; un accusé ne prouve pas le mouvement dans le cockpit.
+- Installation Lua en un clic dans Paramètres → Installation DCS
+  (`POST /api/scripts/install`) : quatre fichiers embarqués, exports et
+  configuration existants conservés, sauvegardes, refus si DCS.exe tourne,
+  état relu sur disque et affichage des résultats/chemins de sauvegarde.
+- Outils d’export/migration/vérification des profils, tests Lua simulés,
+  essais navigateur avec API fictive et documentation du cheminement/retour arrière.
+
 - **Les LED des panneaux sont pilotées depuis DCS-BIOS.** Les voyants de train du
   PZ55 et les LED des boutons du pilote automatique du PZ70 reflètent désormais le
-  cockpit, lus sur les valeurs exportées par DCS-BIOS (les voyants de train sont
-  bicolores : vert pour train sorti et verrouillé, rouge pour non sûr). C'est la
+  cockpit, lus sur les valeurs exportées par DCS-BIOS (vert/rouge/jaune selon
+  les sources et règles du profil ; les couleurs de transit ou de danger ne sont
+  pas déduites pour tous les avions). C'est la
   moitié manquante du pont des panneaux — `mapping` envoyait déjà un mouvement
   d'interrupteur dans le cockpit — et l'équivalent Go des `outputBindings` des
   profils d'origine. Les liaisons de sortie vivent dans les mêmes profils par
@@ -72,11 +96,11 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   sorties (`POST /api/mappings/outputs`) ne fait que lire DCS-BIOS et écrire sur les
   panneaux. Le pilote est rappelé à **chaque** trame DCS-BIOS (et plus seulement sur
   un changement d'état), fusionne les voyants de train du PZ55 et le masque de
-  voyants + les lignes LCD du PZ70 (à venir) en un seul rapport, n'écrit que s'il
+  voyants + les lignes LCD du PZ70 en un seul rapport, n'écrit que s'il
   change, et vide son cache à la reconnexion d'un panneau ou au changement d'appareil
   pour redessiner. Le profil gagne aussi une section `displays` validée (LCD : mode,
-  ligne, source, index d'export, échelle/décalage, unité), pas encore utilisée par
-  l'interface.
+  ligne, source, index d'export, échelle/décalage, unité), configurable dans
+  l’éditeur d’affichage.
 
 - **Un éditeur d'affichage PZ70 dans l'onglet Panneaux.** Une section « Affichage
   PZ70 » lie une ligne du LCD à une valeur exportée par DCS-BIOS, par position du
@@ -95,6 +119,10 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   remplir par l'opérateur après validation du panneau.
 
 ### Modifié
+
+- Expérience vJoy non publiée retirée au profit du plugin Lua. Les attributions
+  restent dans DCS Manager, sans nouvelles colonnes de périphériques dans DCS.
+  Le LCD est facultatif.
 
 - **L'interface est une coquille barre latérale + bandeau.** La navigation quitte
   la barre d'onglets d'en-tête pour une barre latérale à vues groupées (Analyse /

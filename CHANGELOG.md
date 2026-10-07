@@ -11,6 +11,13 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- Panel startup reports establish a baseline without triggering cockpit commands.
+  Fixed encoder custom positions, `fixed_step` INC/DEC values, contextual profile
+  editing and stale aircraft/profile responses. Sending test mode is now atomic.
+- Corrected Hornet battery/anti-ice positions, progressive flap mappings and
+  F-16 battery attribution. DCS-BIOS aircraft text is read from assembled memory;
+  LED and LCD refresh behaviour has regression coverage.
+
 - **A restore no longer proceeds when its safety copy fails.** Restoring replaces
   live DCS files, so the pre-restore `*.prerestore.zip` is now mandatory: if it
   cannot be written (or its categories cannot be resolved), the restore is refused
@@ -27,10 +34,27 @@ to [semantic versioning](https://semver.org/).
 
 ### Added
 
+- Visual PZ55/PZ70 editor with contextual ALT/VS/IAS/HDG/CRS wheel bindings,
+  custom switch positions, rocker reset pulses, conditional LED rules and
+  portable profile import/export. Added A-10C, JF-17 and AV-8B profiles, bringing
+  the library to seven aircraft; the Hornet now has 20 inputs and three gear LED sources.
+- DCS Manager Lua panel plugin for F/A-18C pitch trim, with local UDP transport,
+  aircraft/session checks, a bounded queue, acknowledgements and automatic release.
+  No vJoy or additional Windows driver; existing inputs and LEDs retain DCS-BIOS.
+  A connection/error indicator is available in Panels. Physical trim/LED validation
+  and multiplayer checks remain pending; an acknowledgement does not prove cockpit movement.
+- One-click Lua installation in Settings → DCS install (`POST /api/scripts/install`).
+  Installs four bundled files, preserves existing exports and user configuration,
+  backs up changed files, refuses installation while DCS.exe runs, and refreshes
+  script status from disk. Installation results and backup paths remain visible.
+- Profile export/migration/verification tools, plugin Lua simulation tests,
+  browser review fixtures and French documentation of the integration and rollback.
+
 - **The panels' LEDs are driven from DCS-BIOS.** The PZ55's landing-gear lights
   and the PZ70's autopilot button lights now reflect the cockpit, read from the
-  values DCS-BIOS exports (the gear lights are bicolour: green for down-and-
-  locked, red for unsafe). This is the missing half of the panel bridge —
+  values DCS-BIOS exports (the gear lights support green/red/yellow according
+  to the profile's sources and rules; unsafe/transit colours are not inferred
+  for every aircraft). This is the missing half of the panel bridge —
   `mapping` already sent a switch move into the cockpit — and the Go counterpart
   of the original profiles' `outputBindings`. Output bindings live in the same
   per-aircraft profiles as the input ones and are edited in the Panels tab; the
@@ -66,11 +90,11 @@ to [semantic versioning](https://semver.org/).
   (which writes the pilot's inputs into the aircraft): the outputs switch
   (`POST /api/mappings/outputs`) only reads DCS-BIOS and writes the panels. The
   driver is ticked on **every** DCS-BIOS frame (not only on a state change), merges
-  the PZ55's gear lights and the PZ70's light byte and (to come) LCD lines into a
+  the PZ55's gear lights and the PZ70's light byte and LCD lines into a
   single report, writes only when it changes, and drops its cache on a panel
   reconnect or an aircraft change so the panel is redrawn. The profile also gained a
   validated `displays` section (LCD: mode, line, source, export index, scale/offset,
-  unit), unused by the UI yet.
+  unit), configurable in the display editor.
 
 - **A PZ70 display editor in the Panels tab.** A "PZ70 display" section binds one
   LCD line to a value DCS-BIOS exports, per selector mode (ALT/VS/IAS/HDG/CRS): pick
@@ -89,6 +113,9 @@ to [semantic versioning](https://semver.org/).
   panel is validated.
 
 ### Changed
+
+- Removed the unshipped vJoy experiment in favour of the Lua plugin. Bindings
+  remain in DCS Manager, with no new controller columns in DCS. LCD is optional.
 
 - **The interface is a sidebar + topbar shell.** Navigation moved from a header
   tab bar to a sidebar rail with grouped views (Analysis / Reference /
