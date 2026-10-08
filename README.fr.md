@@ -6,8 +6,8 @@
 
 [🇬🇧 English](README.md) | 🇫🇷 Français
 
-Un compagnon tout-en-un pour **DCS World** : lecture des débriefings,
-statistiques avancées, analyse des sorties, référence des aérodromes et cartes
+Un compagnon tout-en-un pour **DCS World** : collecte des débriefings,
+statistiques avancées, référence des aérodromes et cartes
 aéronautiques. Il tourne
 **en local, sur la même machine Windows que DCS** : un seul `dcsmanager.exe`, ni serveur,
 ni conteneur, rien à configurer. Il s'ouvre dans **sa propre fenêtre**, comme un
@@ -39,8 +39,8 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 
 | Fonction | État | Détail |
 |---|---|---|
-| Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique |
-| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau (carrière + mission), fusionnés avec le logbook dans un onglet **Carrière & statistiques** |
+| Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique conservé ; vue actuellement masquée |
+| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau, choix d’une mission enregistrée et évolution par mission (score, kills, atterrissages), dans **Carrière & statistiques** |
 | Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **220 aérodromes listés, 146 plaçables** sur 6 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes. Un jeu embarqué couvre le Caucase et l'Allemagne Guerre froide si DCS est introuvable |
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
@@ -50,10 +50,10 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Local par conception | ✅ Nouveau | Un `.exe` Windows autonome, ni serveur ni conteneur : persistance SQLite dans `data/`, et toutes les lectures (terrains, Saved Games) se font sur la même machine que DCS |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
-> est toujours reçue et échantillonnée : elle alimente les statistiques et l'onglet
-> Aérodromes (aérodrome le plus proche), et reste stockée en base pour qu'une future
-> vue d'analyse dispose d'un historique. Le gestionnaire s'axe désormais sur les
-> débriefs, les statistiques et les aérodromes.
+> est toujours reçue et échantillonnée : la position actuelle sert à l'onglet
+> Aérodromes (aérodrome le plus proche), et les échantillons restent stockés en
+> base pour une éventuelle analyse future. L'interface affiche la carrière, les
+> statistiques, les aérodromes et les paramètres ; les débriefs restent collectés.
 ### Panneaux et installation Lua
 
 Les PZ55/PZ70 sont lus directement en HID, **sans vJoy ni pilote Windows supplémentaire**.
@@ -67,6 +67,8 @@ n’apparaît dans le menu Commandes de DCS. DCS-BIOS reste nécessaire aux comm
 existantes et aux LED. Le trim F/A-18C utilise notre plugin Lua sur UDP local 7780,
 avec file limitée, accusés de réception et relâchement automatique. Certaines
 touches restent sans attribution ; le LCD est facultatif.
+Le trim expérimental est désactivé à chaque démarrage ; sa case dédiée ne doit
+être activée que pour l’essai. La couper annule les impulsions en attente sans remettre le trim de l’avion à zéro.
 **Le mouvement physique du trim, les LED et le multijoueur restent à vérifier dans
 DCS.** Un accusé confirme uniquement l’absence d’erreur de l’appel Lua.
 
@@ -84,7 +86,6 @@ Voir la [bibliothèque de profils](profiles/panels/README.fr.md) et
 - **Fiche pilote & carrière** — kills/morts/KD, éjections, crashes, temps de vol, par **UCID**
 - **Analyse d'armes** — efficacité par arme, matrice de kills, friendly-fire
 - **Balance & méta** — balance coalition, appareils joués, timeline de mission
-- **Analyse de sortie** — durée, distance, altitude/vitesse/G max (telemetry)
 - **Qualité réseau** — ping, déconnexions, codes d'erreur
 - **Analyse par engin** — granularité **type DCS exact** (`F-16C_50`, `T-72B`, `SA-10`…), plateforme + cible + matchups
 
@@ -154,21 +155,34 @@ côté de la base), puisqu'un exécutable lancé au double-clic n'a pas de conso
 
 ## Manuel d'installation
 
+L’**installateur Windows personnalisé** est le seul fichier publié : logo, thème
+sombre, français/anglais, raccourcis, détection DCS, scripts Lua et reprise
+facultative des données d’une ancienne version portable. Les données restent dans
+`%LOCALAPPDATA%\DCS Manager` après mise à jour et désinstallation.
+L’application vérifie les releases GitHub au lancement puis toutes les 12 heures.
+Une nouvelle version apparaît dans la barre latérale et dans **Paramètres →
+Installation DCS**, avec un lien vers le nouvel installateur. Le bouton de cet
+écran permet aussi de vérifier immédiatement. L’installation reste manuelle.
+Voir [le parcours, la construction et les limites](docs/installation-windows.fr.md).
+Pour le construire : `.\build.ps1` (Inno Setup 6.7+ requis).
+
 Pour une installation complète, pas à pas — téléchargement d'une release,
 installation des scripts Lua, premier lancement, configuration, dépannage — voir
 **[`docs/installation.md`](docs/installation.md)**.
 
 ---
 
-## Démarrage rapide (PoC Phase 0)
+## Démarrage rapide
 
-Le PoC valide toute la chaîne : **DCS → UDP → Go → SSE → navigateur**.
+Installer l’application avec `DCSManager-Setup-<version>.exe`, puis la lancer
+depuis le menu Démarrer. Elle relie la télémétrie DCS à son interface locale.
 
 ### 1. Lancer le manager
 
 ```powershell
-# Backend seul (sert aussi un placeholder si le frontend n'est pas buildé)
-go run ./backend/cmd/dcsmanager
+# Développement depuis les sources uniquement :
+Set-Location backend
+go run ./cmd/dcsmanager
 ```
 
 Par défaut, le backend écoute :
@@ -269,30 +283,27 @@ Alternative PowerShell depuis le dossier de l’exécutable :
 ```
 
 La commande peut mettre à jour une configuration existante, avec sauvegarde ;
-le bouton dans l’application la conserve. Utiliser `dcsmanager-panels.exe` pour la
-version de développement. Si la détection échoue, définir `DCSMANAGER_SAVED_GAMES`
+le bouton dans l’application la conserve. Utiliser l’exécutable construit pour
+les tests depuis les sources. Si la détection échoue, définir `DCSMANAGER_SAVED_GAMES`
 avant de lancer l’application.
 
 ---
 
 ## Déploiement
 
-### `.exe` Windows
+### Installateur Windows
 
 ```powershell
-# 1. Builder le frontend et le backend
+# 1. Construire l’installateur
 .\build.ps1
 
-# 2. Installer les scripts côté DCS (fusion sûre dans Saved Games)
-.\install-dcs.ps1            # ajouter -DryRun pour simuler
-
-# 3. Lancer
-.\dcsmanager.exe
+# 2. Lancer l’installateur généré
+$version = (Get-Content VERSION -Raw).Trim()
+& ".\dist\DCSManager-Setup-$version.exe"
 ```
 
-Le manager s'ouvre dans sa fenêtre. Pour retrouver l'interface dans un navigateur
-(second écran, tablette), lance `.\dcsmanager.exe serve` et ouvre
-<http://localhost:8080>.
+L’assistant propose les scripts Lua et crée le raccourci du menu Démarrer.
+L’application s’ouvre ensuite dans sa propre fenêtre.
 
 ### CLI
 
@@ -316,7 +327,7 @@ indiscernable d'un vrai vol. Chaque session porte donc une **source** :
 
 - `live` — enregistrée depuis DCS. Les statistiques les comptent.
 - `test` — enregistrée depuis les outils de test. Conservée sur disque, mais
-  **exclue des statistiques, de l'analyse et du tableau de bord** sauf demande
+  **exclue des statistiques de carrière** sauf demande
   explicite.
 
 La détection est automatique : le backend reconnaît les indicatifs des fixtures
@@ -391,10 +402,10 @@ DCS Manager/
 - [x] **Phase 2 — Événements & joueurs** : `onGameEvent`, `net.get_stat`, historique SQLite (l'onglet Session est retiré ; les événements et les joueurs restent enregistrés pour les stats et les débriefs)
 - [x] **Phase 3 — Débriefings** : envoi réseau de `debrief.log`, parseur Lua, historique
 - [x] **Phase 4 — Stats avancées** : vue d'ensemble, pilotes, armes, engins, balance, réseau
-- [x] **Phase 4 bis — Cartes analytiques & sortie** : heatmaps, traces, télémétrie
+- [x] **Phase 4 bis — Collecte de télémétrie** : les positions et pertes restent enregistrées ; les cartes analytiques et calculs de sorties ont été retirés
 - [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, binaire unique autonome
 - [x] **Phase 6 — Aérodromes** : fréquences et cartes lues depuis les fichiers DCS
-- [ ] **Phase 1 — Live map** : retirée ; la télémétrie est toujours collectée pour l'analyse
+- [ ] **Phase 1 — Live map** : retirée ; la télémétrie est toujours collectée
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.
 

@@ -18,10 +18,11 @@ const TrimCommand = "DCSM_PITCH_TRIM"
 const Address = "127.0.0.1:7780"
 
 type State struct {
-	Connected bool   `json:"connected"`
-	Aircraft  string `json:"aircraft"`
-	Accepted  uint64 `json:"accepted"`
-	Error     string `json:"error,omitempty"`
+	TrimEnabled bool   `json:"trimEnabled"`
+	Connected   bool   `json:"connected"`
+	Aircraft    string `json:"aircraft"`
+	Accepted    uint64 `json:"accepted"`
+	Error       string `json:"error,omitempty"`
 }
 type Client struct {
 	mu      sync.Mutex
@@ -57,15 +58,51 @@ func (c *Client) Start(address string) error {
 	return nil
 }
 func (c *Client) Close() {
+	_ = c.SetTrimEnabled(false)
 	close(c.done)
 	if c.conn != nil {
 		c.conn.Close()
 	}
 	c.wg.Wait()
 }
+
+// Trim is deliberately opt-in per application session until cockpit validation.
+// Disabling also cancels queued impulses and requests release in the Lua plugin.
+func (c *Client) SetTrimEnabled(enabled bool) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.expireLocked(time.Now())
+	if enabled {
+		if c.conn == nil || time.Since(c.seen) >= 3*time.Second || c.state.Aircraft != "FA-18C_hornet" {
+			return errors.New("plugin: F/A-18C connecté requis pour activer le trim")
+		}
+		c.state.TrimEnabled = true
+		return nil
+	}
+	c.state.TrimEnabled = false
+	clear(c.pending)
+	if c.conn != nil {
+		_, err := c.sendLocked("CANCEL")
+		return err
+	}
+	return nil
+}
+
+// A lost plugin connection ends the trim opt-in, even if a later heartbeat
+// reconnects to the same aircraft. The Lua side also discards its session after
+// three seconds without a heartbeat.
+func (c *Client) expireLocked(now time.Time) {
+	if c.seen.IsZero() || now.Sub(c.seen) < 3*time.Second {
+		return
+	}
+	c.state.TrimEnabled = false
+	clear(c.pending)
+}
+
 func (c *Client) State() State {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.expireLocked(time.Now())
 	s := c.state
 	s.Connected = c.conn != nil && time.Since(c.seen) < 3*time.Second
 	if !s.Connected {
@@ -83,6 +120,10 @@ func (c *Client) SendTrim(aircraft, value string) error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.expireLocked(time.Now())
+	if !c.state.TrimEnabled {
+		return errors.New("trim expérimental désactivé")
+	}
 	if c.conn == nil || time.Since(c.seen) >= 3*time.Second {
 		return errors.New("plugin DCS non connecté")
 	}
@@ -113,6 +154,7 @@ func (c *Client) heartbeat() {
 	defer ticker.Stop()
 	for {
 		c.mu.Lock()
+		c.expireLocked(time.Now())
 		_, _ = c.sendLocked("PING")
 		for seq, at := range c.pending {
 			if time.Since(at) > 2*time.Second {
@@ -155,11 +197,16 @@ func (c *Client) read() {
 			c.mu.Unlock()
 			continue
 		}
-		if parts[3] == "PONG" || parts[3] == "OK" || strings.HasPrefix(parts[3], "ERR_") {
+		if parts[3] == "PONG" || parts[3] == "OK" || parts[3] == "CANCELLED" || strings.HasPrefix(parts[3], "ERR_") {
+			c.expireLocked(time.Now())
 			c.seen = time.Now()
 			c.state.Aircraft = parts[4]
 			if parts[4] == "NONE" {
 				c.state.Aircraft = ""
+			}
+			if parts[3] == "ERR_RELEASE" {
+				c.state.Error = "échec du relâchement du trim ; recharge la mission"
+				c.state.TrimEnabled = false
 			}
 			if _, pending := c.pending[seq]; pending {
 				delete(c.pending, seq)

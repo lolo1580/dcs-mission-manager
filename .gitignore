@@ -2,6 +2,7 @@
 /backend/dcsmanager
 /backend/dcsmanager.exe
 /dist/
+/.tools/
 *.exe
 *.exe~
 

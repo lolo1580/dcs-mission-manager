@@ -106,7 +106,7 @@ Les deux photos et fiches Logitech confirment PZ55/PZ70. Le journal fourni déte
 
 ## 10. Expérience vJoy, abandonnée (7 octobre 2026)
 
-À la demande de l’utilisateur, ajout d’une passerelle Windows x64 : PZ55 vers ID 1 (33 boutons), PZ70 vers ID 2 (29 boutons, molette contextualisée et trim). Les entrées BIOS sont contournées lorsque vJoy est choisi ; les LED/LCD restent BIOS. File asynchrone, relâchement à la déconnexion et conservation du routage en erreur. Aucun preset supprimé ni pilote installé. Voir [l’installation, la table complète et le cheminement](integration-vjoy.fr.md).
+À la demande de l’utilisateur, une passerelle Windows x64 pour les PZ55/PZ70 avait été expérimentée. Cette passerelle et sa documentation d’installation ont été retirées après la décision d’abandonner vJoy. L’intégration actuelle est décrite dans [le plugin DCS Manager](plugin-panels-dcs.fr.md).
 
 ## 11. Plugin DCS Manager sans vJoy (7 octobre 2026)
 
@@ -121,3 +121,17 @@ Tests Go complets, analyse statique, vérification Lua 5.1 et essais Lua simulé
 L’écran Installation DCS était jusqu’ici un état en lecture seule ; l’indication donnée précédemment à l’utilisateur était donc incorrecte. Ajout d’un bouton Installer / mettre à jour les scripts, de l’API POST `/api/scripts/install`, de la lecture actualisée de l’état sur disque et de la liste des résultats/sauvegardes. L’installateur utilise les fichiers embarqués et conserve une configuration utilisateur existante.
 
 Vérification Windows du processus DCS.exe avant écriture, y compris au menu, et sérialisation des installations. Le dossier vient de la configuration détectée de l’application ; aucun chemin envoyé par le navigateur n’est accepté. Tests dans des dossiers temporaires pour exports/configuration/sauvegardes/répétition/blocage, puis interface avec API fictive. Aucun fichier Saved Games réel modifié pendant le développement. La procédure et les limites sont ajoutées dans le document du plugin.
+
+## 13. Signalement de cabrage et isolement du trim
+
+L’utilisateur signale un cabrage nouveau au manche. Cause non confirmée : le journal DCS de la dernière mission consultée ne montre pas le listener du plugin trim, et celui de l’application ne montre pas de DCSM_PITCH_TRIM envoyé. Les fichiers de commandes X56 consultés ne présentent aucune modification d’axe ; cela ne vérifie ni les valeurs physiques du joystick ni toutes les attributions par défaut.
+
+Défauts identifiés dans le code : couper les envois ne vidait pas explicitement les impulsions Lua déjà acceptées ; un relâchement échoué était oublié après journalisation. Ajout de CANCEL, d’une activation trim indépendante et désactivée au démarrage, du relâchement lors de la fermeture de l’application et d’une tentative renouvelée en cas d’échec du relâchement. Tests de non-envoi sans activation, annulation et échec/reprise du relâchement. Vérification physique et essai sans application encore requis pour isoler le signalement initial.
+
+## 14. Installateur Windows personnalisé (7 octobre 2026)
+
+À la demande de l’utilisateur, ajout d’un Setup Inno par compte Windows, sans droits administrateur : logo et thème sombre, français/anglais, dossier/raccourcis, détection DCS/Saved Games avec correction, option Lua désactivée par défaut et reprise facultative d’une portable. La configuration sélectionnée est enregistrée et utilisée par l’application. Un marqueur à côté de l’exécutable distingue le mode installé ; ses données et son cache sont séparés du programme sous LOCALAPPDATA.
+
+La copie portable passe par un dossier temporaire, conserve la source et refuse de remplacer les données installées existantes. Les cartes restent référencées dans leur dossier original. DCS Manager doit être fermé ; DCS doit aussi l’être pour l’option Lua. Les mises à jour et la désinstallation conservent les données et scripts DCS.
+
+Premier essai silencieux bloqué par les champs de dossiers standard, qui refusaient les valeurs vides : remplacement par des champs facultatifs avec boutons Parcourir. Correction de l’INI de détection en UTF-16 pour les chemins accentués. Tests Go et analyse statique réussis ; cycle installation/réinstallation/désinstallation isolé réussi. Contrôle visuel de l’image de bienvenue ; contrôle interactif complet et essais DCS encore requis. Aucun vrai script DCS installé et aucune version utilisateur remplacée pendant ces essais. [Procédure, construction, tests, limites et retour arrière](installation-windows.fr.md).

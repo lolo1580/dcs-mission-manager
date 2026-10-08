@@ -81,7 +81,8 @@ text, to re-parse later if the format evolves).
 
 ## Interface
 
-The **Debriefs** tab shows the list on the left and, for the selected debrief:
+The **Debriefs** tab is currently hidden. Its retained view shows the list on the
+left and, for the selected debrief:
 
 - counters (takeoffs, landings, kills, crashes, ejections, duration);
 - the list of pilots;

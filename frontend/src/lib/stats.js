@@ -3,10 +3,17 @@
  *
  * Scope is "career" (all missions) or "mission" (one mission).
  */
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { tNow } from './i18n.js';
 
 export const scopeMode = writable('career');
+export const selectedMissionID = writable(0);
+export const statsMissions = writable([]);
+export const statsMissionsError = writable('');
+export const statsTrend = writable([]);
+export const trendPilotUCID = writable('');
+export const trendLoading = writable(false);
+export const trendError = writable('');
 
 export const statsOverview = writable(null);
 export const statsPilots = writable([]);
@@ -35,28 +42,28 @@ let statsReq = 0;
 
 /** Query string for the current scope. */
 function scopeQuery() {
-  let mode;
-  scopeMode.subscribe((m) => (mode = m))();
-  return mode === 'mission' ? 'scope=mission' : 'scope=career';
+  if (get(scopeMode) !== 'mission') return 'scope=career';
+  return `scope=mission&missionId=${get(selectedMissionID)}`;
 }
 
-async function getJSON(path) {
-  const res = await fetch(`${path}?${scopeQuery()}`);
+async function getJSON(path, query) {
+  const res = await fetch(`${path}?${query}`);
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
 }
 
 export async function loadStats() {
   const req = ++statsReq;
+  const query = scopeQuery();
   statsLoading.set(true);
   statsError.set('');
   try {
     const [overview, pilots, weapons, engines, network] = await Promise.all([
-      getJSON('/api/stats/overview'),
-      getJSON('/api/stats/pilots'),
-      getJSON('/api/stats/weapons'),
-      getJSON('/api/stats/engines'),
-      getJSON('/api/stats/network'),
+      getJSON('/api/stats/overview', query),
+      getJSON('/api/stats/pilots', query),
+      getJSON('/api/stats/weapons', query),
+      getJSON('/api/stats/engines', query),
+      getJSON('/api/stats/network', query),
     ]);
     if (req !== statsReq) return;
     // With persistence off every endpoint answers {enabled:false}; say so
@@ -81,6 +88,39 @@ export async function loadStats() {
     statsError.set(tNow('error.stats', { detail: e.message }));
   } finally {
     if (req === statsReq) statsLoading.set(false);
+  }
+}
+
+export async function loadStatsMissions() {
+  statsMissionsError.set('');
+  try {
+    const response = await fetch('/api/stats/missions');
+    if (!response.ok) throw new Error(`${response.status}`);
+    const body = await response.json();
+    const missions = body.missions ?? [];
+    statsMissions.set(missions);
+    const selected = get(selectedMissionID);
+    if (!missions.some((m) => m.id === selected)) selectedMissionID.set(missions[0]?.id ?? 0);
+  } catch (error) {
+    statsMissionsError.set(tNow('error.stats', { detail: error.message }));
+  }
+}
+
+let trendReq = 0;
+export async function loadTrend() {
+  const req = ++trendReq;
+  trendLoading.set(true);
+  trendError.set('');
+  try {
+    const query = new URLSearchParams({ ucid: get(trendPilotUCID) });
+    const response = await fetch(`/api/stats/trend?${query}`);
+    if (!response.ok) throw new Error(`${response.status}`);
+    const body = await response.json();
+    if (req === trendReq) statsTrend.set(body.missions ?? []);
+  } catch (error) {
+    if (req === trendReq) trendError.set(tNow('error.stats', { detail: error.message }));
+  } finally {
+    if (req === trendReq) trendLoading.set(false);
   }
 }
 

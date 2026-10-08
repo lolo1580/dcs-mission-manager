@@ -33,8 +33,8 @@ type Telemetry struct {
 	ModelTime float64 `json:"modelTime,omitempty"`
 }
 
-// Sample is one persisted position/telemetry point, used for trails, heatmaps
-// and sortie analysis. Non-ownship aircraft only fill the position fields.
+// Sample is one persisted position/telemetry point. Non-ownship aircraft only
+// fill the position fields.
 type Sample struct {
 	ID        int64  `json:"-"`
 	MissionID int64  `json:"-"`

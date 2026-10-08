@@ -345,9 +345,4 @@
     font-size: 0.78rem;
   }
 
-  code {
-    background: var(--bg);
-    padding: 0.05rem 0.3rem;
-    border-radius: 4px;
-  }
 </style>

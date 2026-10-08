@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS debriefs (
 );
 CREATE INDEX IF NOT EXISTS idx_debriefs_mission ON debriefs(mission_id);
 
--- Position and telemetry samples over time, for trails and heatmaps.
+-- Position and telemetry samples over time.
 CREATE TABLE IF NOT EXISTS track_positions (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	mission_id INTEGER REFERENCES missions(id),

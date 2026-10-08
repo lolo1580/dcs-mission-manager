@@ -16,9 +16,15 @@ return function(socket, say)
     if active then
       -- Use the device which was pressed, even after ownship changes.
       local ok, err = pcall(function() active.device:performClickableAction(active.command, 0) end)
-      if not ok then say("panel trim release failed: " .. tostring(err)) end
+      if not ok then
+        if not active.releaseFailed then say("panel trim release failed: " .. tostring(err)); reply(active.item, "ERR_RELEASE") end
+        active.releaseFailed = true
+        active.untilAt = socket.gettime() + 0.05
+        return false
+      end
       active = nil
     end
+    return true
   end
   local function clear(reason)
     release()
@@ -61,12 +67,21 @@ return function(socket, say)
                 owner, ownerAt, lastSeq = key, now, seq
                 reply(item, "PONG")
               end
+            elseif command == "CANCEL" then
+              if owner ~= key then reply(item, "ERR_SESSION")
+              elseif seq <= lastSeq then reply(item, "ERR_SEQUENCE")
+              else
+                lastSeq = seq
+                clear("CANCELLED")
+                reply(item, active and "ERR_RELEASE" or "CANCELLED")
+              end
             elseif command == "TRIM UP" or command == "TRIM DN" then
               if owner ~= key then reply(item, "ERR_SESSION")
               elseif seq <= lastSeq then reply(item, "ERR_SEQUENCE")
               else
                 lastSeq = seq
                 if aircraft() ~= "FA-18C_hornet" then reply(item, "ERR_AIRCRAFT")
+                elseif active and active.releaseFailed then reply(item, "ERR_RELEASE")
                 elseif #queue >= 8 then reply(item, "ERR_BUSY")
                 else
                   item.command = command == "TRIM UP" and 3014 or 3015
@@ -88,7 +103,7 @@ return function(socket, say)
             device:performClickableAction(item.command, 1)
           end)
           if ok then
-            active = {device = device, command = item.command, untilAt = now + 0.05}
+            active = {device = device, command = item.command, untilAt = now + 0.05, item = item}
             reply(item, "OK")
           else
             -- A failing call may have partially pressed the device.

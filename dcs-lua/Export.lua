@@ -85,6 +85,11 @@ do
     end
   end
 
+  -- A zero or invalid interval must never schedule the next callback at the
+  -- current model time: DCS may then stop calling it after the first packet.
+  if type(interval) ~= "number" or interval < 0.05 then interval = 1.0 end
+  if type(worldInterval) ~= "number" or worldInterval < 0.05 then worldInterval = 2.0 end
+
   local socket_ok, socket = pcall(require, "socket")
   if not socket_ok then
     say("LuaSocket not found, export disabled")
@@ -92,6 +97,7 @@ do
   end
 
   local conn
+  local nextSendAt
   local nextWorldAt
   local panelCommands
   if lfs and lfs.writedir then
@@ -327,6 +333,8 @@ do
   -- own work, so loading after them does not disable them.
   function LuaExportStart()
     if prevStart then pcall(prevStart) end
+    nextSendAt, nextWorldAt = nil, nil
+    ownshipExportAllowed = nil
     if not enabled then return end
     if panelCommands then panelCommands.start() end
     local ok = connect()
@@ -353,14 +361,19 @@ do
 
   function LuaExportActivityNextEvent(t)
     -- Let the previous tool schedule its own next event and keep the earliest,
-    -- so chaining never delays its sampling.
-    local nextT = t
+    -- so chaining never delays its sampling. Returning t itself made DCS call
+    -- this export only once; the heartbeat then expired after the backend TTL.
+    local nextT
     if prevActivity then
       local ok, v = pcall(prevActivity, t)
-      if ok and type(v) == "number" and v < nextT then nextT = v end
+      if ok and type(v) == "number" and v > t and v < math.huge then nextT = v end
     end
 
-    if enabled then
+    if enabled and (not nextSendAt or t >= nextSendAt) then
+      -- Activity can continue without an ownship (spectator) or exportable
+      -- world objects (server restrictions). Keep the backend informed without
+      -- creating a fake unit on the map.
+      send('{"type":"heartbeat"}')
       pcall(sendOwnship)
 
       if worldEnabled then
@@ -372,11 +385,15 @@ do
         end
       end
 
-      local mine = t + interval
-      if mine < nextT then nextT = mine end
+      nextSendAt = t + interval
+    end
+    if enabled and (not nextT or nextSendAt < nextT) then
+      nextT = nextSendAt
     end
 
-    return nextT
+    -- DCS requires a future model time. Keep the callback alive even when our
+    -- export is disabled and the previous callback has no valid deadline.
+    return nextT or (t + 1.0)
   end
 end
 -- <<< DCSMANAGER-END <<<

@@ -63,6 +63,7 @@ type Config struct {
 	// used to find the installation (through Logs\dcs.log) and to read mission
 	// and debrief data. Empty means "not found".
 	SavedGames string
+	DCSInstall string
 	// ChartsDir is the folder holding aeronautical chart scans (approach plates,
 	// ground plans). They are documents, never shipped: only indexed and
 	// displayed. Empty disables the feature.
@@ -132,7 +133,7 @@ func envBool(key string, def bool) bool {
 
 // Load reads the configuration from the environment, applying defaults.
 func Load() Config {
-	return Config{
+	cfg := Config{
 		HTTPAddr:       env("DCSMANAGER_HTTP_ADDR", "127.0.0.1:8080"),
 		UDPAddr:        env("DCSMANAGER_UDP_ADDR", "127.0.0.1:7776"),
 		TCPAddr:        env("DCSMANAGER_TCP_ADDR", "127.0.0.1:7779"),
@@ -149,6 +150,13 @@ func Load() Config {
 		TrackGrace:     envDuration("DCSMANAGER_TRACK_GRACE", 15*time.Second),
 		TrackRetention: envDuration("DCSMANAGER_TRACK_RETENTION", 24*time.Hour),
 		SavedGames:     savedGamesDir(),
+		DCSInstall:     env("DCSMANAGER_DCS_INSTALL", ""),
 		ChartsDir:      env("DCSMANAGER_CHARTS_DIR", "./maps_dcs"),
 	}
+	if executable, err := os.Executable(); err == nil {
+		if root, err := UserDataRoot(); err == nil {
+			applyInstalledDefaults(&cfg, executable, root)
+		}
+	}
+	return cfg
 }

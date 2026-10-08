@@ -15,7 +15,7 @@ Les bugs de fonctionnement sont décrits dans [le rapport de bugs](audit-bugs-ge
 | Fonction | État constaté | Ce qu’il manque | Priorité proposée |
 |---|---|---|---|
 | Accès aux débriefings | Composant et API présents ; entrée de navigation marquée `hidden: true` | Un accès visible à l’historique des débriefings, si leur réactivation est souhaitée | Haute |
-| Statistiques d’une ancienne mission | L’API accepte `missionId` ; l’interface envoie seulement `scope=mission` | Une liste permettant de choisir une mission enregistrée | Haute |
+| Statistiques d’une ancienne mission | Une liste des missions réelles enregistrées permet désormais de choisir `missionId` | Rien pour la sélection de base ; filtres avancés éventuels | Terminée |
 | Modification d’une affectation de panneau | L’interface propose ajout et suppression ; l’inversion existante est seulement affichée | Édition directe, choix de l’inversion et conservation des autres champs | Haute |
 | Création de profils pour d’autres avions hors session | Le sélecteur liste les profils déjà enregistrés ; un avion actif peut fournir un autre nom | Création explicite d’un profil à partir d’un catalogue, même sans mission DCS active | Haute |
 | Sauvegarde des données du gestionnaire | Les archives couvrent le profil DCS dans Saved Games | Sauvegarde/restauration de la base SQLite et de `mappings.json` avec une méthode adaptée aux données en cours d’utilisation | Haute |
@@ -35,7 +35,7 @@ Dans `frontend/src/App.svelte`, l’entrée `debriefs` est marquée `hidden: tru
 
 ### Statistiques : le backend sait déjà filtrer une mission précise
 
-`backend/internal/api/stats.go` accepte `scope=mission&missionId=N`. `frontend/src/lib/stats.js` n’envoie que le mode carrière ou mission. Une sélection d’ancienne mission peut s’appuyer sur `/api/history/missions` et sur le filtrage existant.
+`backend/internal/api/stats.go` accepte `scope=mission&missionId=N`. L’interface propose les missions réelles enregistrées et transmet l’identifiant choisi. La vue carrière affiche aussi l’évolution par mission du score, des kills et des atterrissages, avec un filtre par UCID.
 
 ### Panneaux : l’éditeur couvre seulement les associations simples
 
@@ -114,7 +114,7 @@ L’ordre conseillé pour les panneaux est : fiabiliser l’envoi et le retour d
 ## Fonctions retirées volontairement
 
 - **Carte en temps réel :** retrait explicitement documenté dans le README.
-- **Analyse des trajectoires, heatmaps et sorties :** `docs/phase4bis-analytics.md` indique que la vue, les routes `/api/analytics/*` et le calcul des sorties ont été retirés. La collecte de positions reste présente.
+- **Analyse des trajectoires, heatmaps et sorties :** la vue, les routes `/api/analytics/*` et leurs calculs ont été retirés. La collecte des positions et des pertes reste présente.
 - **Onglet Session, événements et chat :** l’interface a été retirée ; la collecte et certaines routes backend subsistent.
 
 Ces fonctions peuvent devenir des évolutions futures si elles sont souhaitées. Leur absence actuelle ne prouve pas une implémentation oubliée.
@@ -132,7 +132,6 @@ Ces fonctions peuvent devenir des évolutions futures si elles sont souhaitées.
 
 - `README.fr.md`
 - `docs/architecture.md`
-- `docs/phase4bis-analytics.md`
 - `frontend/src/App.svelte`
 - `frontend/src/lib/SettingsPanel.svelte`
 - `frontend/src/lib/CareerPanel.svelte`

@@ -24,16 +24,22 @@ L’option vJoy a été retirée de l’interface et du code exécuté. Aucun pi
 4. Ajout du client Go `backend/internal/panelplugin`. Il vérifie la connexion et l’avion avant l’envoi, surveille les accusés de réception et ne renvoie jamais automatiquement une impulsion perdue.
 5. Ajout au catalogue Hornet de `DCSM_PITCH_TRIM`, catégorie **DCS Manager plugin**, interface `variable_step`. Aucun contrôle BIOS ni source LED remplacé. Les commandes BIOS continuent leur chemin habituel : aucun double envoi.
 6. Attribution PITCH TRIM : UP physique → valeur positive → 3014 ; DN → négative → 3015. `invert=true` compense le sens des bits HID existants. La magnitude ne règle pas l’intensité : chaque événement génère une impulsion.
-7. Retrait de la passerelle vJoy, de son API et de son écran. Ajout de `/api/panels/plugin` en lecture seule et d’un diagnostic dans Paramètres → Panneaux.
+7. Retrait de la passerelle vJoy, de son API et de son écran. Ajout de `/api/panels/plugin` pour le diagnostic et, après le signalement de cabrage, pour l’activation/arrêt du trim dans Paramètres → Panneaux.
 8. Export du profil fourni et migration des profils locaux avec sauvegarde, en conservant les attributions personnalisées. Exécutable reconstruit : `dcsmanager-panels.exe` ; l’ancien `dcsmanager.exe` reste conservé.
 
 ## Protocole et relâchement
+
+Suite au signalement de cabrage, le trim expérimental est désormais **désactivé à chaque démarrage**. Il faut activer sa case dédiée en plus de l’envoi ou du mode test. Le diagnostic disponible ne confirme pas la cause du cabrage : aucun envoi du nouveau trim n’apparaissait dans la dernière mission enregistrée consultée.
+
+Couper cette case, fermer l’application, ou couper à la fois envoi et mode test envoie `CANCEL`, annule les demandes en attente et demande le relâchement de l’impulsion active. Cela ne remet pas le trim de l’avion à sa position initiale. Recharger une mission est nécessaire pour comparer avec un état de départ identique. La correction Lua doit être installée, puis DCS redémarré, pour reconnaître CANCEL.
+
+Un échec de relâchement était auparavant seulement journalisé et l’impulsion était oubliée. Le plugin conserve maintenant le device/commande pour réessayer, signale ERR_RELEASE à l’application et refuse les nouvelles impulsions tant que ce relâchement échoue. Aucun succès en cockpit n’est déduit de ces essais simulés.
 
 Messages versionnés : `DCSM1 <session hex32> <sequence> PING`, `TRIM UP` ou `TRIM DN`. Réponses : PONG, OK ou ERR avec l’avion courant. Aucun texte Lua ni identifiant de device fourni par un profil n’est exécuté.
 
 Le ping établit la session chaque seconde. Après trois secondes sans ping, session et impulsions restantes sont annulées. Les séquences dupliquées sont rejetées. La file Lua est limitée à huit impulsions, chaque impulsion expire après une seconde ; au maximum seize datagrammes sont traités par frame. Le client limite aussi les demandes en attente.
 
-Une pression dure au minimum 50 ms, puis est relâchée à la première frame disponible. Changement d’avion, arrêt de mission, changement de session et expiration de liaison annulent la file et tentent le relâchement du device pressé. Pendant une pause ou un gel sans callbacks DCS, le plugin ne peut pas exécuter le relâchement : il le fera au retour des frames ou au callback Stop. Désactiver l’envoi bloque les nouvelles demandes ; les impulsions déjà acceptées peuvent terminer brièvement.
+Une pression dure au minimum 50 ms, puis est relâchée à la première frame disponible. Changement d’avion, arrêt de mission, changement de session et expiration de liaison annulent la file et tentent le relâchement du device pressé. Pendant une pause ou un gel sans callbacks DCS, le plugin ne peut pas exécuter le relâchement : il le fera au retour des frames ou au callback Stop. Couper envoi et mode test, ou la case trim dédiée, demande désormais l’annulation explicite au prochain callback ; l’absence d’accusé ne garantit pas sa réception.
 
 **« Impulsion acceptée » signifie que l’appel Lua n’a pas levé d’erreur. Cela ne prouve pas que le trim a changé dans le simulateur.** L’accès HOTAS depuis Export.lua reste à valider en cockpit. Erreur de device visible dans le diagnostic ; accusé de réception absent signalé après deux secondes. Aucun repli silencieux vers une autre commande de trim.
 
@@ -67,7 +73,7 @@ Fermer DCS et toute autre instance de DCS Manager avant la mise à jour. Depuis 
 Installation également disponible dans Réglages. DCS-BIOS doit rester installé et chargé dans Export.lua pour les autres touches, l’avion actif côté application et les LED. Les outils d’export chargés ensuite doivent aussi chaîner leurs callbacks.
 
 1. Charger une mission solo avec le F/A-18C du joueur. Vérifier **plugin connecté**, **DCS-BIOS connecté** et `FA-18C_hornet` dans Panneaux.
-2. Vérifier PITCH TRIM → `DCSM_PITCH_TRIM`, inversé. Activer l’envoi ou le mode test au moment de l’essai.
+2. Vérifier PITCH TRIM → `DCSM_PITCH_TRIM`, inversé. Activer la case **Activer le trim expérimental du panel**, puis l’envoi ou le mode test au moment de l’essai.
 3. Tourner vers UP puis DN. Vérifier sens, mouvement dans DCS, compteur et absence de trim continu après l’arrêt de la roue.
 4. Essayer plusieurs crans rapides, quitter puis revenir dans une mission : aucun ancien cran ne doit être rejoué. Tester la déconnexion de l’application.
 5. Activer les sorties LED. Vérifier gauche, nez et droite avec `FLP_LG_LEFT_GEAR_LT`, `FLP_LG_NOSE_GEAR_LT`, `FLP_LG_RIGHT_GEAR_LT`. Elles représentent les témoins cockpit, pas la position du levier. Rouge en transit et dépendance électrique restent à valider/compléter, sans couleur inventée.
@@ -91,4 +97,4 @@ La commande suivante retire **tous les scripts gérés DCS Manager**, dont tél�
 .\dcsmanager-panels.exe uninstall-lua --saved-games "$env:USERPROFILE\Saved Games\DCS"
 ```
 
-Pour revenir à la version Lua précédente, restaurer les sauvegardes indiquées par l’installateur. L’expérience vJoy reste documentée comme historique, sans fonctionnalité vJoy active.
+Pour revenir à la version Lua précédente, restaurer les sauvegardes indiquées par l’installateur. L’expérience vJoy abandonnée reste consultable dans l’historique Git ; aucune fonctionnalité vJoy n’est active.

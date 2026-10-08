@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"dcsmanager/internal/category"
+	"dcsmanager/internal/db"
 	"dcsmanager/internal/stats"
 )
 
@@ -28,6 +30,8 @@ func TestStatsEndpointsDegradeWithoutDatabase(t *testing.T) {
 		"/api/stats/weapons":  s.handleStatsWeapons,
 		"/api/stats/engines":  s.handleStatsEngines,
 		"/api/stats/network":  s.handleStatsNetwork,
+		"/api/stats/missions": s.handleStatsMissions,
+		"/api/stats/trend":    s.handleStatsTrend,
 	}
 	for path, h := range routes {
 		rec := httptest.NewRecorder()
@@ -47,5 +51,38 @@ func TestStatsEndpointsDegradeWithoutDatabase(t *testing.T) {
 		if body.Enabled == nil || *body.Enabled {
 			t.Errorf("%s: enabled = %v, want false", path, body.Enabled)
 		}
+	}
+}
+
+func TestMissionScopeDefaultsToLatestLiveMission(t *testing.T) {
+	database, err := db.Open(filepath.Join(t.TempDir(), "stats.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	live, err := database.StartMission("Real flight", "Caucasus", db.SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.StartMission("Fixture", "Caucasus", db.SourceTest); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{db: database, stats: stats.New(database, category.New(""))}
+	r := httptest.NewRequest(http.MethodGet, "/api/stats/overview?scope=mission", nil)
+	if got := s.scopeFromRequest(r).MissionID; got != live {
+		t.Fatalf("default mission = %d, want %d", got, live)
+	}
+	rec := httptest.NewRecorder()
+	s.handleStatsMissions(rec, httptest.NewRequest(http.MethodGet, "/api/stats/missions", nil))
+	var body struct {
+		Missions []struct {
+			ID int64 `json:"id"`
+		} `json:"missions"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Missions) != 1 || body.Missions[0].ID != live {
+		t.Fatalf("selectable missions: %+v", body.Missions)
 	}
 }

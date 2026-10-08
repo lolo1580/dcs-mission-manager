@@ -59,6 +59,12 @@ func main() {
 			return
 		case "install-lua":
 			os.Exit(runLuaCommand(os.Args[2:], "install"))
+		case "setup-user":
+			os.Exit(runSetupUser(os.Args[2:]))
+		case "setup-check":
+			os.Exit(runSetupCheck(os.Args[2:]))
+		case "setup-detect":
+			os.Exit(runSetupDetect(os.Args[2:]))
 		case "uninstall-lua":
 			os.Exit(runLuaCommand(os.Args[2:], "uninstall"))
 		case "status":

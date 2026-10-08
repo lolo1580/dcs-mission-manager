@@ -5,9 +5,10 @@
   import CareerPanel from './lib/CareerPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
   import SettingsPanel from './lib/SettingsPanel.svelte';
-  import { connected, paused, mission, fetchTheatres, connect } from './lib/units.js';
+  import { connected, feedStatus, mission, fetchTheatres, connect } from './lib/units.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
   import { onMount } from 'svelte';
+  import { updateInfo, checkForUpdates } from './lib/updates.js';
 
   // The Debriefs view is built from the redesign mockup: the shell is a sidebar +
   // topbar, and each view keeps its existing panel. Debriefs stays hidden for
@@ -61,7 +62,9 @@
   // topbar, the cockpit-hardware updates and the pause indicator all depend on it.
   onMount(() => {
     const stopStream = connect();
-    return stopStream;
+    checkForUpdates();
+    const updateTimer = setInterval(() => checkForUpdates(), 12 * 60 * 60 * 1000);
+    return () => { stopStream(); clearInterval(updateTimer); };
   });
 
   // Theatres drive the airfields view: load them once at startup.
@@ -93,6 +96,11 @@
     </nav>
 
     <div class="status">
+      {#if $updateInfo?.status === 'available'}
+        <a class="update-link" href={$updateInfo.downloadUrl} target="_blank" rel="noopener noreferrer">
+          {$t('update.available')}: {$updateInfo.latestVersion}
+        </a>
+      {/if}
       <span class="live">
         <span class="dot" class:on={$connected}></span>
         {$connected ? $t('app.connected') : $t('app.offline')}
@@ -123,10 +131,15 @@
       </label>
     </header>
 
-    {#if $paused}
-      <div class="pause-banner" title={$t('app.pausedNote')}>
+    {#if $feedStatus === 'waiting'}
+      <div class="pause-banner" title={$t('app.feedWaitingNote')}>
+        <span class="pause-icon">◌</span>
+        {$t('app.feedWaiting')} — <span class="pause-note">{$t('app.feedWaitingNote')}</span>
+      </div>
+    {:else if $feedStatus === 'interrupted'}
+      <div class="pause-banner" title={$t('app.feedStoppedNote')}>
         <span class="pause-icon">⏸</span>
-        {$t('app.paused')} — <span class="pause-note">{$t('app.pausedNote')}</span>
+        {$t('app.feedStopped')} — <span class="pause-note">{$t('app.feedStoppedNote')}</span>
       </div>
     {/if}
 
@@ -261,6 +274,14 @@
     margin-top: auto;
     padding: 0.8rem 1rem;
     border-top: 1px solid var(--border);
+  }
+
+  .update-link {
+    display: block;
+    margin-bottom: 0.6rem;
+    color: var(--blue);
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
   }
 
   .live {

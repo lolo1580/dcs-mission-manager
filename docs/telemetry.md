@@ -3,10 +3,20 @@
 ## What the manager receives
 
 DCS pushes unit telemetry (positions, the player's aircraft, the world objects) to
-the manager, which samples it for **statistics and analysis**. The live map has
-been removed, so this feed is no longer drawn: it is what feeds the flight trails,
-the heatmaps and the sortie analysis (Phase 4 bis), and the airfields tab's
-"nearest field" lookup.
+the manager, which stores position samples and uses the current ownship position
+for the airfields tab's "nearest field" lookup. The live map and analytical map
+views have been removed; stored samples remain available for future analysis.
+
+`Export.lua` also sends a small `heartbeat` every export cycle. It contains no
+position and creates no map unit. This keeps the feed active when DCS is running
+but the player is a spectator or the server denies ownship/world export. If a
+previously active feed becomes silent, the interface reports an interrupted
+export; silence alone cannot prove that DCS is paused.
+The export callback always schedules a future model time and keeps the earlier
+valid deadline returned by another export tool. Returning the current time
+caused a single heartbeat followed by an interrupted feed after the 5-second
+unit TTL. The manager sends its own heartbeat at the configured interval even
+when another tool requests more frequent callbacks.
 
 Each unit carries:
 

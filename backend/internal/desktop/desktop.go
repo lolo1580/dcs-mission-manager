@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"dcsmanager/internal/app"
 	"dcsmanager/internal/config"
@@ -29,6 +30,9 @@ func Run() {
 	// log file next to the database; this is where "it does not start" gets an
 	// answer.
 	if path, err := app.LogFilePath(); err == nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			log.Printf("desktop: log directory unavailable: %v", err)
+		}
 		if f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
 			defer f.Close()
 			// The file comes first: io.MultiWriter stops at the first writer that

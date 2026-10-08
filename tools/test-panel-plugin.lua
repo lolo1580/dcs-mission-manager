@@ -40,5 +40,21 @@ plugin.frame();assert(#calls==7)
 now=2;plugin.frame();assert(calls[8][2]==0);last("ERR_EXPIRED")
 now=4;plugin.frame();last("ERR_TIMEOUT")
 packet(21,"TRIM UP");plugin.frame();last("ERR_SESSION")
+packet(22,"PING");plugin.frame()
+packet(23,"TRIM UP");plugin.frame();local beforeCancel=#calls
+packet(24,"TRIM DN");plugin.frame()
+packet(25,"CANCEL");plugin.frame();last("CANCELLED");assert(#calls==beforeCancel+1 and calls[#calls][2]==0)
+now=4.2;plugin.frame();assert(#calls==beforeCancel+1)
+local failRelease=true
+GetDevice=function()
+  return {performClickableAction=function(_,command,value)
+    if value==0 and failRelease then error("simulated release failure") end
+    calls[#calls+1]={command,value}
+  end}
+end
+packet(26,"TRIM UP");plugin.frame();local beforeFailure=#calls
+now=4.3;plugin.frame();last("ERR_RELEASE");assert(#calls==beforeFailure)
+packet(27,"TRIM DN");plugin.frame();last("ERR_RELEASE");assert(#calls==beforeFailure)
+failRelease=false;now=4.4;plugin.frame();assert(calls[#calls][2]==0)
 plugin.stop()
-print("OK panel plugin: directions, release, aircraft, session, duplicates, queue, expiry, stop")
+print("OK panel plugin: directions, release, aircraft, session, duplicates, queue, expiry, stop, cancel, release failure retry")

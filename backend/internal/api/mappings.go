@@ -103,6 +103,9 @@ func (s *Server) handleMappingSafety(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
 		return
 	}
+	if !body.Enabled && !s.TestMode() && s.panelPlugin != nil {
+		_ = s.panelPlugin.SetTrimEnabled(false)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"enabled": s.mappings.Enabled()})
 }
 
@@ -192,6 +195,9 @@ func (s *Server) handleMappingTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.SetTestMode(body.Enabled)
+	if !body.Enabled && (s.mappings == nil || !s.mappings.Enabled()) && s.panelPlugin != nil {
+		_ = s.panelPlugin.SetTrimEnabled(false)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"enabled": s.TestMode()})
 }
 

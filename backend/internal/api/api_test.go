@@ -1,9 +1,12 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"dcsmanager/internal/live"
 	"dcsmanager/internal/state"
 )
 
@@ -13,6 +16,33 @@ func sample() []state.Unit {
 		{ID: "2", Type: "T-72B", Category: "ground", Coalition: "red"},
 		{ID: "3", Type: "USS_Arleigh_Burke", Category: "ship", Coalition: "blue", Country: "USA"},
 	}
+}
+
+func TestSessionReportsExportStateWithoutClaimingPause(t *testing.T) {
+	store := state.New(time.Second, 0)
+	s := &Server{store: store, live: live.New(5, 5)}
+	check := func(wantSeen, wantStopped bool) {
+		t.Helper()
+		data, err := s.sessionJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var frame struct {
+			FeedSeen    bool `json:"feedSeen"`
+			FeedStopped bool `json:"feedStopped"`
+		}
+		if err := json.Unmarshal(data, &frame); err != nil {
+			t.Fatal(err)
+		}
+		if frame.FeedSeen != wantSeen || frame.FeedStopped != wantStopped {
+			t.Fatalf("unexpected export state: %+v", frame)
+		}
+	}
+	check(false, false)
+	store.Touch()
+	check(true, false)
+	store.SimulateSilence(2 * time.Second)
+	check(true, true)
 }
 
 func TestFilterNoParams(t *testing.T) {

@@ -35,14 +35,15 @@ enregistrée, ainsi que le dépannage.
 | LuaSocket | ✅ | **fourni avec DCS**, rien à installer |
 | Droits administrateur | ❌ | aucune étape n'exige d'élévation |
 
-Pour **installer depuis les sources** uniquement, il faut en plus :
+Pour **construire l’installateur depuis les sources** uniquement, il faut en plus :
 
 - **Go 1.25+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
 - **Node.js 20+** — <https://nodejs.org/>
 - **Git**
+- **Inno Setup 6.7+**
 
-> Le binaire final est **autonome** : ni Go ni Node ne sont nécessaires pour
-> l'utiliser une fois construit ou téléchargé.
+> L’installateur embarque l’application et ses scripts Lua : ni Go ni Node ne
+> sont nécessaires pour l’utiliser.
 
 ---
 
@@ -54,56 +55,34 @@ Sur la page **Releases** du dépôt, récupérez :
 
 | Fichier | Rôle |
 |---|---|
-| `dcsmanager.exe` | Le manager (interface web incluse dans le binaire) |
-| `dcsmanager-lua-<version>.zip` | Les scripts Lua à installer dans DCS (si vous préférez l'installateur manuel) |
+| `DCSManager-Setup-<version>.exe` | Installateur Windows contenant l’application et les scripts Lua |
 | `SHA256SUMS.txt` | Sommes de contrôle, pour vérifier l'intégrité |
 
 Vérification facultative de l'exécutable :
 
 ```powershell
-(Get-FileHash .\dcsmanager.exe -Algorithm SHA256).Hash.ToLower()
+(Get-FileHash .\DCSManager-Setup-<version>.exe -Algorithm SHA256).Hash.ToLower()
 # à comparer à la ligne correspondante de SHA256SUMS.txt
 ```
 
-Placez `dcsmanager.exe` dans un dossier de votre choix (par exemple
-`C:\DCS Manager\`).
+Lancez l’installateur et suivez l’assistant. Il installe le programme pour votre
+compte Windows, sans droits administrateur. Les données sont conservées dans
+`%LOCALAPPDATA%\DCS Manager` lors des mises à jour. Voir aussi
+[le parcours détaillé de l’assistant](installation-windows.fr.md).
 
 ### 2.2 Installer les scripts côté DCS
 
-Le binaire sait installer les scripts tout seul, de façon **sûre** (il *fusionne*
-avec un `Export.lua` existant, il ne l'écrase jamais) :
-
-```powershell
-.\dcsmanager.exe install-lua
-```
-
-Simuler d'abord, sans rien écrire :
-
-```powershell
-.\dcsmanager.exe install-lua --dry-run
-```
-
-Vérifier l'état à tout moment :
-
-```powershell
-.\dcsmanager.exe status
-```
-
-Si DCS n'est pas détecté automatiquement :
-
-```powershell
-.\dcsmanager.exe install-lua --saved-games "D:\Saved Games\DCS"
-```
-
-> Vous préférez le faire à la main ? Voir la [section 4](#4-installer-les-scripts-lua-dans-dcs).
+Dans l’assistant, vérifiez le dossier Saved Games détecté et cochez l’option
+**Installer / mettre à jour les scripts Lua DCS Manager** si vous souhaitez les
+installer immédiatement. Fermez DCS avant cette étape. Vous pouvez aussi les
+installer plus tard depuis **Paramètres → Installation DCS** dans l’application.
+L’installation fusionne le bloc DCS Manager dans `Export.lua` et conserve les
+autres exports. La [section 4](#4-installer-les-scripts-lua-dans-dcs) décrit les
+commandes manuelles et les contrôles.
 
 ### 2.3 Lancer
 
-```powershell
-.\dcsmanager.exe
-```
-
-Le manager s'ouvre dans **sa propre fenêtre**. Détails au [point 5](#5-premier-lancement).
+Ouvrez **DCS Manager** depuis le menu Démarrer. Détails au [point 5](#5-premier-lancement).
 
 ---
 
@@ -118,33 +97,35 @@ cd "DCS Manager"
 
 ### 3.2 Construire
 
-Le script construit d'abord l'interface (Svelte + Vite), puis le binaire Go qui
-l'embarque :
+Le script construit l’interface, l’exécutable interne et l’installateur :
 
 ```powershell
-.\build.ps1              # frontend + backend -> .\dcsmanager.exe
+.\build.ps1              # crée dist\DCSManager-Setup-<version>.exe
 ```
 
 Autres cibles utiles :
 
 ```powershell
 .\build.ps1 -Target frontend   # interface seulement
-.\build.ps1 -Target backend    # binaire seulement (interface déjà construite)
+.\build.ps1 -Target backend    # exécutable de développement seulement
 .\build.ps1 -Target run        # lancer depuis les sources
 .\build.ps1 -Target test       # tests Go
 ```
 
-Équivalent avec `make` : `make build`, `make run`, `make test`.
+`make build` construit uniquement un exécutable de développement ; il ne produit
+pas l’installateur Windows.
 
 ### 3.3 Enchaîner build + installation
 
 ```powershell
 .\build.ps1
-.\install-dcs.ps1              # fusionne les scripts Lua dans Saved Games
-.\install-dcs.ps1 -DryRun      # simulation
+$version = (Get-Content VERSION -Raw).Trim()
+& ".\dist\DCSManager-Setup-$version.exe"
 ```
 
-`install-dcs.ps1` n'est qu'un raccourci vers `dcsmanager.exe install-lua`.
+L’assistant propose l’installation des scripts Lua. L’exécutable de développement
+et les commandes CLI restent disponibles pour les tests locaux ; seule la version
+installable est publiée.
 
 ---
 
@@ -168,7 +149,11 @@ DCS charge deux familles de scripts depuis le dossier *Saved Games* :
 
 ### 4.1 Méthode automatique (recommandée)
 
+Depuis l’application, ouvrez **Paramètres → Installation DCS → Installer / mettre
+à jour les scripts**. En ligne de commande, depuis le dossier installé :
+
 ```powershell
+Set-Location "$env:LOCALAPPDATA\Programs\DCS Manager"
 .\dcsmanager.exe install-lua
 ```
 
@@ -201,8 +186,12 @@ Détails complémentaires : [`dcs-installation.md`](dcs-installation.md).
 
 ### 5.1 Démarrer le manager
 
+Ouvrez **DCS Manager** depuis le menu Démarrer. Pour les commandes avancées
+ci-dessous, ouvrez PowerShell dans le dossier du programme :
+
 ```powershell
-.\dcsmanager.exe
+Set-Location "$env:LOCALAPPDATA\Programs\DCS Manager"
+.\dcsmanager.exe version
 ```
 
 Le manager s'ouvre dans une **fenêtre native** (composant WebView2). Le serveur
@@ -226,7 +215,7 @@ statistiques, et sauvegarde chaque mission pour les débriefings.
 ### 5.3 Vérifier que tout fonctionne
 
 - Dans la fenêtre du manager, l'onglet **Carrière & statistiques** se remplit.
-- Les débriefings apparaissent après un vol dans l'onglet **Débriefings**.
+- Les débriefings sont collectés après un vol ; leur vue est actuellement masquée.
 - En cas de doute, `GET /api/health` répond :
 
   ```powershell
@@ -237,9 +226,9 @@ statistiques, et sauvegarde chaque mission pour les débriefings.
 
 | Chemin | Contenu |
 |---|---|
-| `.\data\dcsmanager.db` | Base SQLite (missions, événements, stats, débriefings) |
-| `.\data\dcsmanager.log` | Journal (utile en mode fenêtre, sans console) |
-| `.\dcsmanager.log` / console | Journal en mode `serve` |
+| `%LOCALAPPDATA%\DCS Manager\data\dcsmanager.db` | Base SQLite (missions, événements, stats, débriefings) |
+| `%LOCALAPPDATA%\DCS Manager\data\dcsmanager.log` | Journal de l’application |
+| `%LOCALAPPDATA%\DCS Manager\settings.json` | Dossiers choisis dans l’assistant |
 
 Le chemin de la base est réglable via `DCSMANAGER_DB_PATH`.
 
@@ -256,11 +245,11 @@ Toute la configuration passe par des **variables d'environnement** préfixées
 | `DCSMANAGER_API_TOKEN` | *(vide)* | Si défini, les appels **non locaux** doivent le présenter. L'accès local (loopback) reste autorisé sans jeton |
 | `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7776` | Télémétrie des unités. **Pas 7778** : DCS-BIOS l'occupe |
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | Événements + commandes |
-| `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | Base SQLite |
+| `DCSMANAGER_DB_PATH` | `%LOCALAPPDATA%\DCS Manager\data\dcsmanager.db` | Base SQLite |
 | `DCSMANAGER_DB_ENABLED` | `true` | Persistance (sinon tout en mémoire) |
 | `DCSMANAGER_THEATRE` | `Caucasus` | Théâtre par défaut |
 | `DCSMANAGER_SAVED_GAMES` | *(auto)* | Dossier Saved Games, si la détection échoue |
-| `DCSMANAGER_CHARTS_DIR` | `./maps_dcs` | Cartes aéronautiques (approches, plans) |
+| `DCSMANAGER_CHARTS_DIR` | `%LOCALAPPDATA%\DCS Manager\maps_dcs` | Cartes aéronautiques (approches, plans) |
 | `DCSMANAGER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `DCSMANAGER_DEBUG` | `false` | Journal de débogage en direct (actions, requêtes API, panneaux). S'active aussi depuis Paramètres → Débogage |
 
@@ -280,10 +269,12 @@ intervalles). Voir [`dcs-installation.md`](dcs-installation.md).
 
 ### Mettre à jour
 
-1. Téléchargez le nouvel `dcsmanager.exe` et remplacez l'ancien.
-2. Relancez `.\dcsmanager.exe install-lua` pour mettre à jour les scripts Lua.
-3. `.\dcsmanager.exe status` indique si les scripts installés sont **à jour**,
-   **obsolètes** ou **absents**.
+1. Fermez DCS Manager, téléchargez le nouvel `DCSManager-Setup-<version>.exe`
+   et relancez l’assistant. Il remplace le programme et conserve vos données.
+2. Si les scripts Lua doivent être mis à jour, fermez DCS et cochez leur option
+   dans l’assistant, ou utilisez **Paramètres → Installation DCS** ensuite.
+3. La commande `.\dcsmanager.exe status`, depuis le dossier du programme,
+   indique si les scripts sont **à jour**, **obsolètes** ou **absents**.
 
 ### Désinstaller les scripts Lua
 

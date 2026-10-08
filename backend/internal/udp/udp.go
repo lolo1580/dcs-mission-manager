@@ -1,6 +1,8 @@
 // Package udp receives telemetry from the DCS Lua scripts over UDP.
 //
-// Two message kinds are produced by the Export.lua script:
+// The Export.lua script produces an activity heartbeat and two unit messages:
+//
+//	{"type":"heartbeat"}
 //
 //	{"type":"ownship","name":"Player","unitType":"F-16C_50","coalition":"blue",
 //	 "lat":41.5,"lng":41.8,"alt":5000,"heading":123,"modelTime":42.0}
@@ -124,6 +126,8 @@ func (l *Listener) dispatch(payload []byte, m *Message) {
 
 func (l *Listener) handle(m *Message) {
 	switch m.Type {
+	case "heartbeat":
+		l.store.Touch()
 	case "ownship":
 		l.store.Update(&state.Unit{
 			ID:        ownshipID,

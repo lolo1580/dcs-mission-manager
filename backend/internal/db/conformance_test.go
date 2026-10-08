@@ -125,7 +125,7 @@ func TestConformancePlayersAndStats(t *testing.T) {
 	})
 }
 
-func TestConformanceTrackingAndHeatmap(t *testing.T) {
+func TestConformanceTrackingPersistence(t *testing.T) {
 	forEachStore(t, func(t *testing.T, s db.Store) {
 		mid, _ := s.EnsureMission("M", "Caucasus")
 		samples := []model.Sample{
@@ -140,22 +140,15 @@ func TestConformanceTrackingAndHeatmap(t *testing.T) {
 			t.Fatalf("SaveLoss: %v", err)
 		}
 
-		// Heatmap exercises the most dialect-sensitive SQL (GROUP BY over a
-		// computed grid, rounded to the grid step).
-		points, err := s.Heatmap(mid, "losses", 0.05, 100)
-		if err != nil {
-			t.Fatalf("Heatmap: %v", err)
+		var losses, positions int
+		if err := s.QueryRow(`SELECT COUNT(*) FROM losses WHERE mission_id = ?`, mid).Scan(&losses); err != nil {
+			t.Fatalf("read losses: %v", err)
 		}
-		if len(points) != 1 || points[0].Weight != 1 {
-			t.Fatalf("heatmap = %+v", points)
+		if err := s.QueryRow(`SELECT COUNT(*) FROM track_positions WHERE mission_id = ? AND unit_id = ?`, mid, "u1").Scan(&positions); err != nil {
+			t.Fatalf("read positions: %v", err)
 		}
-
-		trails, err := s.Trails(mid, 10, 100)
-		if err != nil {
-			t.Fatalf("Trails: %v", err)
-		}
-		if len(trails["u1"]) != 2 {
-			t.Fatalf("trail u1 = %d points, want 2", len(trails["u1"]))
+		if losses != 1 || positions != 2 {
+			t.Fatalf("persisted tracking: %d losses, %d positions for u1", losses, positions)
 		}
 
 		if n, err := s.PruneTracking(0); err != nil || n == 0 {

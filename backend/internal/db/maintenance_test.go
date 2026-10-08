@@ -97,11 +97,11 @@ func TestPurgeSourceRemovesOnlyThatSource(t *testing.T) {
 	if n, err := d.CountMissions(SourceTest); err != nil || n != 0 {
 		t.Fatalf("test missions: want 0, got %d (err=%v)", n, err)
 	}
-	remaining, err := d.Trails(liveID, 10, 100)
-	if err != nil {
-		t.Fatalf("trails: %v", err)
+	var remaining int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM track_positions WHERE mission_id = ? AND unit_id = ?`, liveID, "live-unit").Scan(&remaining); err != nil {
+		t.Fatalf("read live positions: %v", err)
 	}
-	if _, ok := remaining["live-unit"]; !ok {
+	if remaining != 1 {
 		t.Fatal("the live unit's track should have survived the purge")
 	}
 }

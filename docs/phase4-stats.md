@@ -8,8 +8,10 @@ All statistics exist in **two scopes**:
   a pilot's history survives their callsign changes;
 - **`mission`**: limited to one mission (the current one, or `?missionId=N`).
 
-API side: `?scope=career` or `?scope=mission` (+ `&missionId=N`). Interface side:
-the **Career / Mission** selector at the top of the Statistics tab.
+API side: `?scope=career` or `?scope=mission&missionId=N`. Interface side:
+the **Career / Mission** selector and a list of recorded live missions. Without
+an explicit id, the API selects the most recent live mission; when none exists,
+the mission scope stays empty rather than showing career totals.
 
 ## Sources and merging
 
@@ -42,7 +44,14 @@ does not directly provide the number of deaths in `net.get_stat`.
 | **4.2 Weapons** | `/api/stats/weapons` | Kills and friendly-fire per weapon, breakdown of targets and platforms |
 | **4.4 Balance** | (in overview) | Score/kills per coalition, comparative bars |
 | **4.6 Network** | `/api/stats/network` | Average/max ping and number of samples per pilot |
-| **4.7 Vehicles** | `/api/stats/engines` | By **exact DCS type**: kills, losses, sorties, K/D |
+| **4.7 Vehicles** | `/api/stats/engines` | By **exact DCS type**: kills, losses, distinct missions flown, K/D |
+| **Mission list** | `/api/stats/missions` | Up to 200 recent live missions for the selector |
+| **Progress** | `/api/stats/trend?ucid=...` | Score, kills and landings from final player snapshots in the 20 most recent live missions; optional pilot UCID filter |
+
+The overview's pilot count includes only pilots with snapshots in the selected
+scope. Callsign changes with the same UCID count as one pilot; test missions are
+excluded by default. Vehicle "missions" counts distinct mission ids per type,
+not individual respawns or sorties.
 
 ### Vehicle granularity
 
@@ -53,11 +62,9 @@ is provided by the Lua hook which resolves the player's slot via
 
 ## Accepted limitations
 
-- **4.3 Analytical maps** (heatmaps, tracks) and **4.5 Sortie analysis**
-  (telemetry: altitude/speed/max G) require recording positions
-  per unit and the ownship export. They will rely on the lat/lng positions already
-  received as telemetry rather than on the debrief's internal coordinates, which
-  will avoid any per-theatre projection. Coming in a dedicated increment.
+- **4.3 Analytical maps** and **4.5 Sortie analysis** were removed from the
+  interface. Position samples and the ownship export are still recorded, but no
+  heatmap, track or sortie calculation currently uses them.
 - **Friendly-fire** is only counted from the events; the debrief does not
   always detail it.
 - **Deaths** (`pilot_death`) are only attributed if the player has a statistics

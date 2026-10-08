@@ -11,6 +11,23 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Corrigé
 
+- Correction de la planification de `LuaExportActivityNextEvent` : l’export
+  programme désormais son prochain appel dans le futur et conserve l’échéance
+  la plus proche des autres outils. Le flux ne s’arrête plus après son premier
+  envoi et le bandeau d’interruption ne réapparaît plus après cinq secondes.
+
+- L’état « DCS en pause » ne se base plus sur l’absence de positions. Un signal
+  d’activité Lua indique que l’export fonctionne même en spectateur ou lorsque le
+  serveur limite les positions. L’interface distingue l’attente de données et un
+  export interrompu, sans présenter une interruption comme une pause certaine.
+
+- Trim expérimental désactivé au démarrage et interrupteur dédié. Couper envoi
+  et mode test, désactiver le trim ou fermer le client envoie CANCEL pour vider
+  la file et relâcher l’impulsion active. Lua conserve un relâchement échoué,
+  le signale, le retente et bloque les nouvelles impulsions jusqu’à réussite.
+  Tests d’annulation/échec du relâchement ajoutés après un signalement de cabrage,
+  dont la cause reste non confirmée.
+
 - Le premier rapport USB initialise les panels sans envoyer de commande cockpit.
   Correction des positions d’encodeur, des valeurs INC/DEC de `fixed_step`, de
   l’édition selon le contexte et des réponses tardives d’avion/profil. Mode test atomique.
@@ -35,6 +52,14 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   apparaître en premier.
 
 ### Ajouté
+
+- Installateur Windows personnalisé par utilisateur : identité visuelle sombre,
+  français/anglais, raccourcis, détection/correction des dossiers DCS, scripts Lua
+  facultatifs et copie facultative des données portables sans écraser les données
+  installées. Mode installé avec données/cache sous LOCALAPPDATA, conservés à la
+  désinstallation ; portable inchangée. Construction et test isolé automatisés,
+  tests de migration, conservation et chemins accentués. Exécutable non signé ;
+  WebView2 requis et validation visuelle interactive encore à effectuer.
 
 - Éditeur visuel PZ55/PZ70 : molette selon ALT/VS/IAS/HDG/CRS, positions
   personnalisées, impulsions avec recentrage, règles LED conditionnelles et

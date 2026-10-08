@@ -18,10 +18,10 @@ export const lastUpdate = writable(null);
 export const mission = writable(null);
 
 /**
- * True when DCS has stopped sending telemetry, which happens when the
- * simulation is paused: the export script is only called while time advances.
+ * Waiting for the first DCS export packet, active, or interrupted after data
+ * previously arrived. A silent feed is not proof that the simulation is paused.
  */
-export const paused = writable(false);
+export const feedStatus = writable('waiting');
 
 /**
  * Open the SSE stream. Returns a cleanup function.
@@ -65,12 +65,9 @@ export function connect() {
       }
 
       if (msg.type !== 'session') return;
-      // The Session tab (players, events, chat) was removed, so only the
-      // mission and the pause indicator are still consumed from the frame.
+      // The Session tab was removed; the mission and export state remain.
       mission.set(msg.mission ?? null);
-      // A paused simulator sends nothing at all; say so rather than looking
-      // like a broken app.
-      paused.set(Boolean(msg.paused));
+      feedStatus.set(msg.feedStopped ? 'interrupted' : msg.feedSeen ? 'active' : 'waiting');
     } catch {
       /* ignore malformed frames */
     }

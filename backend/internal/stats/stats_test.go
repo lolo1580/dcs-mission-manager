@@ -169,8 +169,8 @@ func TestEngines(t *testing.T) {
 	if byType["T-72B"].Deaths != 1 || byType["T-72B"].Category != category.Ground {
 		t.Fatalf("unexpected T-72B: %+v", byType["T-72B"])
 	}
-	if byType["F-16C_50"].Sorties != 1 {
-		t.Fatalf("F-16C_50 sorties = %d", byType["F-16C_50"].Sorties)
+	if byType["F-16C_50"].Missions != 1 {
+		t.Fatalf("F-16C_50 missions = %d", byType["F-16C_50"].Missions)
 	}
 }
 
@@ -240,11 +240,112 @@ func TestEnginesUseResolvedUnitTypes(t *testing.T) {
 	for _, e := range engines {
 		byType[e.TypeID] = e
 	}
-	if byType["Su-27"].Sorties != 1 {
-		t.Fatalf("Su-27 sorties = %d, want 1", byType["Su-27"].Sorties)
+	if byType["Su-27"].Missions != 1 {
+		t.Fatalf("Su-27 missions = %d, want 1", byType["Su-27"].Missions)
 	}
-	if byType["F-16C_50"].Sorties != 1 {
-		t.Fatalf("F-16C_50 sorties = %d, want 1", byType["F-16C_50"].Sorties)
+	if byType["F-16C_50"].Missions != 1 {
+		t.Fatalf("F-16C_50 missions = %d, want 1", byType["F-16C_50"].Missions)
+	}
+}
+
+func TestOverviewPilotCountFollowsScopeAndUCID(t *testing.T) {
+	svc, database := setup(t)
+	live, err := database.StartMission("Real", "Caucasus", db.SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"Viper", "Viper renamed"} {
+		id, err := database.UpsertPlayer("same-ucid", name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := database.SaveStats(live, id, model.Player{ID: 1, UCID: "same-ucid", Name: name}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	testID, err := database.StartMission("Fixture", "Caucasus", db.SourceTest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := database.UpsertPlayer("test-ucid", "Fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveStats(testID, id, model.Player{ID: 2, UCID: "test-ucid", Name: "Fixture"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		scope Scope
+		want  int
+	}{
+		{Scope{Mode: "career"}, 1},
+		{Scope{Mode: "mission", MissionID: live}, 1},
+		{Scope{Mode: "mission", MissionID: testID}, 0},
+		{Scope{Mode: "mission"}, 0},
+	} {
+		got, err := svc.Overview(tc.scope)
+		if err != nil || got.Players != tc.want {
+			t.Fatalf("scope %+v: players=%d, err=%v", tc.scope, got.Players, err)
+		}
+	}
+}
+
+func TestAirframeMissionCountAndTrendUseFinalSnapshots(t *testing.T) {
+	svc, database := setup(t)
+	id, err := database.UpsertPlayer("pilot-1", "Viper")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := database.UpsertPlayer("pilot-2", "Wingman")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := database.StartMission("First", "Caucasus", db.SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, score := range []int{10, 20} {
+		if err := database.SaveStats(first, id, model.Player{ID: 1, UCID: "pilot-1", Name: "Viper", UnitType: "F-16C_50", Score: score, KillsAir: 1, Landings: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := database.SaveStats(first, other, model.Player{ID: 2, UCID: "pilot-2", Name: "Wingman", UnitType: "F-16C_50", Score: 5, Landings: 1}); err != nil {
+		t.Fatal(err)
+	}
+	second, err := database.StartMission("Second", "Syria", db.SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveStats(second, id, model.Player{ID: 1, UCID: "pilot-1", Name: "Viper", UnitType: "F-16C_50", Score: 30, KillsAir: 2, Landings: 2}); err != nil {
+		t.Fatal(err)
+	}
+	fixture, err := database.StartMission("Fixture", "Syria", db.SourceTest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveStats(fixture, id, model.Player{ID: 1, UCID: "pilot-1", Name: "Viper", UnitType: "F-16C_50", Score: 999}); err != nil {
+		t.Fatal(err)
+	}
+	engines, err := svc.Engines(Scope{Mode: "career"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(engines) != 1 || engines[0].Missions != 2 {
+		t.Fatalf("airframe missions: %+v", engines)
+	}
+	all, err := svc.Trend("", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 || all[0].Score != 25 || all[0].Kills != 1 || all[0].Landings != 2 || all[1].Score != 30 {
+		t.Fatalf("all-pilot trend: %+v", all)
+	}
+	pilot, err := svc.Trend("pilot-1", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pilot) != 2 || pilot[0].Score != 20 || pilot[1].Score != 30 || pilot[1].Kills != 2 {
+		t.Fatalf("pilot trend: %+v", pilot)
 	}
 }
 

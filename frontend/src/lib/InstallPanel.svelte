@@ -19,6 +19,7 @@
     fmtSize,
   } from './install.js';
   import { t } from './i18n.js';
+  import UpdatePanel from './UpdatePanel.svelte';
 
   onMount(loadInstall);
 
@@ -40,6 +41,7 @@
 </script>
 
 <section class="install">
+  <UpdatePanel />
   <header>
     <h2>{$t('install.title')}</h2>
     <button class="refresh" on:click={loadInstall} disabled={$installLoading || $scriptsInstalling}>

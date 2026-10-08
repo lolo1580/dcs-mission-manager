@@ -95,12 +95,12 @@ versioned), then embedded into the Go binary via `//go:embed`. Result: **a singl
 executable** contains the backend and the interface. If the frontend has not been
 built, a fallback page is served automatically.
 
-The UI is organised in tabs: **Debriefs**, **Career & statistics**, **Airfields**
+The UI is organised in tabs: **Career & statistics**, **Airfields**
 (reference data, frequencies and charts) and **Settings**, which groups the installed
 modules, the DCS-side install (scripts and mods) and the cockpit panels as sub-tabs.
 There is no live map, no mission library, no analysis view and no DCS-configuration
-view any more; the unit telemetry is still received and sampled, and it feeds the
-statistics and the airfields tab.
+view any more; the Debriefs view is also hidden. Unit telemetry is still received
+and sampled, and current position feeds the airfields tab.
 
 ## Application window
 

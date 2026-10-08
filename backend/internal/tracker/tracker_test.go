@@ -86,17 +86,23 @@ func TestTickSamplesPositions(t *testing.T) {
 
 	tr.Tick()
 
-	trails, err := database.Trails(tr.missionID, 10, 100)
-	if err != nil {
-		t.Fatalf("trails: %v", err)
+	var count int
+	var lat, speed float64
+	if err := database.QueryRow(`SELECT COUNT(*), lat, speed FROM track_positions WHERE mission_id = ? AND unit_id = ?`, tr.missionID, "1").Scan(&count, &lat, &speed); err != nil {
+		t.Fatalf("read position: %v", err)
 	}
-	pts, ok := trails["1"]
-	if !ok || len(pts) != 1 {
-		t.Fatalf("want 1 trail point for unit 1, got %#v", trails)
+	if count != 1 || lat != 42 || speed != 250 {
+		t.Fatalf("unexpected position: count=%d lat=%v speed=%v", count, lat, speed)
 	}
-	if pts[0].Lat != 42 || pts[0].Speed != 250 {
-		t.Fatalf("unexpected point: %+v", pts[0])
+}
+
+func lossCount(t *testing.T, database *db.DB, missionID int64) int {
+	t.Helper()
+	var count int
+	if err := database.QueryRow(`SELECT COUNT(*) FROM losses WHERE mission_id = ?`, missionID).Scan(&count); err != nil {
+		t.Fatalf("read losses: %v", err)
 	}
+	return count
 }
 
 func TestTickDetectsLoss(t *testing.T) {
@@ -114,11 +120,8 @@ func TestTickDetectsLoss(t *testing.T) {
 	store.Remove("1")
 	tr.Tick()
 
-	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
-	if err != nil {
-		t.Fatalf("heatmap: %v", err)
-	}
-	if len(points) == 0 {
+	before := lossCount(t, database, tr.missionID)
+	if before == 0 {
 		t.Fatal("expected at least one loss")
 	}
 	// The unit is forgotten once its loss is recorded, which is what keeps the
@@ -128,11 +131,10 @@ func TestTickDetectsLoss(t *testing.T) {
 	}
 
 	// A second tick must not report the same loss twice.
-	before := len(points)
 	tr.Tick()
-	after, _ := database.Heatmap(tr.missionID, "losses", 0.05, 100)
-	if len(after) != before {
-		t.Fatalf("loss reported twice: %d -> %d", before, len(after))
+	after := lossCount(t, database, tr.missionID)
+	if after != before {
+		t.Fatalf("loss reported twice: %d -> %d", before, after)
 	}
 }
 
@@ -154,12 +156,8 @@ func TestPausedFeedDoesNotReportLosses(t *testing.T) {
 
 	tr.Tick()
 
-	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
-	if err != nil {
-		t.Fatalf("heatmap: %v", err)
-	}
-	if len(points) != 0 {
-		t.Fatalf("a paused simulator must not produce losses, got %d", len(points))
+	if count := lossCount(t, database, tr.missionID); count != 0 {
+		t.Fatalf("a paused simulator must not produce losses, got %d", count)
 	}
 	// The tracked state is kept, so the map resumes where it left off.
 	if _, tracked := tr.seen["1"]; !tracked {
@@ -188,12 +186,8 @@ func TestUnitWithinGraceIsNotLost(t *testing.T) {
 	if _, tracked := tr.seen["1"]; !tracked {
 		t.Fatal("a unit within its grace window should still be tracked")
 	}
-	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
-	if err != nil {
-		t.Fatalf("heatmap: %v", err)
-	}
-	if len(points) != 0 {
-		t.Fatalf("no loss should be recorded within the grace window, got %d", len(points))
+	if count := lossCount(t, database, tr.missionID); count != 0 {
+		t.Fatalf("no loss should be recorded within the grace window, got %d", count)
 	}
 }
 
@@ -211,12 +205,8 @@ func TestReappearingUnitIsNotLost(t *testing.T) {
 	if _, tracked := tr.seen["1"]; !tracked {
 		t.Fatal("a unit that reappears should still be tracked")
 	}
-	points, err := database.Heatmap(tr.missionID, "losses", 0.05, 100)
-	if err != nil {
-		t.Fatalf("heatmap: %v", err)
-	}
-	if len(points) != 0 {
-		t.Fatalf("a unit that reappears must not be reported lost, got %d loss(es)", len(points))
+	if count := lossCount(t, database, tr.missionID); count != 0 {
+		t.Fatalf("a unit that reappears must not be reported lost, got %d loss(es)", count)
 	}
 }
 

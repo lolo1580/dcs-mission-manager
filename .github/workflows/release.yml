@@ -51,44 +51,39 @@ jobs:
           }
           # "v1.0.0-beta.1" -> "1.0.0-beta.1"
           $version = $tag -replace '^v', ''
+          $projectVersion = (Get-Content VERSION -Raw).Trim()
+          if ($version -ne $projectVersion) { throw "Tag $tag does not match VERSION ($projectVersion)" }
           $prerelease = if ($version -match '[A-Za-z]') { 'true' } else { 'false' }
           "tag=$tag"             >> $env:GITHUB_OUTPUT
           "version=$version"     >> $env:GITHUB_OUTPUT
           "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
           Write-Host "Building $tag (version $version, prerelease $prerelease)"
 
-      - name: Build frontend
-        working-directory: frontend
-        run: npm ci && npm run build
-
       - name: Embedded Lua scripts up to date
         run: node tools/gen-lua-embed.mjs --check
 
-      - name: Build dcsmanager.exe (frontend embedded)
-        working-directory: backend
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
         env:
           CGO_ENABLED: '0'
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          go build -trimpath -ldflags="-s -w -X main.Version=$env:VERSION" -o ../dcsmanager.exe ./cmd/dcsmanager
-          if (-not (Test-Path ../dcsmanager.exe)) { throw 'dcsmanager.exe was not produced' }
-          Get-Item ../dcsmanager.exe | Select-Object Name, Length
+        run: pwsh -File tools/build-installer.ps1
 
-      # The Windows artifact is smoke-tested directly: it is what users download.
-      - name: Smoke test the release build
-        run: pwsh -File tools/smoke-serve.ps1
+      - name: Smoke test embedded application
+        run: pwsh -File tools/smoke-serve.ps1 -Exe dist/staging/dcsmanager.exe
 
-      - name: Package the Lua scripts
+      - name: Smoke test installer
         run: |
-          Compress-Archive -Path dcs-lua/* -DestinationPath "dcsmanager-lua-${{ steps.version.outputs.version }}.zip"
-          Get-Item dcsmanager-lua-*.zip | Select-Object Name, Length
+          pwsh -File tools/build-installer.ps1 -SkipBuild -TestBuild
+          pwsh -File tools/test-installer.ps1
 
       - name: Checksums
         run: |
           $lines = @()
-          foreach ($f in @('dcsmanager.exe') + (Get-ChildItem 'dcsmanager-lua-*.zip').Name) {
-            $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
-            $lines += "$hash  $f"
+          foreach ($f in @(Get-ChildItem 'dist/DCSManager-Setup-*.exe')) {
+            $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+            $lines += "$hash  $($f.Name)"
           }
           $lines | Set-Content -Encoding ascii SHA256SUMS.txt
           Get-Content SHA256SUMS.txt
@@ -103,30 +98,25 @@ jobs:
           body: |
             DCS Manager ${{ steps.version.outputs.version }}.
 
-            This is a **pre-release**: the whole chain is tested, but the Lua
-            scripts have not yet been run against a live DCS installation.
-            See the CHANGELOG "Beta scope" section for what is and is not verified.
+            The build and installer are tested automatically. Lua scripts still
+            require validation in a live DCS installation; see the CHANGELOG for
+            the current validation scope.
 
             ## Download
 
-            - `dcsmanager.exe` — Windows binary (web UI embedded). Run it and the
-              manager opens in its own window. Prefer the browser? `dcsmanager serve`,
-              then open http://localhost:8080.
-            - `dcsmanager-lua-*.zip` — the Lua scripts to install into DCS, if you
-              prefer not to use the built-in installer (`dcsmanager install-lua`).
+            - `DCSManager-Setup-*.exe` — Windows installer. It installs the app for
+              the current Windows account and can optionally install the DCS Lua scripts.
             - `SHA256SUMS.txt` — checksums.
 
             ## Quick start
 
             ```powershell
-            .\dcsmanager.exe install-lua   # merges the scripts into Saved Games (safe)
-            .\dcsmanager.exe               # start the manager
+            .\DCSManager-Setup-${{ steps.version.outputs.version }}.exe
             ```
 
             Then load a mission in DCS. See the README for the full setup.
 
             > Community project, not affiliated with or endorsed by Eagle Dynamics.
           files: |
-            dcsmanager.exe
-            dcsmanager-lua-*.zip
+            dist/DCSManager-Setup-*.exe
             SHA256SUMS.txt

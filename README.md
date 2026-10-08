@@ -6,7 +6,7 @@
 
 🇬🇧 English | [🇫🇷 Français](README.fr.md)
 
-An all-in-one companion for **DCS World**: debriefing reading, advanced statistics, sortie analysis, airfield reference and aeronautical charts. It runs **locally, on the same Windows machine as DCS**: one `dcsmanager.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
+An all-in-one companion for **DCS World**: debriefing collection, advanced statistics, airfield reference and aeronautical charts. It runs **locally, on the same Windows machine as DCS**: one `dcsmanager.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
 
 Because it is local, it can read **DCS's own files** — the airfields, frequencies and beacons of every installed map, as well as the Saved Games folder — instead of relying on a hand-maintained dataset.
 
@@ -32,8 +32,8 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 
 | Feature | Status | Details |
 |---|---|---|
-| Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser, history |
-| Advanced stats | ✅ Phase 4 | Pilots, weapons, engines, balance, network (career + mission), merged with the logbook in one **Career & statistics** tab |
+| Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser and retained history; view currently hidden |
+| Advanced stats | ✅ Phase 4 | Pilots, weapons, airframes, balance, network, recorded-mission selector and mission-by-mission trends (score, kills, landings) in **Career & statistics** |
 | Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **220 airfields listed, 146 mappable** across 6 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts. A bundled dataset covers Caucasus and Cold War Germany when DCS cannot be read |
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
@@ -43,9 +43,10 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Local by design | ✅ New | One self-contained Windows `.exe`, no server and no container: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still
-> received and sampled: it feeds the statistics and the airfields tab (nearest
-> field), and it is kept in the database so a future analysis view would have a
-> history to draw on. The manager is now debrief-, stats- and airfields-oriented.
+> received and sampled: the current position supports the airfields tab (nearest
+> field), and samples remain in the database for possible future analysis. The
+> interface currently shows career, statistics, airfields and settings; debriefs
+> continue to be collected.
 
 ### Cockpit panels and Lua installation
 
@@ -59,6 +60,8 @@ Bindings remain in DCS Manager; this does not add controller columns to DCS.
 DCS-BIOS remains required for existing cockpit commands and LED feedback. The
 F/A-18C pitch trim uses our Lua plugin on local UDP port 7780, with a bounded queue,
 acknowledgements and automatic release. Some controls remain unassigned; LCD is optional.
+Experimental trim is off on each application startup; enable its dedicated checkbox
+only for a controlled test. Disabling it cancels pending impulses, without resetting aircraft trim.
 **Physical trim movement, LED behaviour and multiplayer support remain to be
 validated in DCS.** An acknowledgement only confirms an error-free Lua device call.
 
@@ -145,21 +148,33 @@ database), since a double-clicked executable has no console.
 
 ## Installation guide
 
+A **custom Windows installer** is the only release artifact:
+logo, dark theme, French/English, shortcuts, DCS detection, optional Lua scripts
+and optional import of data from an older portable copy. Installed data stays in `%LOCALAPPDATA%\DCS Manager`
+after upgrades and uninstall. See [the workflow, build and limitations
+(French)](docs/installation-windows.fr.md). Build it with
+`.\build.ps1` (requires Inno Setup 6.7+).
+The app checks GitHub releases at startup and every 12 hours. A newer installer
+appears in the sidebar and under **Settings → DCS install**, where you can also
+check manually. Download and installation remain manual.
+
 For a complete, step-by-step installation — release download, Lua script
 installation, first launch, configuration, troubleshooting — see
 **[`docs/installation.md`](docs/installation.md)**.
 
 ---
 
-## Quick start (PoC Phase 0)
+## Quick start
 
-The PoC validates the whole chain: **DCS → UDP → Go → SSE → browser**.
+Install the application with `DCSManager-Setup-<version>.exe`, then use the Start
+menu shortcut. The application connects DCS telemetry to its local interface.
 
 ### 1. Start the manager
 
 ```powershell
-# Backend only (also serves a placeholder if the frontend is not built)
-go run ./backend/cmd/dcsmanager
+# Development from source only:
+Set-Location backend
+go run ./cmd/dcsmanager
 ```
 
 By default, the backend listens on:
@@ -259,28 +274,26 @@ PowerShell alternative from the executable's folder:
 ```
 
 The CLI can update an existing configuration, with backup; the one-click installer
-preserves it. Use `dcsmanager-panels.exe` instead if running the development build.
+preserves it. Use the build's own executable when testing from source.
 If detection fails, set `DCSMANAGER_SAVED_GAMES` before starting the application.
 
 ---
 
 ## Deployment
 
-### Windows `.exe`
+### Windows installer
 
 ```powershell
-# 1. Build the frontend and the backend
+# 1. Build the installer
 .\build.ps1
 
-# 2. Install the scripts on the DCS side (safe merge into Saved Games)
-.\install-dcs.ps1            # add -DryRun to simulate
-
-# 3. Run
-.\dcsmanager.exe
+# 2. Run the generated installer
+$version = (Get-Content VERSION -Raw).Trim()
+& ".\dist\DCSManager-Setup-$version.exe"
 ```
 
-The manager opens in its own window. To reach the interface from a browser instead
-(second monitor, tablet), run `.\dcsmanager.exe serve` and open <http://localhost:8080>.
+The installer offers to install the Lua scripts and creates the Start menu
+shortcut. The application opens in its own window.
 
 ### CLI
 
@@ -304,7 +317,7 @@ flight. Every session is therefore tagged with a **source**:
 
 - `live` — recorded from DCS. Statistics count these.
 - `test` — recorded from the test tools. Kept on disk, but **excluded from
-  statistics, analytics and the dashboard** unless explicitly requested.
+  career statistics** unless explicitly requested.
 
 Detection is automatic: the backend recognises the fixture callsigns used by
 `tools/send-telemetry.mjs`. Set `DCSMANAGER_SOURCE=test` (or `live`) to force the
@@ -378,10 +391,10 @@ DCS Manager/
 - [x] **Phase 2 — Events & players**: `onGameEvent`, `net.get_stat`, SQLite history (the Session tab is now removed; events and players are still recorded for the stats and the debriefs)
 - [x] **Phase 3 — Debriefings**: network transfer of `debrief.log`, Lua parser, history
 - [x] **Phase 4 — Advanced stats**: overview, pilots, weapons, engines, balance, network
-- [x] **Phase 4 bis — Analytical maps & sortie**: heatmaps, trails, telemetry
+- [x] **Phase 4 bis — Telemetry collection**: position and loss samples remain stored; analytical maps and sortie calculations were removed
 - [x] **Phase 5 — Packaging**: CLI, safe Lua injector, single self-contained binary
 - [x] **Phase 6 — Aerodromes**: read from DCS's own terrain files (frequencies, aids, charts)
-- [ ] **Phase 1 — Live map**: removed; telemetry is still collected for analysis
+- [ ] **Phase 1 — Live map**: removed; telemetry is still collected
 
 The full, detailed plan is available in the project's plan file.
 

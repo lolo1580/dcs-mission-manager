@@ -35,14 +35,24 @@
     statTab,
     STAT_TABS,
     scopeMode,
+    selectedMissionID,
+    statsMissions,
+    statsMissionsError,
+    statsTrend,
+    trendPilotUCID,
+    trendLoading,
+    trendError,
     statsError,
     statsLoading,
     statsNetwork,
     statsEnabled,
     loadStats,
+    loadStatsMissions,
+    loadTrend,
     fmtNum,
   } from './stats.js';
   import { t } from './i18n.js';
+  import StatsTrend from './StatsTrend.svelte';
 
   const STAT_TAB_KEYS = {
     pilots: 'stats.pilots',
@@ -58,19 +68,47 @@
 
   onMount(() => {
     loadCareer();
+    loadStatsMissions();
     loadStats();
+    loadTrend();
   });
 
   // The header's Refresh reloads both halves: they come from different files
   // (the logbook and the database) but belong to the same view.
   function refresh() {
     loadCareer();
+    loadStatsMissions();
+    loadStats();
+    loadTrend();
+  }
+
+  async function onScopeChange(mode) {
+    scopeMode.set(mode);
+    if (mode === 'mission') await loadStatsMissions();
     loadStats();
   }
 
-  function onScopeChange(mode) {
-    scopeMode.set(mode);
+  function onMissionChange(event) {
+    selectedMissionID.set(Number(event.currentTarget.value));
     loadStats();
+  }
+
+  function onTrendPilotChange(event) {
+    trendPilotUCID.set(event.currentTarget.value);
+    loadTrend();
+  }
+
+  function missionLabel(mission) {
+    return `${new Date(mission.startedAt).toLocaleDateString()} · ${mission.name}`;
+  }
+
+  function trendPilots(pilots) {
+    const seen = new Set();
+    return pilots.filter((pilot) => {
+      if (!pilot.ucid || seen.has(pilot.ucid)) return false;
+      seen.add(pilot.ucid);
+      return true;
+    });
   }
 
   /** Reads a raw logbook aggregate value, which may be a number or a string. */
@@ -194,6 +232,19 @@
       </div>
     </div>
 
+    {#if $scopeMode === 'mission'}
+      <div class="mission-picker">
+        <label for="stats-mission">{$t('stats.chooseMission')}</label>
+        <select id="stats-mission" value={$selectedMissionID} on:change={onMissionChange} disabled={$statsMissions.length === 0}>
+          {#each $statsMissions as mission (mission.id)}
+            <option value={mission.id}>{missionLabel(mission)}</option>
+          {/each}
+        </select>
+        {#if $statsMissions.length === 0}<span class="muted">{$t('stats.noMission')}</span>{/if}
+        {#if $statsMissionsError}<span class="error">{$statsMissionsError}</span>{/if}
+      </div>
+    {/if}
+
     {#if $statsError}
       <p class="error">{$statsError}</p>
     {/if}
@@ -211,6 +262,24 @@
           <div class="kpi k-crash"><span class="v">{o.crashes}</span><span class="k">{$t('stats.crashes')}</span></div>
           <div class="kpi k-eject"><span class="v">{o.ejections}</span><span class="k">{$t('stats.ejections')}</span></div>
           <div class="kpi k-ff" class:warn={o.friendlyFire > 0}><span class="v">{o.friendlyFire}</span><span class="k">{$t('events.friendlyFire')}</span></div>
+        </div>
+      {/if}
+
+      {#if $scopeMode === 'career'}
+        <div class="trend-block">
+          <div class="trend-head">
+            <h3>{$t('stats.trendTitle')}</h3>
+            <label>{$t('stats.trendPilot')}
+              <select value={$trendPilotUCID} on:change={onTrendPilotChange}>
+                <option value="">{$t('stats.allPilots')}</option>
+                {#each trendPilots($statsPilots) as pilot (pilot.ucid)}
+                  <option value={pilot.ucid}>{pilot.name}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+          {#if $trendError}<p class="error">{$trendError}</p>{/if}
+          {#if $trendLoading}<p class="muted">{$t('stats.loadingTrend')}</p>{:else}<StatsTrend points={$statsTrend} />{/if}
         </div>
       {/if}
 
@@ -288,7 +357,7 @@
         {:else}
           <table>
             <thead>
-              <tr><th>{$t('stats.type')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.losses')}</th><th>{$t('stats.sorties')}</th><th>K/D</th></tr>
+              <tr><th>{$t('stats.type')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.losses')}</th><th>{$t('stats.missions')}</th><th>K/D</th></tr>
             </thead>
             <tbody>
               {#each $enginesByCategory as e (e.typeId)}
@@ -296,7 +365,7 @@
                   <td class="name">{e.typeId}</td>
                   <td class="num">{e.kills}</td>
                   <td class="num">{e.deaths}</td>
-                  <td class="num">{e.sorties}</td>
+                  <td class="num">{e.missions}</td>
                   <td class="num">{fmtNum(e.kd, 2)}</td>
                 </tr>
               {/each}
@@ -591,6 +660,29 @@
     color: var(--text);
     background: var(--panel);
   }
+
+  .mission-picker, .trend-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+    font-size: 0.78rem;
+  }
+
+  .mission-picker select, .trend-head select {
+    max-width: min(100%, 420px);
+    padding: 0.3rem 0.5rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .trend-block { margin: 0 0 1rem; }
+  .trend-head { justify-content: space-between; margin-bottom: 0.45rem; }
+  .trend-head h3 { margin: 0; }
+  .trend-head label { display: flex; align-items: center; gap: 0.5rem; }
 
   .cards {
     display: grid;

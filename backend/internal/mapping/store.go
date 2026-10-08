@@ -238,16 +238,55 @@ func (s *Store) Profile(aircraft string) Profile {
 
 // SetProfile replaces an aircraft's bindings and persists them.
 func (s *Store) SetProfile(p Profile) error {
+	if err := validateProfile(p); err != nil {
+		return err
+	}
+	if p.Bindings == nil {
+		p.Bindings = []Binding{}
+	}
+	if p.Outputs == nil {
+		p.Outputs = []OutputBinding{}
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Persist first, then publish: a failed write must not leave the in-memory
+	// state changed, or the UI would report an error while the manager behaves as
+	// if the save had succeeded (and a panel could act on the unsaved profile).
+	previous, had := s.profiles[p.Aircraft]
+	s.profiles[p.Aircraft] = &p
+	if err := s.saveLocked(); err != nil {
+		if had {
+			s.profiles[p.Aircraft] = previous
+		} else {
+			delete(s.profiles, p.Aircraft)
+		}
+		return err
+	}
+	return nil
+}
+
+func validateProfile(p Profile) error {
 	if p.Aircraft == "" {
 		return fmt.Errorf("mapping: a profile needs an aircraft")
 	}
 	if !validToken(p.Aircraft, 64) {
 		return fmt.Errorf("mapping: invalid aircraft name")
 	}
+	if err := validateBindings(p.Bindings); err != nil {
+		return err
+	}
+	if err := validateOutputs(p.Outputs); err != nil {
+		return err
+	}
+	return validateDisplays(p.Displays)
+}
+
+func validateBindings(bindings []Binding) error {
 	// Reject two bindings on the same control: the second would silently shadow
 	// the first, and the panel would look broken.
 	seen := map[string]bool{}
-	for i, b := range p.Bindings {
+	for i, b := range bindings {
 		for _, value := range []*int{b.StateOn, b.StateOff, b.PulseReset} {
 			if value != nil && (b.Interface != "set_state" || *value < 0 || *value > 65535) {
 				return fmt.Errorf("mapping: custom positions require set_state and values 0..65535")
@@ -286,13 +325,14 @@ func (s *Store) SetProfile(p Profile) error {
 		}
 		seen[k] = true
 	}
-	if p.Bindings == nil {
-		p.Bindings = []Binding{}
-	}
+	return nil
+}
+
+func validateOutputs(outputs []OutputBinding) error {
 	// Output bindings are validated the same way: bounded, safe tokens, one binding
 	// per indicator so the second cannot silently shadow the first.
 	seenOut := map[string]bool{}
-	for i, o := range p.Outputs {
+	for i, o := range outputs {
 		if len(o.Rules) > 16 {
 			return fmt.Errorf("mapping: too many LED rules")
 		}
@@ -328,12 +368,13 @@ func (s *Store) SetProfile(p Profile) error {
 		}
 		seenOut[k] = true
 	}
-	if p.Outputs == nil {
-		p.Outputs = []OutputBinding{}
-	}
+	return nil
+}
+
+func validateDisplays(displays []DisplayBinding) error {
 	// Displays are validated the same way, plus the mode/line/export rules.
 	seenDisp := map[string]bool{}
-	for i, dp := range p.Displays {
+	for i, dp := range displays {
 		if i >= maxBindings {
 			return fmt.Errorf("mapping: too many displays (max %d)", maxBindings)
 		}
@@ -363,22 +404,6 @@ func (s *Store) SetProfile(p Profile) error {
 			return fmt.Errorf("mapping: %s line is configured twice for %s", dp.Line, dp.Mode)
 		}
 		seenDisp[k] = true
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	// Persist first, then publish: a failed write must not leave the in-memory
-	// state changed, or the UI would report an error while the manager behaves as
-	// if the save had succeeded (and a panel could act on the unsaved profile).
-	previous, had := s.profiles[p.Aircraft]
-	s.profiles[p.Aircraft] = &p
-	if err := s.saveLocked(); err != nil {
-		if had {
-			s.profiles[p.Aircraft] = previous
-		} else {
-			delete(s.profiles, p.Aircraft)
-		}
-		return err
 	}
 	return nil
 }
@@ -428,40 +453,27 @@ func (s *Store) DeleteProfile(aircraft string) error {
 // It returns the commands sent, so a caller (a test, or the live monitor) can see
 // what happened. Nothing is sent when the store is disabled.
 func (s *Store) Apply(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []string {
-	s.mu.RLock()
-	p := s.profiles[aircraft]
-	enabled := s.enabled
-	send := s.send
-	s.mu.RUnlock()
-
-	if p == nil || !enabled || send == nil {
-		return nil
-	}
-
-	var sent []string
-	for _, command := range commandPlan(p, ev, cat) {
-		if command.delay > 0 {
-			time.Sleep(command.delay)
-		}
-		if err := send(command.line); err != nil {
-			continue
-		}
-		sent = append(sent, command.line)
-	}
-	return sent
+	return s.apply(aircraft, ev, cat, false)
 }
 
 // ApplyForced sends the commands a panel input matches even when sending is off.
 // It exists only for the live mapping test, which deliberately overrides the
 // switch so the cockpit can be checked without arming it.
 func (s *Store) ApplyForced(aircraft string, ev panel.Event, cat *biosmeta.Catalog) []string {
+	return s.apply(aircraft, ev, cat, true)
+}
+
+func (s *Store) apply(aircraft string, ev panel.Event, cat *biosmeta.Catalog, forced bool) []string {
 	s.mu.RLock()
 	p := s.profiles[aircraft]
+	enabled := s.enabled
 	send := s.send
 	s.mu.RUnlock()
-	if p == nil || send == nil {
+
+	if p == nil || (!enabled && !forced) || send == nil {
 		return nil
 	}
+
 	var sent []string
 	for _, command := range commandPlan(p, ev, cat) {
 		if command.delay > 0 {

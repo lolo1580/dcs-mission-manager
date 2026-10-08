@@ -91,3 +91,22 @@ func TestRemove(t *testing.T) {
 		t.Fatalf("want 0 units after remove, got %d", n)
 	}
 }
+
+func TestHeartbeatTracksExportWithoutCreatingUnit(t *testing.T) {
+	s := New(time.Minute, 0)
+	if s.FeedStopped() {
+		t.Fatal("a feed that never started cannot be reported as stopped")
+	}
+	s.Touch()
+	if s.FeedStopped() || s.Count() != 0 {
+		t.Fatal("heartbeat must keep an empty export feed active without creating a unit")
+	}
+	s.SimulateSilence(2 * time.Minute)
+	if !s.FeedStopped() {
+		t.Fatal("a previously active feed should be reported as stopped after its TTL")
+	}
+	s.Touch()
+	if s.FeedStopped() {
+		t.Fatal("a new heartbeat should restore the feed")
+	}
+}

@@ -50,6 +50,18 @@
   import { t } from './i18n.js';
 
   let pluginState = {connected: false, aircraft: '', accepted: 0};
+  let pluginBusy = false;
+  let pluginError = '';
+  async function setPluginTrim(enabled) {
+    pluginBusy = true; pluginError = '';
+    try {
+      const r = await fetch('/api/panels/plugin', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({trimEnabled:enabled})});
+      const body = await r.json();
+      if (!r.ok) { if (body.state) pluginState=body.state; throw new Error(body.error || r.status); }
+      pluginState=body;
+    } catch (e) { pluginError=e.message; }
+    finally { pluginBusy=false; }
+  }
   async function loadPlugin() {
     try {
       const r = await fetch('/api/panels/plugin');
@@ -431,6 +443,9 @@
     <div class="block">
       <h3>{$t('panels.plugin.title')} <span class="badge" class:on={pluginState.connected}>{$t(pluginState.connected ? 'panels.connected' : 'panels.disconnected')}</span></h3>
       <p class="hint">{$t('panels.plugin.hint')}</p>
+      <label><input type="checkbox" checked={!!pluginState.trimEnabled} disabled={pluginBusy || (!pluginState.trimEnabled && !pluginState.connected)} on:change={e => setPluginTrim(e.currentTarget.checked)} /> {$t('panels.plugin.trimEnable')}</label>
+      <p class="hint">{$t('panels.plugin.trimWarning')}</p>
+      {#if pluginError}<p class="error">{pluginError}</p>{/if}
       <p>{pluginState.aircraft || $t('panels.noAircraft')} · {pluginState.accepted} {$t('panels.plugin.accepted')}</p>
       {#if pluginState.error}<p class="error">{pluginState.error}</p>{/if}
       {#if !pluginState.connected}<p class="hint">{$t('panels.plugin.install')}</p>{/if}

@@ -13,7 +13,7 @@ import (
 //
 // The interface is deliberately the union of what the consumers need, not every
 // method *DB has: SQL() stays off it on purpose (it is an escape hatch for tests
-// and maintenance), and the analytics queries go through Query/QueryRow instead.
+// and maintenance), and the statistics queries go through Query/QueryRow instead.
 type Store interface {
 	// Lifecycle.
 	Close() error
@@ -45,8 +45,6 @@ type Store interface {
 	// Position tracking.
 	SaveSamples(missionID int64, samples []model.Sample) error
 	SaveLoss(missionID int64, s model.Sample) error
-	Heatmap(missionID int64, source string, grid float64, limit int) ([]HeatPoint, error)
-	Trails(missionID int64, limitUnits, maxPointsPerUnit int) (map[string][]TrailPoint, error)
 	PruneTracking(olderThan time.Duration) (int64, error)
 
 	// Debriefs.
@@ -65,8 +63,8 @@ type Store interface {
 	Querier
 }
 
-// Querier is the read-only SQL surface the analytics package needs. It is put
-// on the interface (rather than exposing the raw *sql.DB) so the analytics code
+// Querier is the read-only SQL surface the statistics package needs. It is put
+// on the interface (rather than exposing the raw *sql.DB) so the statistics code
 // depends only on what it actually uses.
 type Querier interface {
 	Query(query string, args ...any) (*sql.Rows, error)

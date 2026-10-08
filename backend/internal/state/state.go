@@ -50,10 +50,9 @@ type Store struct {
 	units map[string]*Unit
 	ttl   time.Duration
 	max   int
-	// lastUpdate is when any unit was last written. It is what tells a paused
-	// simulator apart from a genuine end of export: DCS stops calling the export
-	// script entirely while the simulation is paused, so the feed goes silent
-	// without the mission ending.
+	// lastUpdate is when a unit or export heartbeat last arrived. Unit positions
+	// alone cannot show whether DCS is running: spectators and restricted servers
+	// may export no positions while the simulation still advances.
 	lastUpdate time.Time
 	// everUpdated records whether any unit has ever been stored.
 	everUpdated bool
@@ -69,9 +68,8 @@ func New(ttl time.Duration, max int) *Store {
 	}
 }
 
-// FeedStopped reports whether the telemetry feed has gone quiet. DCS pauses the
-// whole export while the simulation is paused, so silence longer than the unit
-// TTL means "no data is coming", not "the units are gone".
+// FeedStopped reports whether a previously active export feed has gone quiet.
+// Silence can mean a pause, a stopped mission, or a broken export connection.
 //
 // A caller must not treat a stopped feed as a mass destruction: doing so records
 // every unit as lost, which is exactly what a pause used to produce.
@@ -79,12 +77,20 @@ func (s *Store) FeedStopped() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if !s.everUpdated {
-		return true // nothing has ever arrived
+		return false // no evidence that an active feed has stopped
 	}
 	if s.ttl <= 0 {
 		return false // no TTL configured: cannot judge
 	}
 	return time.Since(s.lastUpdate) > s.ttl
+}
+
+// Touch records an export heartbeat without creating a fictitious map unit.
+func (s *Store) Touch() {
+	s.mu.Lock()
+	s.lastUpdate = time.Now()
+	s.everUpdated = true
+	s.mu.Unlock()
 }
 
 // FeedAge returns how long ago telemetry last arrived, and whether any ever did.

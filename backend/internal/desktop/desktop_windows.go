@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"dcsmanager/internal/app"
+	"dcsmanager/internal/config"
 )
 
 // show opens url in a WebView2 window and blocks until it is closed.
@@ -46,6 +47,7 @@ func show(url string) error {
 	}
 
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
+		DataPath:  config.WebViewDataPath(),
 		Debug:     false,
 		AutoFocus: true,
 		WindowOptions: webview2.WindowOptions{

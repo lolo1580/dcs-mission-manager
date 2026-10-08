@@ -32,6 +32,7 @@ import (
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
 	"dcsmanager/internal/theatre"
+	"dcsmanager/internal/updatecheck"
 )
 
 // The frontend build is written here by `npm run build` (see
@@ -125,7 +126,9 @@ type Server struct {
 	testMode atomic.Bool
 	// debug is the runtime debug switch and in-memory log. It may be nil (some
 	// tests build a Server without it), so every use goes through helpers below.
-	debug *debuglog.Logger
+	debug   *debuglog.Logger
+	version string
+	updates *updatecheck.Checker
 }
 
 // SetDebug installs the debug logger. It is optional: the endpoints then just
@@ -163,8 +166,12 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		theatres:   theatre.All(),
 		chartsDir:  cfg.ChartsDir,
 		localOnly:  isLoopbackAddr(cfg.HTTPAddr),
+		updates:    updatecheck.New(),
 	}
 }
+
+// SetVersion sets the version embedded by the release build.
+func (s *Server) SetVersion(version string) { s.version = version }
 
 // SetLocalOnly overrides the loopback decision after the real listen address is
 // known. The server is built before `net.Listen`, so `New` can only guess from
@@ -324,6 +331,7 @@ func IsLoopbackAddr(addr string) bool {
 func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", s.handleHealth)
+	mux.HandleFunc("/api/update", s.handleUpdate)
 	mux.HandleFunc("/api/state", s.handleState)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/theatres", s.handleTheatres)
@@ -338,6 +346,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/debriefs", s.handleDebriefs)
 	mux.HandleFunc("/api/debriefs/", s.handleDebrief)
 	mux.HandleFunc("/api/stats/overview", s.handleStatsOverview)
+	mux.HandleFunc("/api/stats/missions", s.handleStatsMissions)
+	mux.HandleFunc("/api/stats/trend", s.handleStatsTrend)
 	mux.HandleFunc("/api/stats/pilots", s.handleStatsPilots)
 	mux.HandleFunc("/api/stats/weapons", s.handleStatsWeapons)
 	mux.HandleFunc("/api/stats/engines", s.handleStatsEngines)
@@ -405,12 +415,15 @@ func (s *Server) sessionJSON() ([]byte, error) {
 		"events":  s.live.Events(),
 		"players": s.live.Players(),
 		"chat":    s.live.Chat(),
-		// A paused simulator stops sending telemetry entirely. Reporting it lets
-		// the UI say so instead of looking broken.
-		"paused": s.store.FeedStopped(),
+		// A silent export is not proof that DCS is paused: the mission may have
+		// stopped or the Lua/UDP connection may be unavailable.
+		"feedStopped": s.store.FeedStopped(),
 	}
 	if age, ok := s.store.FeedAge(); ok {
 		payload["feedAgeMs"] = age.Milliseconds()
+		payload["feedSeen"] = true
+	} else {
+		payload["feedSeen"] = false
 	}
 	if m, ok := s.live.Mission(); ok {
 		payload["mission"] = m

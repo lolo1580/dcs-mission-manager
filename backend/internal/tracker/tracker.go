@@ -1,5 +1,5 @@
 // Package tracker turns the live unit feed into a persisted history: periodic
-// position samples (for trails and heatmaps) and loss events (units that vanish,
+// position samples and loss events (units that vanish,
 // presumed destroyed or despawned).
 //
 // It deliberately works from the lat/lng positions already received by the live

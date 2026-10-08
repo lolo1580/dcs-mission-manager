@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"dcsmanager/internal/db"
 	"dcsmanager/internal/stats"
 )
 
@@ -25,16 +26,38 @@ func (s *Server) scopeFromRequest(r *http.Request) stats.Scope {
 		if id, err := strconv.ParseInt(q.Get("missionId"), 10, 64); err == nil && id > 0 {
 			sc.MissionID = id
 		} else if s.db != nil {
-			sc.MissionID = s.db.OpenMissionID()
-			if sc.MissionID == 0 {
-				// Fall back to the newest mission when none is open.
-				if list, err := s.db.Missions(1); err == nil && len(list) > 0 {
-					sc.MissionID = list[0].ID
-				}
+			// Only live missions appear by default: the newest test run must not
+			// make the Mission view look empty while career stats exclude tests.
+			if list, err := s.db.MissionsWithSource(db.SourceLive, 1); err == nil && len(list) > 0 {
+				sc.MissionID = list[0].ID
 			}
 		}
 	}
 	return sc
+}
+
+func (s *Server) handleStatsMissions(w http.ResponseWriter, r *http.Request) {
+	if !s.statsReady(w) {
+		return
+	}
+	list, err := s.db.MissionsWithSource(db.SourceLive, 200)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"missions": list})
+}
+
+func (s *Server) handleStatsTrend(w http.ResponseWriter, r *http.Request) {
+	if !s.statsReady(w) {
+		return
+	}
+	points, err := s.stats.Trend(r.URL.Query().Get("ucid"), 20)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"missions": points})
 }
 
 // statsReady reports whether statistics can be served, and answers the request

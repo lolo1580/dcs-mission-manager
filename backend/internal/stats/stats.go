@@ -40,7 +40,7 @@ func (sc Scope) filter(column string) (string, []any) {
 	frag := ""
 	var args []any
 
-	if sc.Mode == "mission" && sc.MissionID > 0 {
+	if sc.Mode == "mission" {
 		frag += " AND " + column + " = ?"
 		args = append(args, sc.MissionID)
 	}
@@ -99,7 +99,7 @@ type EngineStats struct {
 	Category string  `json:"category"`
 	Kills    int     `json:"kills"`
 	Deaths   int     `json:"deaths"`
-	Sorties  int     `json:"sorties"`
+	Missions int     `json:"missions"`
 	KD       float64 `json:"kd"`
 }
 
@@ -132,6 +132,59 @@ type Overview struct {
 	Ejections  int              `json:"ejections"`
 	FriendlyFF int              `json:"friendlyFire"`
 	Coalitions []CoalitionStats `json:"coalitions"`
+}
+
+// MissionTrend is one mission's final snapshot totals. It is not derived from
+// the DCS logbook, whose player profiles do not expose a matching UCID.
+type MissionTrend struct {
+	MissionID int64  `json:"missionId"`
+	Name      string `json:"name"`
+	StartedAt int64  `json:"startedAt"`
+	Score     int    `json:"score"`
+	Kills     int    `json:"kills"`
+	Landings  int    `json:"landings"`
+}
+
+// Trend returns recent real missions, oldest first for charting. With a UCID,
+// only missions containing that pilot are included. Repeated snapshots are
+// reduced to the final snapshot for each player in each mission.
+func (s *Service) Trend(ucid string, limit int) ([]MissionTrend, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	rows, err := s.db.Query(`
+		WITH recent AS (
+			SELECT m.id, m.name, m.started_at FROM missions m
+			WHERE m.source <> 'test' AND (? = '' OR EXISTS (
+				SELECT 1 FROM player_stats ps JOIN players p ON p.id = ps.player_id
+				WHERE ps.mission_id = m.id AND p.ucid = ?))
+			ORDER BY m.id DESC LIMIT ?
+		), latest AS (
+			SELECT MAX(ps.id) AS id FROM player_stats ps
+			JOIN recent m ON m.id = ps.mission_id
+			JOIN players p ON p.id = ps.player_id
+			WHERE (? = '' OR p.ucid = ?)
+			GROUP BY ps.mission_id, ps.player_id
+		)
+		SELECT m.id, m.name, m.started_at,
+		       COALESCE(SUM(ps.score),0),
+		       COALESCE(SUM(ps.kills_air + ps.kills_car + ps.kills_ship),0),
+		       COALESCE(SUM(ps.landings),0)
+		FROM recent m LEFT JOIN player_stats ps ON ps.mission_id = m.id AND ps.id IN (SELECT id FROM latest)
+		GROUP BY m.id, m.name, m.started_at ORDER BY m.id ASC`, ucid, ucid, limit, ucid, ucid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MissionTrend
+	for rows.Next() {
+		var point MissionTrend
+		if err := rows.Scan(&point.MissionID, &point.Name, &point.StartedAt, &point.Score, &point.Kills, &point.Landings); err != nil {
+			return nil, err
+		}
+		out = append(out, point)
+	}
+	return out, rows.Err()
 }
 
 // --- queries ---------------------------------------------------------------
@@ -366,19 +419,23 @@ func (s *Service) Engines(sc Scope) ([]EngineStats, error) {
 		return nil, err
 	}
 
-	// Uses: the unit types players occupied, from the resolved unit type.
+	// Count missions in which each type was flown. Snapshots repeat throughout a
+	// mission, so counting rows would inflate this number. This is deliberately
+	// called missions rather than sorties: respawns within one mission are not
+	// separately identified by the stored snapshots.
 	rows2, err := s.db.Query(
-		`SELECT DISTINCT unit_type FROM player_stats WHERE unit_type IS NOT NULL AND unit_type <> ''`+where, args...)
+		`SELECT unit_type, COUNT(DISTINCT mission_id) FROM player_stats WHERE unit_type IS NOT NULL AND unit_type <> ''`+where+` GROUP BY unit_type`, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows2.Close()
 	for rows2.Next() {
 		var unitType string
-		if err := rows2.Scan(&unitType); err != nil {
+		var missions int
+		if err := rows2.Scan(&unitType, &missions); err != nil {
 			return nil, err
 		}
-		ensure(unitType).Sorties++
+		ensure(unitType).Missions = missions
 	}
 	if err := rows2.Err(); err != nil {
 		return nil, err
@@ -507,9 +564,12 @@ func (s *Service) Overview(sc Scope) (Overview, error) {
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM missions WHERE 1=1`+mWhere, mArgs...).Scan(&o.Missions); err != nil {
 		return o, err
 	}
-	// Players is a count of identities, not sessions: player rows survive a
-	// purge and carry no source of their own, so it is not filtered here.
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM players`).Scan(&o.Players); err != nil {
+	// Count only pilots with snapshots in this scope. A UCID can have several
+	// player rows after a callsign change; count it once. Anonymous rows retain
+	// their own identity instead of collapsing into one empty UCID.
+	pWhere, pArgs := sc.filter("ps.mission_id")
+	if err := s.db.QueryRow(`SELECT COUNT(DISTINCT CASE WHEN COALESCE(p.ucid,'') <> '' THEN 'ucid:' || p.ucid ELSE 'player:' || p.id END)
+		FROM player_stats ps JOIN players p ON p.id = ps.player_id WHERE 1=1`+pWhere, pArgs...).Scan(&o.Players); err != nil {
 		return o, err
 	}
 	return o, nil

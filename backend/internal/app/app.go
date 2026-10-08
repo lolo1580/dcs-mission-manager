@@ -184,6 +184,9 @@ func Run(onReady func(addr string)) error {
 	// fall back to the dataset embedded in the binary otherwise. Reading them is
 	// possible because the manager runs on the same machine as the simulator.
 	dcsInstall := dcsdir.Find(cfg.SavedGames)
+	if cfg.DCSInstall != "" {
+		dcsInstall = cfg.DCSInstall
+	}
 	terrainsDir := dcsdir.TerrainsDir(dcsInstall)
 	if dcsInstall == "" {
 		log.Printf("dcs: installation not found, using the embedded airfield dataset")
@@ -238,6 +241,7 @@ func Run(onReady func(addr string)) error {
 	}
 
 	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, tcpListener)
+	srv.SetVersion(Version)
 	// Debug lines are streamed to the UI once the API can broadcast them, and echo
 	// to the file/console log so a problem can still be read after the fact (and in
 	// window mode, where there is no console).
@@ -498,7 +502,7 @@ func Run(onReady func(addr string)) error {
 	}()
 	go srv.RunBroadcast(ctx, time.Second)
 
-	// ---- Tracking: positions, losses and sortie analysis -------------------
+	// ---- Tracking: positions and losses ------------------------------------
 	track := tracker.New(database, store, tracker.Options{
 		SampleEvery: cfg.TrackInterval,
 		Grace:       cfg.TrackGrace,

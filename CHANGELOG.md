@@ -11,6 +11,22 @@ to [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- Fixed `LuaExportActivityNextEvent` scheduling: the export now returns a future
+  deadline while preserving the earliest valid deadline from other tools. The
+  feed no longer stops after its first packet and expire five seconds later.
+
+- The "DCS paused" indicator no longer relies on missing positions. A Lua
+  activity heartbeat keeps the export active for spectators and servers that
+  restrict positions. The interface distinguishes waiting for data from an
+  interrupted export without claiming that silence proves a pause.
+
+- Experimental panel trim is disabled on startup and has a dedicated switch.
+  Disarming both sending and test mode, disabling trim or closing the client sends
+  CANCEL for queued impulses and active release. Lua no longer forgets a failed
+  release: it reports it, retries and blocks new trim impulses until release succeeds.
+  Added cancellation/release-failure tests after a reported pitch-up; that report's
+  root cause remains unconfirmed.
+
 - Panel startup reports establish a baseline without triggering cockpit commands.
   Fixed encoder custom positions, `fixed_step` INC/DEC values, contextual profile
   editing and stale aircraft/profile responses. Sending test mode is now atomic.
@@ -33,6 +49,14 @@ to [semantic versioning](https://semver.org/).
   search every theatre, so a field absent from the current map could appear first.
 
 ### Added
+
+- Custom per-user Windows installer: dark branding, French/English, shortcuts,
+  detected/editable DCS folders, optional Lua scripts and portable data copy
+  without overwriting existing installed data. Installed mode stores data/cache
+  under LOCALAPPDATA and retains them on uninstall; portable behaviour is unchanged.
+  Automated build and isolated install/upgrade/uninstall check, migration and
+  Unicode path tests. Unsigned build; WebView2 required and interactive visual
+  verification remains pending.
 
 - Visual PZ55/PZ70 editor with contextual ALT/VS/IAS/HDG/CRS wheel bindings,
   custom switch positions, rocker reset pulses, conditional LED rules and

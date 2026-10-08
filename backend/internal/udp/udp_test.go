@@ -91,6 +91,16 @@ func TestHandleUnknownType(t *testing.T) {
 	}
 }
 
+func TestHeartbeatKeepsFeedActiveWithoutPositions(t *testing.T) {
+	store := state.New(time.Minute, 0)
+	l := NewListener(store, category.New(""))
+	store.SimulateSilence(2 * time.Minute)
+	l.handle(&Message{Type: "heartbeat"})
+	if store.FeedStopped() || store.Count() != 0 {
+		t.Fatal("heartbeat should revive the feed without adding a map unit")
+	}
+}
+
 // TestSourceDetectorSeesRawPayload checks that the detector is invoked with the
 // datagram as received, and only for ownship messages. The detector relies on
 // the raw bytes, so the listener must not hand it a re-serialised message.

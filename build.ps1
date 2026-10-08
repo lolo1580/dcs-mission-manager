@@ -1,12 +1,12 @@
 # DCS Manager — build script (Windows / PowerShell)
 #
 # Usage:
-#   .\build.ps1              # frontend + backend
+#   .\build.ps1              # Windows installer (dist/DCSManager-Setup-*.exe)
 #   .\build.ps1 -Target run  # run from source
 
 param(
-    [ValidateSet('all', 'frontend', 'backend', 'run', 'test', 'winres')]
-    [string]$Target = 'all'
+    [ValidateSet('frontend', 'backend', 'installer', 'run', 'test', 'winres')]
+    [string]$Target = 'installer'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,9 +78,9 @@ function Build-Backend {
 }
 
 switch ($Target) {
+    'installer' { & (Join-Path $root 'tools\build-installer.ps1') }
     'frontend' { Build-Frontend }
     'backend'  { Build-Backend }
-    'all'      { Build-Frontend; Build-Backend }
     'winres'   { Build-Winres }
     'run'      { Push-Location (Join-Path $root 'backend'); try { go run ./cmd/dcsmanager; Assert-Ok } finally { Pop-Location } }
     'test'     { Push-Location (Join-Path $root 'backend'); try { go test ./...; Assert-Ok } finally { Pop-Location } }
