@@ -7,6 +7,9 @@ import { writable, derived, get } from 'svelte/store';
 import { tNow } from './i18n.js';
 
 export const scopeMode = writable('career');
+export const statsPeriod = writable('total');
+export const statsDateFrom = writable('');
+export const statsDateTo = writable('');
 export const selectedMissionID = writable(0);
 export const statsMissions = writable([]);
 export const statsMissionsError = writable('');
@@ -40,10 +43,42 @@ export const statTab = writable('pilots');
 // for a scope the user already left cannot overwrite the current one.
 let statsReq = 0;
 
-/** Query string for the current scope. */
+function localDate(value) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/** Mission start window in local calendar time; the upper bound is exclusive. */
+export function periodParams(period = get(statsPeriod), startDate = get(statsDateFrom), endDate = get(statsDateTo)) {
+  if (period === 'total') return {};
+  const now = new Date();
+  let from;
+  let before;
+  if (period === 'custom') {
+    const start = startDate;
+    const end = endDate;
+    if (!start || !end || start > end) return {};
+    from = localDate(start);
+    before = localDate(end);
+    before.setDate(before.getDate() + 1);
+  } else {
+    before = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    if (period === 'day') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (period === 'week') {
+      const monday = now.getDate() - ((now.getDay() + 6) % 7);
+      from = new Date(now.getFullYear(), now.getMonth(), monday);
+    }
+    if (period === 'month') from = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (period === 'sixMonths') from = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    if (period === 'year') from = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  }
+  return from ? { from: String(from.getTime()), before: String(before.getTime()) } : {};
+}
+
+/** Query string for the current scope and selected period. */
 function scopeQuery() {
-  if (get(scopeMode) !== 'mission') return 'scope=career';
-  return `scope=mission&missionId=${get(selectedMissionID)}`;
+  if (get(scopeMode) === 'mission') return new URLSearchParams({ scope: 'mission', missionId: String(get(selectedMissionID)) }).toString();
+  return new URLSearchParams({ scope: 'career', ...periodParams() }).toString();
 }
 
 async function getJSON(path, query) {
@@ -112,7 +147,7 @@ export async function loadTrend() {
   trendLoading.set(true);
   trendError.set('');
   try {
-    const query = new URLSearchParams({ ucid: get(trendPilotUCID) });
+    const query = new URLSearchParams({ ucid: get(trendPilotUCID), ...periodParams() });
     const response = await fetch(`/api/stats/trend?${query}`);
     if (!response.ok) throw new Error(`${response.status}`);
     const body = await response.json();

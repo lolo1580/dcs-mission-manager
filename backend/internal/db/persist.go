@@ -101,10 +101,10 @@ func (d *DB) UpsertPlayer(ucid, name string) (int64, error) {
 // SaveStats records a player's statistics snapshot for a mission.
 func (d *DB) SaveStats(missionID, playerID int64, p model.Player) error {
 	_, err := d.sql.Exec(
-		`INSERT INTO player_stats(mission_id, player_id, dcs_player_id, side, slot, unit_type, ping, crashes,
+		`INSERT INTO player_stats(mission_id, player_id, dcs_player_id, side, slot, unit_type, country, ping, crashes,
 			kills_car, kills_air, kills_ship, score, landings, ejects, real_ts)
-		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		nullInt(missionID), nullInt(playerID), p.ID, p.Side, p.Slot, nullStr(p.UnitType), p.Ping, p.Crashes,
+		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		nullInt(missionID), nullInt(playerID), p.ID, p.Side, p.Slot, nullStr(p.UnitType), nullStr(p.Country), p.Ping, p.Crashes,
 		p.KillsCar, p.KillsAir, p.KillsShip, p.Score, p.Landings, p.Ejects,
 		time.Now().UnixMilli(),
 	)

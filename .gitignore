@@ -56,3 +56,6 @@ dcs-lua/Config/dcsmanager.local.cfg
 
 # Local investigation notes (debug context, machine-specific)
 /notes/
+
+# Local reference copy supplied for comparison; never ship it in the repository.
+/old project/

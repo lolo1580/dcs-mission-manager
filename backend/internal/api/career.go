@@ -2,9 +2,27 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"dcsmanager/internal/dcsdata"
 )
+
+// handleCareerInsights provides period breakdowns and a fixed 30-day activity
+// calendar for one recorded pilot. It never includes simulated sessions.
+func (s *Server) handleCareerInsights(w http.ResponseWriter, r *http.Request) {
+	if !s.statsReady(w) {
+		return
+	}
+	sc := s.scopeFromRequest(r)
+	sc.Mode = "career"
+	sc.IncludeTest = false
+	insights, err := s.stats.CareerInsightsForPilot(sc, r.URL.Query().Get("ucid"), r.URL.Query().Get("name"), time.Now())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, insights)
+}
 
 // handleCareer returns the player's logbook: career totals and a per-airframe
 // breakdown (flight hours, landings, deaths, kills), read from DCS's own

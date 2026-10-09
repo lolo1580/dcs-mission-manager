@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
 	side       INTEGER,
 	slot       TEXT,
 	unit_type  TEXT,
+	country    TEXT,
 	ping       INTEGER,
 	crashes    INTEGER,
 	kills_car  INTEGER,
@@ -189,6 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_losses_ts ON losses(real_ts);
 	// is the case for idx_missions_source on databases predating the column).
 	const indexes = `
 CREATE INDEX IF NOT EXISTS idx_missions_source ON missions(source);
+CREATE INDEX IF NOT EXISTS idx_stats_player_ts ON player_stats(player_id, real_ts);
 `
 
 	if _, err := d.sql.Exec(schema); err != nil {
@@ -232,6 +234,9 @@ func (d *DB) ensureSingleOpenMissionIndex() error {
 // database written before a column existed must be upgraded here.
 func (d *DB) migrations() error {
 	if err := d.ensureColumn("missions", "source", "TEXT NOT NULL DEFAULT 'live'"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("player_stats", "country", "TEXT"); err != nil {
 		return err
 	}
 	return nil

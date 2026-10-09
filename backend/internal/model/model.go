@@ -126,6 +126,7 @@ type Player struct {
 	// UnitType is the DCS type of the aircraft the player occupies, resolved by
 	// the Lua hook via Sim.getAvailableSlots. Empty when in spectators.
 	UnitType  string `json:"unitType,omitempty"`
+	Country   string `json:"country,omitempty"` // DCS slot country, when available
 	Ping      int    `json:"ping"`
 	Crashes   int    `json:"crashes"`
 	KillsCar  int    `json:"killsCar"`

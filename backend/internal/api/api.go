@@ -349,6 +349,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/stats/missions", s.handleStatsMissions)
 	mux.HandleFunc("/api/stats/trend", s.handleStatsTrend)
 	mux.HandleFunc("/api/stats/pilots", s.handleStatsPilots)
+	mux.HandleFunc("/api/career/insights", s.handleCareerInsights)
 	mux.HandleFunc("/api/stats/weapons", s.handleStatsWeapons)
 	mux.HandleFunc("/api/stats/engines", s.handleStatsEngines)
 	mux.HandleFunc("/api/stats/network", s.handleStatsNetwork)

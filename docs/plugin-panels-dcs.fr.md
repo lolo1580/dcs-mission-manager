@@ -16,6 +16,13 @@ Le profil Hornet comporte maintenant 20 attributions, trois sources LED et aucun
 
 L’option vJoy a été retirée de l’interface et du code exécuté. Aucun pilote Windows n’a été installé. Les attributions restent dans DCS Manager : cette solution ne crée pas de colonnes de périphériques dans Options → Commandes de DCS.
 
+Si le journal affiche `aircraft=""` pendant un vol alors que DCS-BIOS détecte
+l’avion dans `Saved Games\DCS\Logs\DCS-BIOS.log`, vérifier que le manager reçoit
+ses trames dans **Panneaux → DCS-BIOS**. Le manager accepte désormais le multicast
+émis par DCS sur le même PC sous Windows. `commands=false` dans le journal signifie
+que l’option **Activer l’envoi des commandes** est désactivée : elle doit être
+cochée volontairement dans **Panneaux → Entrées** une fois l’avion reconnu.
+
 ## Cheminement technique
 
 1. Vérification des fichiers de DCS installé, version 2.9.30.28738 : `Mods/aircraft/FA-18C/Input/FA-18C/joystick/default.lua`, `Cockpit/Scripts/devices.lua` et `command_defs.lua`. HOTAS=13, trim UP=3014, DOWN=3015, pression=1 et relâchement=0. Ces valeurs ne sont pas universelles entre avions ou versions.

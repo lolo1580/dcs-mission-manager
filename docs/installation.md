@@ -214,7 +214,7 @@ statistiques, et sauvegarde chaque mission pour les débriefings.
 
 ### 5.3 Vérifier que tout fonctionne
 
-- Dans la fenêtre du manager, l'onglet **Carrière & statistiques** se remplit.
+- Dans la fenêtre du manager, les pages **Carrière** et **Statistiques** se remplissent.
 - Les débriefings sont collectés après un vol ; leur vue est actuellement masquée.
 - En cas de doute, `GET /api/health` répond :
 

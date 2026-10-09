@@ -153,6 +153,13 @@ func (c *Client) Start() error {
 	if err != nil {
 		return fmt.Errorf("dcsbios: join %s: %w", group, err)
 	}
+	// Go disables multicast loopback on this socket. On Windows the option is
+	// checked by the receiver, so the manager would miss DCS-BIOS packets sent
+	// by DCS on the same computer unless it is enabled again.
+	if err := enableLocalMulticast(conn); err != nil {
+		conn.Close()
+		return fmt.Errorf("dcsbios: enable local multicast: %w", err)
+	}
 	// A generous buffer: DCS-BIOS caps itself around 11 KB/s but a burst can be
 	// larger than the default, and a truncated datagram would corrupt the stream.
 	_ = conn.SetReadBuffer(1 << 20)

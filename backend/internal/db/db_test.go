@@ -1,11 +1,46 @@
 package db
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 
 	"dcsmanager/internal/model"
 )
+
+func TestMigrateOldPlayerStatsAddsCountry(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = old.Exec(`CREATE TABLE player_stats (
+		id INTEGER PRIMARY KEY, mission_id INTEGER, player_id INTEGER,
+		dcs_player_id INTEGER, side INTEGER, slot TEXT, unit_type TEXT,
+		ping INTEGER, crashes INTEGER, kills_car INTEGER, kills_air INTEGER,
+		kills_ship INTEGER, score INTEGER, landings INTEGER, ejects INTEGER,
+		real_ts INTEGER NOT NULL) `)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+	upgraded, err := Open(path)
+	if err != nil {
+		t.Fatalf("opening previous database: %v", err)
+	}
+	defer upgraded.Close()
+	mission, _ := upgraded.EnsureMission("Flight", "Caucasus")
+	pilot, _ := upgraded.UpsertPlayer("ucid", "Pilot")
+	if err := upgraded.SaveStats(mission, pilot, model.Player{ID: 1, Name: "Pilot", UnitType: "F-16C_50", Country: "USA"}); err != nil {
+		t.Fatal(err)
+	}
+	var country string
+	if err := upgraded.QueryRow(`SELECT country FROM player_stats LIMIT 1`).Scan(&country); err != nil || country != "USA" {
+		t.Fatalf("country after migration = %q, %v", country, err)
+	}
+}
 
 func openTemp(t *testing.T) *DB {
 	t.Helper()

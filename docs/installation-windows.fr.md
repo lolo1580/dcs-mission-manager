@@ -2,6 +2,8 @@
 
 L’installateur `DCSManager-Setup-<version>.exe` est le seul format publié. Il installe l’application pour le compte Windows courant, sans administrateur, avec logo DCS Manager, thème sombre, français/anglais et raccourcis.
 
+À l’accueil, il détecte une installation existante du même compte Windows et affiche sa version ainsi que celle à installer. Si aucune installation n’est trouvée, il annonce une nouvelle installation. La même identité Inno Setup permet de mettre le programme à jour dans son dossier existant, sans créer une seconde entrée de désinstallation. Les données et profils restent dans leur dossier séparé.
+
 ## Parcours
 
 1. Présentation et licence.
@@ -11,6 +13,13 @@ L’installateur `DCSManager-Setup-<version>.exe` est le seul format publié. Il
 5. Installation puis lancement facultatif de DCS Manager.
 
 Les scripts Lua sont installés seulement si l’option est cochée et si DCS est fermé. Les exports des autres outils et la configuration utilisateur sont conservés ; les fichiers modifiés sont sauvegardés. DCS-BIOS n’est pas installé par cet assistant. Le trim expérimental reste désactivé au démarrage.
+
+Pour appliquer la correction des statistiques lors d’une sortie directe au bureau,
+mettre aussi à jour les scripts Lua après l’installation : fermer DCS, cocher
+l’option **scripts Lua** dans l’installateur ou utiliser **Paramètres →
+Installation DCS → Installer / mettre à jour les scripts**, puis relancer DCS.
+L’installateur seul ne remplace pas un hook déjà présent si cette option est
+laissée désactivée.
 
 Si le bandeau **Export DCS interrompu** apparaît pendant une mission active, vérifier l’état des scripts dans **Paramètres → Installation DCS**. Mettre les scripts à jour après avoir fermé DCS, puis relancer la mission. Le bandeau indique une absence de données récentes ; il ne confirme pas à lui seul une pause du simulateur.
 

@@ -135,6 +135,7 @@ Ces fonctions peuvent devenir des évolutions futures si elles sont souhaitées.
 - `frontend/src/App.svelte`
 - `frontend/src/lib/SettingsPanel.svelte`
 - `frontend/src/lib/CareerPanel.svelte`
+- `frontend/src/lib/StatsPanel.svelte`
 - `frontend/src/lib/stats.js`
 - `frontend/src/lib/PanelsPanel.svelte`
 - `frontend/src/lib/mappings.js`

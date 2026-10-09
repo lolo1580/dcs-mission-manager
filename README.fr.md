@@ -40,11 +40,11 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Fonction | État | Détail |
 |---|---|---|
 | Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique conservé ; vue actuellement masquée |
-| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau, choix d’une mission enregistrée et évolution par mission (score, kills, atterrissages), dans **Carrière & statistiques** |
+| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau, choix d’une mission enregistrée et évolution par mission (score, kills, atterrissages), dans la page **Statistiques** |
 | Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **220 aérodromes listés, 146 plaçables** sur 6 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes. Un jeu embarqué couvre le Caucase et l'Allemagne Guerre froide si DCS est introuvable |
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
-| Carrière | ✅ Nouveau | Le logbook du joueur : grade, escadrille, décorations, heures et kills par appareil — affiché au-dessus des statistiques |
+| Carrière | ✅ Nouveau | Une page **Carrière** distincte avec le carnet du joueur, les cartes et pays favoris et une heatmap quotidienne sur 30 jours |
 | Paramètres | ✅ Nouveau | Un onglet regroupant les modules installés, l'installation DCS (mods, état des scripts, `Export.lua` partagé), les panneaux de cockpit (PZ55/PZ70, DCS-BIOS, associations) et la **sauvegarde du profil joueur** en sous-onglets |
 | Sauvegarde du profil | ✅ Nouveau | Sauvegarder/restaurer le logbook, les commandes (bindings), les options et les scripts (et en option kneeboard, missions, mods) dans un zip portable, depuis la CLI, l'API ou les Paramètres |
 | Local par conception | ✅ Nouveau | Un `.exe` Windows autonome, ni serveur ni conteneur : persistance SQLite dans `data/`, et toutes les lectures (terrains, Saved Games) se font sur la même machine que DCS |
@@ -343,6 +343,21 @@ dcsmanager purge --source test --dry-run  # affiche ce qui serait supprimé, san
 
 Les statistiques acceptent `?includeTest=1` pour inclure volontairement les
 sessions simulées.
+Les pages **Carrière** et **Statistiques** ont chacune leur filtre de période :
+aujourd’hui, semaine ou mois en cours, 6 ou 12 derniers mois, total ou plage de
+dates. Les choix sont indépendants. La période sélectionne les missions entières
+selon leur date de début locale. Pour une période, Carrière affiche les missions
+du pilote enregistrées par DCS Manager. « Total » affiche le carnet DCS. Celui-ci
+ne date pas ses cumuls : les anciennes heures de vol, le grade, les décorations
+et les totaux par appareil ne peuvent donc pas être filtrés par période.
+
+Les statistiques avancées de Carrière comptent les missions par carte et par
+pays pour le pilote choisi. La heatmap affiche le temps en cockpit estimé à
+partir des relevés du manager sur les 30 derniers jours, même si une autre
+période est sélectionnée pour les classements. Les longues interruptions ne
+sont pas comptées. Le pays n’était pas conservé dans les anciennes données :
+pour les prochains vols, mettre à jour les scripts Lua avec DCS fermé via
+**Paramètres → Installation DCS → Installer / mettre à jour les scripts**.
 
 ---
 

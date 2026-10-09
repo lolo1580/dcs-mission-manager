@@ -184,6 +184,14 @@ do
     return 0
   end
 
+  -- The GUI hook must schedule snapshots using wall time. Model time can stay
+  -- at zero in this Lua state or stop while DCS is paused, leaving the final
+  -- player counters unsent when the user exits straight to the desktop.
+  local function wallTime()
+    if socket.gettime then return socket.gettime() end
+    return os.time()
+  end
+
   -- The running theatre, so a mission is recorded on the map it is actually
   -- flown on instead of defaulting to Caucasus. Sim.getCurrentMission returns
   -- the loaded mission table; the id sits in `.theatre` (or `.mission.theatre`).
@@ -233,6 +241,7 @@ do
   -- list of available slots with their type; we build the table once per
   -- mission and refresh it periodically (slots can appear).
   local slotTypes = {}
+  local slotCountries = {}
 
   local function refreshSlotTypes()
     if not (Sim and Sim.getAvailableSlots and Sim.getAvailableCoalitions) then
@@ -242,6 +251,7 @@ do
     if not okCo or type(coalitions) ~= "table" then return end
 
     local map = {}
+    local countries = {}
     for coalitionID in pairs(coalitions) do
       local okS, slots = pcall(Sim.getAvailableSlots, coalitionID)
       if okS and type(slots) == "table" then
@@ -251,11 +261,20 @@ do
           local unitType = slot.type or slot[2]
           if unitId and unitType then
             map[tostring(unitId)] = unitType
+            local slotCountry = slot.country or slot[6]
+            if type(slotCountry) == "string" or type(slotCountry) == "number" then
+              if type(slotCountry) == "number" and type(country) == "table"
+                 and type(country.name) == "table" then
+                slotCountry = country.name[slotCountry] or slotCountry
+              end
+              countries[tostring(unitId)] = tostring(slotCountry)
+            end
           end
         end
       end
     end
     slotTypes = map
+    slotCountries = countries
   end
 
   -- A player's slotID in a multi-seat aircraft is "unitID_seatID"; we keep only
@@ -265,6 +284,14 @@ do
     if slotTypes[slot] then return slotTypes[slot] end
     local base = slot:match("^(.-)_%d+$")
     if base and slotTypes[base] then return slotTypes[base] end
+    return ""
+  end
+
+  local function countryForSlot(slot)
+    if not slot or slot == "" then return "" end
+    if slotCountries[slot] then return slotCountries[slot] end
+    local base = slot:match("^(.-)_%d+$")
+    if base and slotCountries[base] then return slotCountries[base] end
     return ""
   end
 
@@ -284,6 +311,7 @@ do
           side = info(id, "side") or 0,
           slot = slot,
           unitType = unitTypeForSlot(slot),
+          country = countryForSlot(slot),
           ping = stat(id, net.PS_PING),
           crashes = stat(id, net.PS_CRASH),
           killsCar = stat(id, net.PS_CAR),
@@ -524,6 +552,9 @@ do
   end
 
   function dcsmanager.onSimulationStop()
+    -- Capture the final cumulative counters while DCS still exposes them.
+    -- A mission can end before the next periodic refresh.
+    pcall(sendPlayers)
     -- We send the debrief BEFORE closing the connection: the backend waits
     -- for the file to archive it.
     pcall(sendDebrief)
@@ -585,7 +616,7 @@ do
   function dcsmanager.onPlayerDisconnect(id, code) sendPlayers() end
   function dcsmanager.onPlayerChangeSlot(id) sendPlayers() end
 
-  -- Periodic refresh of statistics, via the simulator timer.
+  -- Periodic refresh of statistics, via wall time rather than model time.
   local nextPlayersAt, nextSlotsAt, nextCommandAt
   -- How often we look for a command from the backend. Short enough to feel
   -- responsive, long enough that the socket read (which never blocks anyway)
@@ -593,7 +624,7 @@ do
   local commandInterval = 0.25
 
   function dcsmanager.onSimulationFrame()
-    local t = modelTime()
+    local t = wallTime()
     if not nextSlotsAt then nextSlotsAt = t + 30.0 end
     if t >= nextSlotsAt then
       refreshSlotTypes()

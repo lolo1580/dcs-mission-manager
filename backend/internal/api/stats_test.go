@@ -25,13 +25,14 @@ func TestStatsEndpointsDegradeWithoutDatabase(t *testing.T) {
 	}
 
 	routes := map[string]http.HandlerFunc{
-		"/api/stats/overview": s.handleStatsOverview,
-		"/api/stats/pilots":   s.handleStatsPilots,
-		"/api/stats/weapons":  s.handleStatsWeapons,
-		"/api/stats/engines":  s.handleStatsEngines,
-		"/api/stats/network":  s.handleStatsNetwork,
-		"/api/stats/missions": s.handleStatsMissions,
-		"/api/stats/trend":    s.handleStatsTrend,
+		"/api/stats/overview":  s.handleStatsOverview,
+		"/api/stats/pilots":    s.handleStatsPilots,
+		"/api/stats/weapons":   s.handleStatsWeapons,
+		"/api/stats/engines":   s.handleStatsEngines,
+		"/api/stats/network":   s.handleStatsNetwork,
+		"/api/stats/missions":  s.handleStatsMissions,
+		"/api/stats/trend":     s.handleStatsTrend,
+		"/api/career/insights": s.handleCareerInsights,
 	}
 	for path, h := range routes {
 		rec := httptest.NewRecorder()
@@ -84,5 +85,14 @@ func TestMissionScopeDefaultsToLatestLiveMission(t *testing.T) {
 	}
 	if len(body.Missions) != 1 || body.Missions[0].ID != live {
 		t.Fatalf("selectable missions: %+v", body.Missions)
+	}
+}
+
+func TestStatsScopeReadsDateWindow(t *testing.T) {
+	s := &Server{}
+	r := httptest.NewRequest(http.MethodGet, "/api/stats/overview?scope=career&from=1700000000000&before=1800000000000", nil)
+	scope := s.scopeFromRequest(r)
+	if scope.FromMs != 1_700_000_000_000 || scope.BeforeMs != 1_800_000_000_000 {
+		t.Fatalf("date window = %+v", scope)
 	}
 }

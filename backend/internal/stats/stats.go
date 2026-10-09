@@ -28,6 +28,10 @@ type Scope struct {
 	// IncludeTest also counts missions recorded from the test tools. Off by
 	// default: simulated sessions must never flatter a real career.
 	IncludeTest bool
+	// FromMs is inclusive and BeforeMs is exclusive. Missions are selected by
+	// their start time, so all their events and final snapshots stay together.
+	FromMs   int64
+	BeforeMs int64
 }
 
 // filter returns the SQL fragment and args restricting a query to the scope.
@@ -44,10 +48,22 @@ func (sc Scope) filter(column string) (string, []any) {
 		frag += " AND " + column + " = ?"
 		args = append(args, sc.MissionID)
 	}
-	if !sc.IncludeTest {
-		// Rows with a NULL mission id (unattributed data) are excluded too,
-		// since NULL never matches an IN sub-query.
-		frag += " AND " + column + " IN (SELECT id FROM missions WHERE source <> 'test')"
+	if !sc.IncludeTest || sc.FromMs > 0 || sc.BeforeMs > 0 {
+		// Rows with a NULL mission id are excluded too: a dated period can only
+		// contain data attributed to a mission.
+		frag += " AND " + column + " IN (SELECT id FROM missions WHERE 1=1"
+		if !sc.IncludeTest {
+			frag += " AND source <> 'test'"
+		}
+		if sc.FromMs > 0 {
+			frag += " AND started_at >= ?"
+			args = append(args, sc.FromMs)
+		}
+		if sc.BeforeMs > 0 {
+			frag += " AND started_at < ?"
+			args = append(args, sc.BeforeMs)
+		}
+		frag += ")"
 	}
 	return frag, args
 }
@@ -149,15 +165,21 @@ type MissionTrend struct {
 // only missions containing that pilot are included. Repeated snapshots are
 // reduced to the final snapshot for each player in each mission.
 func (s *Service) Trend(ucid string, limit int) ([]MissionTrend, error) {
+	return s.TrendWithScope(ucid, limit, Scope{Mode: "career"})
+}
+
+// TrendWithScope applies the same mission-date window as the other career views.
+func (s *Service) TrendWithScope(ucid string, limit int, sc Scope) ([]MissionTrend, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 20
 	}
+	where, args := sc.filter("m.id")
 	rows, err := s.db.Query(`
 		WITH recent AS (
 			SELECT m.id, m.name, m.started_at FROM missions m
 			WHERE m.source <> 'test' AND (? = '' OR EXISTS (
 				SELECT 1 FROM player_stats ps JOIN players p ON p.id = ps.player_id
-				WHERE ps.mission_id = m.id AND p.ucid = ?))
+				WHERE ps.mission_id = m.id AND p.ucid = ?))`+where+`
 			ORDER BY m.id DESC LIMIT ?
 		), latest AS (
 			SELECT MAX(ps.id) AS id FROM player_stats ps
@@ -171,7 +193,7 @@ func (s *Service) Trend(ucid string, limit int) ([]MissionTrend, error) {
 		       COALESCE(SUM(ps.kills_air + ps.kills_car + ps.kills_ship),0),
 		       COALESCE(SUM(ps.landings),0)
 		FROM recent m LEFT JOIN player_stats ps ON ps.mission_id = m.id AND ps.id IN (SELECT id FROM latest)
-		GROUP BY m.id, m.name, m.started_at ORDER BY m.id ASC`, ucid, ucid, limit, ucid, ucid)
+		GROUP BY m.id, m.name, m.started_at ORDER BY m.id ASC`, append(append([]any{ucid, ucid}, args...), limit, ucid, ucid)...)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,35 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The installed version appears next to the connection status in the sidebar.
+- Manager statistics can be filtered by today, this week, this month, the last
+  6 or 12 months, all time, or a custom date range. Totals, pilots, weapons,
+  airframes, network data and the trend use the same mission start dates.
+- Career and Statistics now have separate full pages in the Analysis sidebar,
+  each with its own period selector. Career shows the selected pilot's recorded
+  missions for that period; all time retains the DCS logbook.
+- Career now ranks played maps and countries by mission and shows an estimated
+  cockpit-time heatmap for each of the last 30 days. New player snapshots retain
+  their DCS slot country.
+
 ### Fixed
+
+- Receive DCS-BIOS from DCS on the same Windows computer by re-enabling
+  multicast loopback on the manager's socket. Panel mappings can then identify
+  the active aircraft.
+
+- PZ55/PZ70 USB output now sends feature reports first, as the supplied older
+  panel application did; Windows could accept the other method without updating
+  LEDs or the LCD.
+
+- Player statistics are sampled every five seconds of wall time, even when
+  simulation time does not advance in the DCS hook. A final snapshot is sent
+  when the mission stops before DCS closes.
+
+- The installer detects an existing Windows installation and shows both its
+  version and the version being installed on the welcome page.
 
 - Fixed `LuaExportActivityNextEvent` scheduling: the export now returns a future
   deadline while preserving the earliest valid deadline from other tools. The

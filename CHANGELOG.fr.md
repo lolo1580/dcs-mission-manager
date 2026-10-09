@@ -9,7 +9,35 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Ajouté
+
+- La version installée apparaît à côté de l'état de connexion dans la barre latérale.
+- Filtre de période dans les statistiques du manager : aujourd’hui, semaine,
+  mois, 6 mois, 12 mois, total ou plage de dates. Les totaux, pilotes, armes,
+  engins, réseau et graphique utilisent la date de début des mêmes missions.
+- Carrière et Statistiques ont chacune leur page dans la barre latérale Analyse
+  et leur propre filtre de période. Carrière affiche les missions enregistrées
+  pour le pilote choisi ; « Total » conserve le carnet DCS.
+- La page Carrière classe les cartes et pays joués par missions et affiche une
+  heatmap du temps en cockpit estimé pour chacun des 30 derniers jours. Le pays
+  est désormais relevé dans les nouveaux clichés de pilote.
+
 ### Corrigé
+
+- Réception DCS-BIOS sur le même PC sous Windows : le manager réactive la
+  boucle locale multicast que la bibliothèque réseau désactive par défaut.
+  L’avion actif peut ainsi être reconnu pour les attributions des panneaux.
+
+- Les sorties USB PZ55/PZ70 utilisent d’abord les rapports « feature », comme
+  dans l’ancien projet de panneaux fourni ; Windows pouvait accepter l’autre
+  méthode sans actualiser les LED ou le LCD.
+
+- Les statistiques des joueurs sont relevées toutes les cinq secondes en temps
+  réel, même si le temps de simulation ne progresse pas dans le hook DCS. Un
+  dernier relevé est envoyé à la fin de la mission avant la fermeture de DCS.
+
+- L’installateur reconnaît une version déjà installée via son entrée Windows,
+  affiche sa version sur l’écran d’accueil et indique la nouvelle version à poser.
 
 - Correction de la planification de `LuaExportActivityNextEvent` : l’export
   programme désormais son prochain appel dans le futur et conserve l’échéance

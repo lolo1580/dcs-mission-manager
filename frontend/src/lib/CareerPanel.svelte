@@ -1,148 +1,183 @@
 <script>
-  /**
-   * Career & statistics, merged into one tab:
-   *
-   *  - on top, the player's own logbook as DCS records it (MissionEditor/
-   *    logbook.lua): rank, squadron, awards, flight hours and the per-airframe
-   *    breakdown;
-   *  - below, the statistics the manager aggregates from its recorded sessions:
-   *    overview, pilots, weapons, airframes, balance and network, scoped to the
-   *    whole career or a single mission.
-   *
-   * The two answer different questions — "what does DCS say I have done?" and
-   * "what did the manager record?" — so they are stacked rather than blended,
-   * the logbook first.
-   */
   import { onMount } from 'svelte';
   import {
-    careerPlayers,
-    careerPlayer,
-    careerCurrent,
-    careerError,
-    careerLoading,
-    careerIndex,
-    careerTotalHours,
-    loadCareer,
-    fmtHours,
-    aircraftLabel,
+    careerPlayers, careerPlayer, careerCurrent, careerError, careerLoading,
+    careerIndex, careerTotalHours, careerPeriod, careerDateFrom, careerDateTo,
+    loadCareer, fmtHours, aircraftLabel,
   } from './career.js';
-  import {
-    statsOverview,
-    statsPilots,
-    statsWeapons,
-    enginesByCategory,
-    engineCategory,
-    statTab,
-    STAT_TABS,
-    scopeMode,
-    selectedMissionID,
-    statsMissions,
-    statsMissionsError,
-    statsTrend,
-    trendPilotUCID,
-    trendLoading,
-    trendError,
-    statsError,
-    statsLoading,
-    statsNetwork,
-    statsEnabled,
-    loadStats,
-    loadStatsMissions,
-    loadTrend,
-    fmtNum,
-  } from './stats.js';
+  import { periodParams, fmtNum } from './stats.js';
   import { t } from './i18n.js';
-  import StatsTrend from './StatsTrend.svelte';
 
-  const STAT_TAB_KEYS = {
-    pilots: 'stats.pilots',
-    weapons: 'stats.weapons',
-    engines: 'stats.engines',
-    balance: 'stats.balance',
-    network: 'stats.network',
-  };
+  let pilots = [];
+  let pilotLoading = false;
+  let pilotError = '';
+  let pilotDisabled = false;
+  let selectedPilot = '';
+  let pilotRequest = 0;
+  let insights = null;
+  let insightsLoading = false;
+  let insightsError = '';
+  let insightsRequest = 0;
 
-  function statTabKey(id) {
-    return STAT_TAB_KEYS[id] ?? id;
+  function pilotKey(pilot) { return JSON.stringify([pilot.ucid, pilot.name]); }
+  $: periodPilot = pilots.find((pilot) => pilotKey(pilot) === selectedPilot)
+    ?? pilots.find((pilot) => pilot.name === $careerPlayer?.name)
+    ?? null;
+  $: invalidDates = $careerPeriod === 'custom'
+    && (!$careerDateFrom || !$careerDateTo || $careerDateFrom > $careerDateTo);
+
+  async function loadPilots() {
+    const request = ++pilotRequest;
+    pilotLoading = true;
+    pilotError = '';
+    pilots = [];
+    if (invalidDates) {
+      pilotLoading = false;
+      return;
+    }
+    try {
+      const params = new URLSearchParams({ scope: 'career', ...periodParams($careerPeriod, $careerDateFrom, $careerDateTo) });
+      const response = await fetch(`/api/stats/pilots?${params}`);
+      if (!response.ok) throw new Error(`${response.status}`);
+      const body = await response.json();
+      if (request !== pilotRequest) return;
+      pilotDisabled = body.enabled === false;
+      pilots = pilotDisabled ? [] : (body.pilots ?? []);
+    } catch (error) {
+      if (request === pilotRequest) pilotError = error.message;
+    } finally {
+      if (request === pilotRequest) pilotLoading = false;
+    }
   }
 
-  onMount(() => {
-    loadCareer();
-    loadStatsMissions();
-    loadStats();
-    loadTrend();
-  });
-
-  // The header's Refresh reloads both halves: they come from different files
-  // (the logbook and the database) but belong to the same view.
-  function refresh() {
-    loadCareer();
-    loadStatsMissions();
-    loadStats();
-    loadTrend();
+  async function loadInsights(query) {
+    const request = ++insightsRequest;
+    insightsLoading = true;
+    insightsError = '';
+    insights = null;
+    try {
+      const response = await fetch(`/api/career/insights?${query}`);
+      if (!response.ok) throw new Error(`${response.status}`);
+      const body = await response.json();
+      if (request !== insightsRequest) return;
+      insights = body.enabled === false ? null : body;
+    } catch (error) {
+      if (request === insightsRequest) insightsError = error.message;
+    } finally {
+      if (request === insightsRequest) insightsLoading = false;
+    }
   }
 
-  async function onScopeChange(mode) {
-    scopeMode.set(mode);
-    if (mode === 'mission') await loadStatsMissions();
-    loadStats();
+  $: insightQuery = periodPilot && !invalidDates
+    ? new URLSearchParams({ ucid: periodPilot.ucid || '', name: periodPilot.name,
+      ...periodParams($careerPeriod, $careerDateFrom, $careerDateTo) }).toString()
+    : '';
+  $: if (insightQuery) loadInsights(insightQuery);
+  else { insightsRequest += 1; insights = null; insightsLoading = false; }
+
+  onMount(() => { loadCareer(); loadPilots(); });
+
+  function refresh() { loadCareer(); loadPilots(); }
+
+  function todayLocal() {
+    const now = new Date();
+    const two = (number) => String(number).padStart(2, '0');
+    return `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`;
   }
 
-  function onMissionChange(event) {
-    selectedMissionID.set(Number(event.currentTarget.value));
-    loadStats();
+  function onPeriodChange(event) {
+    const period = event.currentTarget.value;
+    if (period === 'custom' && (!$careerDateFrom || !$careerDateTo)) {
+      careerDateFrom.set(todayLocal());
+      careerDateTo.set(todayLocal());
+    }
+    careerPeriod.set(period);
+    selectedPilot = '';
+    loadPilots();
   }
 
-  function onTrendPilotChange(event) {
-    trendPilotUCID.set(event.currentTarget.value);
-    loadTrend();
-  }
+  function onDateChange() { loadPilots(); }
 
-  function missionLabel(mission) {
-    return `${new Date(mission.startedAt).toLocaleDateString()} · ${mission.name}`;
-  }
-
-  function trendPilots(pilots) {
-    const seen = new Set();
-    return pilots.filter((pilot) => {
-      if (!pilot.ucid || seen.has(pilot.ucid)) return false;
-      seen.add(pilot.ucid);
-      return true;
-    });
-  }
-
-  /** Reads a raw logbook aggregate value, which may be a number or a string. */
   function agg(key) {
-    const v = $careerPlayer?.aggregate?.[key];
-    if (v == null) return null;
-    const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) ? n : null;
+    const value = $careerPlayer?.aggregate?.[key];
+    if (value == null) return null;
+    const number = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(number) ? number : null;
   }
 
-  /** The largest flight-hours value, so a bar can be scaled to it. */
-  $: maxHours = ($careerPlayer?.aircraft ?? []).reduce((m, a) => Math.max(m, a.flightHours ?? 0), 0) || 1;
+  $: maxHours = ($careerPlayer?.aircraft ?? []).reduce((max, aircraft) => Math.max(max, aircraft.flightHours ?? 0), 0) || 1;
+  $: mapMax = Math.max(1, ...(insights?.maps ?? []).map((place) => place.missions));
+  $: countryMax = Math.max(1, ...(insights?.countries ?? []).map((place) => place.missions));
+  $: playMinutes = (insights?.days ?? []).reduce((total, day) => total + day.minutes, 0);
 
-  function medal(i) {
-    return i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+  function heatLevel(minutes) {
+    if (!minutes) return 0;
+    if (minutes < 60) return 1;
+    if (minutes < 120) return 2;
+    if (minutes < 240) return 3;
+    return 4;
   }
+
+  function formatMinutes(minutes) { return minutes === 0 ? '0 h' : minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`; }
 </script>
 
 <section class="career">
   <header>
-    <h2>{$t('tab.stats')}</h2>
-    <button class="refresh" on:click={refresh} disabled={$careerLoading || $statsLoading}>
-      {$t('stats.refresh')}
-    </button>
+    <h2>{$t('tab.career')}</h2>
+    <button class="refresh" on:click={refresh} disabled={$careerLoading || pilotLoading || insightsLoading}>{$t('stats.refresh')}</button>
   </header>
 
+  <div class="period-picker">
+    <label for="career-period">{$t('stats.period')}</label>
+    <select id="career-period" value={$careerPeriod} on:change={onPeriodChange}>
+      {#each ['day', 'week', 'month', 'sixMonths', 'year', 'total', 'custom'] as period}
+        <option value={period}>{$t('stats.period.' + period)}</option>
+      {/each}
+    </select>
+    {#if $careerPeriod === 'custom'}
+      <label for="career-from">{$t('stats.from')}</label>
+      <input id="career-from" type="date" bind:value={$careerDateFrom} on:change={onDateChange} />
+      <label for="career-to">{$t('stats.to')}</label>
+      <input id="career-to" type="date" bind:value={$careerDateTo} on:change={onDateChange} />
+      {#if invalidDates}<span class="error">{$t('stats.invalidPeriod')}</span>{/if}
+    {/if}
+  </div>
+  {#if $careerPeriod !== 'total'}<p class="muted note">{$t('career.periodSource')}</p>{/if}
+  {#if pilotError}<p class="error">{pilotError}</p>{/if}
+  {#if pilotDisabled}<p class="empty">{$t('stats.disabled')}</p>{/if}
+  {#if !pilotLoading && pilots.length > 0}
+    <div class="period-picker">
+      <label for="career-pilot">{$t('career.periodPilot')}</label>
+      <select id="career-pilot" value={periodPilot ? pilotKey(periodPilot) : ''} on:change={(event) => selectedPilot = event.currentTarget.value}>
+        {#if !periodPilot}<option value="">{$t('career.choosePilot')}</option>{/if}
+        {#each pilots as pilot, index (`${pilot.ucid}:${pilot.name}:${index}`)}
+          <option value={pilotKey(pilot)}>{pilot.name}</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
   <!-- ------------------------------------------------------------------ -->
   <!-- Logbook (DCS's own record)                                          -->
   <!-- ------------------------------------------------------------------ -->
-  {#if $careerError}
+  {#if $careerPeriod === 'total' && $careerError}
     <p class="error">{$careerError}</p>
   {/if}
 
-  {#if $careerPlayers.length === 0 && !$careerError}
+  {#if $careerPeriod !== 'total'}
+    {#if invalidDates}<p class="error">{$t('stats.invalidPeriod')}</p>
+    {:else if pilotLoading}<p class="muted">{$t('career.loading')}</p>
+    {:else if periodPilot}
+      <div class="identity"><h3>{periodPilot.name}</h3><dl>
+        <div><dt>{$t('career.missions')}</dt><dd>{fmtNum(periodPilot.missions, 0)}</dd></div>
+        <div><dt>{$t('career.landings')}</dt><dd>{fmtNum(periodPilot.landings, 0)}</dd></div>
+        <div><dt>{$t('career.score')}</dt><dd>{fmtNum(periodPilot.score, 0)}</dd></div>
+        <div><dt>{$t('stats.killsCol')}</dt><dd>{fmtNum(periodPilot.kills, 0)}</dd></div>
+        <div><dt>{$t('stats.deaths')}</dt><dd>{fmtNum(periodPilot.deaths, 0)}</dd></div>
+        <div><dt>{$t('stats.crashes')}</dt><dd>{fmtNum(periodPilot.crashes, 0)}</dd></div>
+        <div><dt>{$t('stats.ejections')}</dt><dd>{fmtNum(periodPilot.ejections, 0)}</dd></div>
+      </dl></div>
+    {:else}<p class="empty">{$t('career.periodEmpty')}</p>{/if}
+  {:else if $careerPlayers.length === 0 && !$careerError}
     <p class="empty">{$t('career.none')}</p>
   {:else if $careerPlayer}
     {#if $careerPlayers.length > 1}
@@ -216,203 +251,42 @@
     </div>
   {/if}
 
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Statistics (the manager's own record)                               -->
-  <!-- ------------------------------------------------------------------ -->
-  <div class="stats">
-    <div class="stats-head">
-      <h3>{$t('stats.title')}</h3>
-      <div class="scope">
-        <button class:active={$scopeMode === 'career'} on:click={() => onScopeChange('career')}>
-          {$t('stats.career')}
-        </button>
-        <button class:active={$scopeMode === 'mission'} on:click={() => onScopeChange('mission')}>
-          {$t('stats.mission')}
-        </button>
-      </div>
-    </div>
-
-    {#if $scopeMode === 'mission'}
-      <div class="mission-picker">
-        <label for="stats-mission">{$t('stats.chooseMission')}</label>
-        <select id="stats-mission" value={$selectedMissionID} on:change={onMissionChange} disabled={$statsMissions.length === 0}>
-          {#each $statsMissions as mission (mission.id)}
-            <option value={mission.id}>{missionLabel(mission)}</option>
-          {/each}
-        </select>
-        {#if $statsMissions.length === 0}<span class="muted">{$t('stats.noMission')}</span>{/if}
-        {#if $statsMissionsError}<span class="error">{$statsMissionsError}</span>{/if}
-      </div>
-    {/if}
-
-    {#if $statsError}
-      <p class="error">{$statsError}</p>
-    {/if}
-
-    {#if !$statsEnabled}
-      <p class="empty">{$t('stats.disabled')}</p>
-    {:else}
-      {#if $statsOverview}
-        {@const o = $statsOverview}
-        <div class="cards">
-          <div class="kpi k-missions"><span class="v">{o.missions}</span><span class="k">{$t('stats.missions')}</span></div>
-          <div class="kpi k-pilots"><span class="v">{o.players}</span><span class="k">{$t('stats.pilots')}</span></div>
-          <div class="kpi k-kills"><span class="v">{o.kills}</span><span class="k">{$t('events.kills')}</span></div>
-          <div class="kpi k-deaths"><span class="v">{o.deaths}</span><span class="k">{$t('stats.deaths')}</span></div>
-          <div class="kpi k-crash"><span class="v">{o.crashes}</span><span class="k">{$t('stats.crashes')}</span></div>
-          <div class="kpi k-eject"><span class="v">{o.ejections}</span><span class="k">{$t('stats.ejections')}</span></div>
-          <div class="kpi k-ff" class:warn={o.friendlyFire > 0}><span class="v">{o.friendlyFire}</span><span class="k">{$t('events.friendlyFire')}</span></div>
-        </div>
-      {/if}
-
-      {#if $scopeMode === 'career'}
-        <div class="trend-block">
-          <div class="trend-head">
-            <h3>{$t('stats.trendTitle')}</h3>
-            <label>{$t('stats.trendPilot')}
-              <select value={$trendPilotUCID} on:change={onTrendPilotChange}>
-                <option value="">{$t('stats.allPilots')}</option>
-                {#each trendPilots($statsPilots) as pilot (pilot.ucid)}
-                  <option value={pilot.ucid}>{pilot.name}</option>
-                {/each}
-              </select>
-            </label>
-          </div>
-          {#if $trendError}<p class="error">{$trendError}</p>{/if}
-          {#if $trendLoading}<p class="muted">{$t('stats.loadingTrend')}</p>{:else}<StatsTrend points={$statsTrend} />{/if}
-        </div>
-      {/if}
-
-      <nav class="subtabs">
-        {#each STAT_TABS as tab (tab.id)}
-          <button class:active={$statTab === tab.id} on:click={() => statTab.set(tab.id)}>{$t(statTabKey(tab.id))}</button>
-        {/each}
-      </nav>
-
-      <div class="panel">
-      {#if $statTab === 'pilots'}
-        {#if $statsPilots.length === 0}
-          <p class="empty">{$t('stats.noPilot')}</p>
-        {:else}
-          <table>
-            <thead>
-              <tr>
-                <th></th><th>{$t('players.pilot')}</th><th>{$t('players.score')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.deaths')}</th>
-                <th>K/D</th><th>{$t('stats.landings')}</th><th>{$t('stats.ejections')}</th><th>{$t('stats.crashes')}</th><th>{$t('stats.friendlyFire')}</th><th>{$t('stats.ping')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each $statsPilots as p, i}
-                <tr>
-                  <td class="medal">{medal(i)}</td>
-                  <td class="name" title={p.ucid}>{p.name}</td>
-                  <td class="num">{p.score}</td>
-                  <td class="num">{p.killsAir}/{p.killsCar}/{p.killsShip}</td>
-                  <td class="num">{p.deaths}</td>
-                  <td class="num">{fmtNum(p.kd, 2)}</td>
-                  <td class="num">{p.landings}</td>
-                  <td class="num">{p.ejections}</td>
-                  <td class="num">{p.crashes}</td>
-                  <td class="num" class:warn={p.friendlyFire > 0}>{p.friendlyFire}</td>
-                  <td class="num">{Math.round(p.avgPing)}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      {:else if $statTab === 'weapons'}
-        {#if $statsWeapons.length === 0}
-          <p class="empty">{$t('stats.noWeapon')}</p>
-        {:else}
-          <table>
-            <thead>
-              <tr><th>{$t('stats.weapon')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.friendlyFire')}</th><th>{$t('stats.targets')}</th></tr>
-            </thead>
-            <tbody>
-              {#each $statsWeapons as w (w.weapon)}
-                <tr>
-                  <td class="name">{w.weapon}</td>
-                  <td class="num">{w.kills}</td>
-                  <td class="num" class:warn={w.friendlyFire > 0}>{w.friendlyFire}</td>
-                  <td class="targets">
-                    {#each Object.entries(w.victimsByType ?? {}).slice(0, 4) as [type, n] (type)}
-                      <span class="tag">{type} ×{n}</span>
-                    {/each}
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      {:else if $statTab === 'engines'}
-        <div class="cats">
-          {#each ['plane', 'heli', 'ground', 'ship', 'structure', 'other'] as c (c)}
-            <button class:active={$engineCategory === c} on:click={() => engineCategory.set(c)}>
-              {$t('category.' + c)}
-            </button>
+  <div class="advanced">
+    <h3>{$t('career.insights')}</h3>
+    <p class="muted note">{$t('career.insightsSource')}</p>
+    {#if insightsError}<p class="error">{insightsError}</p>{/if}
+    {#if insightsLoading}<p class="muted">{$t('career.loading')}</p>{/if}
+    {#if !periodPilot && !pilotLoading && !pilotDisabled}<p class="empty">{$t('career.choosePilot')}</p>{/if}
+    {#if insights}
+      <div class="breakdowns">
+        <div class="breakdown">
+          <h4>{$t('career.favoriteMaps')}</h4>
+          {#if insights.maps.length === 0}<p class="empty">{$t('career.noMapData')}</p>{/if}
+          {#each insights.maps as place (place.name)}
+            <div class="place"><span>{place.name}</span><b>{place.missions}</b></div>
+            <div class="place-track"><span style={`width:${Math.max(3, place.missions / mapMax * 100)}%`}></span></div>
           {/each}
         </div>
-        {#if $enginesByCategory.length === 0}
-          <p class="empty">{$t('stats.noEngine')}</p>
-        {:else}
-          <table>
-            <thead>
-              <tr><th>{$t('stats.type')}</th><th>{$t('stats.killsCol')}</th><th>{$t('stats.losses')}</th><th>{$t('stats.missions')}</th><th>K/D</th></tr>
-            </thead>
-            <tbody>
-              {#each $enginesByCategory as e (e.typeId)}
-                <tr>
-                  <td class="name">{e.typeId}</td>
-                  <td class="num">{e.kills}</td>
-                  <td class="num">{e.deaths}</td>
-                  <td class="num">{e.missions}</td>
-                  <td class="num">{fmtNum(e.kd, 2)}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      {:else if $statTab === 'balance'}
-        {#if !$statsOverview?.coalitions?.length}
-          <p class="empty">{$t('stats.noCoalition')}</p>
-        {:else}
-          {#each $statsOverview.coalitions as c (c.coalition)}
-            {@const total = Math.max(...$statsOverview.coalitions.map((x) => x.score), 1)}
-            <div class="balance-row">
-              <span class="side {c.coalition}">{$t('coalition.' + c.coalition)}</span>
-              <div class="bar">
-                <div
-                  class="fill {c.coalition}"
-                  style="width:{(c.score / total) * 100}%"
-                ></div>
-              </div>
-              <span class="num">{c.score} {$t('stats.points')}</span>
-              <span class="num">{c.kills} {$t('stats.killsCol')}</span>
-              <span class="num">{c.players} {$t('players.title')}</span>
+        <div class="breakdown">
+          <h4>{$t('career.favoriteCountries')}</h4>
+          {#if insights.countries.length === 0}<p class="empty">{$t('career.noCountryData')}</p>{/if}
+          {#each insights.countries as place (place.name)}
+            <div class="place"><span>{place.name}</span><b>{place.missions}</b></div>
+            <div class="place-track"><span style={`width:${Math.max(3, place.missions / countryMax * 100)}%`}></span></div>
+          {/each}
+        </div>
+      </div>
+      <div class="heatmap">
+        <div class="heat-head"><h4>{$t('career.heatmap')}</h4><strong>{formatMinutes(playMinutes)}</strong></div>
+        <p class="muted note">{$t('career.heatmapHint')}</p>
+        <div class="heat-grid" role="img" aria-label={$t('career.heatmap')}>
+          {#each insights.days as day (day.date)}
+            <div class={`heat-cell level-${heatLevel(day.minutes)}`} title={`${day.date} · ${formatMinutes(day.minutes)}`}>
+              <span>{day.date.slice(5)}</span><strong>{formatMinutes(day.minutes)}</strong>
             </div>
           {/each}
-        {/if}
-      {:else if $statTab === 'network'}
-        {#if $statsNetwork.length === 0}
-          <p class="empty">{$t('stats.noNetwork')}</p>
-        {:else}
-          <table>
-            <thead>
-              <tr><th>{$t('players.pilot')}</th><th>{$t('stats.samples')}</th><th>{$t('stats.avgPing')}</th><th>{$t('stats.maxPing')}</th></tr>
-            </thead>
-            <tbody>
-              {#each $statsNetwork as n (n.name)}
-                <tr>
-                  <td class="name">{n.name}</td>
-                  <td class="num">{n.samples}</td>
-                  <td class="num" class:warn={n.avgPing > 250}>{Math.round(n.avgPing)} ms</td>
-                  <td class="num" class:warn={n.maxPing > 400}>{n.maxPing} ms</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      {/if}
+        </div>
+        <div class="heat-legend"><span>0</span><i class="level-0"></i><i class="level-1"></i><i class="level-2"></i><i class="level-3"></i><i class="level-4"></i><span>4 h+</span></div>
       </div>
     {/if}
   </div>
@@ -425,8 +299,6 @@
     min-height: 0;
     height: 100%;
     padding: 0.9rem 1rem;
-    /* A single scroll for the whole view: the logbook grows to its content and
-       the statistics tables follow, instead of each half scrolling on its own. */
     overflow-y: auto;
   }
 
@@ -619,282 +491,33 @@
     position: relative;
   }
 
-  /* ---- Statistics ---- */
 
-  .stats {
-    border-top: 1px solid var(--border);
-    padding-top: 0.9rem;
-  }
-
-  .stats-head {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    margin-bottom: 0.7rem;
-  }
-
-  .stats-head h3 {
-    margin: 0;
-  }
-
-  .scope {
-    display: inline-flex;
-    gap: 0.15rem;
-    padding: 0.12rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 7px;
-  }
-
-  .scope button {
-    padding: 0.25rem 0.6rem;
-    font-size: 0.76rem;
-    color: var(--muted);
-    background: transparent;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-  }
-
-  .scope button.active {
-    color: var(--text);
-    background: var(--panel);
-  }
-
-  .mission-picker, .trend-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.8rem;
-    font-size: 0.78rem;
-  }
-
-  .mission-picker select, .trend-head select {
-    max-width: min(100%, 420px);
-    padding: 0.3rem 0.5rem;
-    color: var(--text);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-  }
-
-  .trend-block { margin: 0 0 1rem; }
-  .trend-head { justify-content: space-between; margin-bottom: 0.45rem; }
-  .trend-head h3 { margin: 0; }
-  .trend-head label { display: flex; align-items: center; gap: 0.5rem; }
-
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-    gap: 0.55rem;
-    margin-bottom: 0.85rem;
-  }
-
-  /* KPI cards, per the redesign mockup: a coloured accent stripe, a large value
-     and a small uppercase label. The stripe colour distinguishes the metrics at a
-     glance (missions, pilots, kills…) without a legend. */
-  .cards .kpi {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    padding: 0.55rem 0.7rem 0.55rem 0.85rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    overflow: hidden;
-  }
-
-  .cards .kpi::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--accent, var(--blue));
-  }
-
-  .cards .kpi .k {
-    font-size: 0.62rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--muted);
-  }
-
-  .cards .kpi .v {
-    font-size: 1.35rem;
-    font-weight: 650;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .cards .k-missions { --accent: var(--blue); }
-  .cards .k-pilots { --accent: #a371f7; }
-  .cards .k-kills { --accent: var(--green); }
-  .cards .k-deaths { --accent: #f0883e; }
-  .cards .k-crash { --accent: #db6d28; }
-  .cards .k-eject { --accent: #58a6ff; }
-  .cards .k-ff { --accent: #f0b429; }
-
-  .cards .kpi.warn {
-    border-color: color-mix(in srgb, #f0b429 55%, var(--border));
-  }
-
-  .cards .kpi.warn .v {
-    color: #f0b429;
-  }
-
-  .subtabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-bottom: 0.6rem;
-  }
-
-  .subtabs button {
-    padding: 0.28rem 0.65rem;
-    font-size: 0.78rem;
-    color: var(--muted);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-
-  .subtabs button:hover {
-    color: var(--text);
-  }
-
-  .subtabs button.active {
-    color: var(--text);
-    background: var(--bg);
-    border-color: var(--border);
-  }
-
-  .panel {
-    min-height: 0;
-  }
-
-  .panel th:not(:nth-child(1)):not(:nth-child(2)),
-  .panel td.num {
-    text-align: right;
-  }
-
-  .panel th:nth-child(1),
-  .panel th:nth-child(2),
-  .panel td:nth-child(1),
-  .panel td:nth-child(2) {
-    text-align: left;
-  }
-
-  .panel td.warn {
-    color: #f0b429;
-  }
-
-  .medal {
-    width: 22px;
-  }
-
-  .targets {
-    text-align: left;
-  }
-
-  .tag-chip {
-    display: inline-block;
-  }
-
-  .panel .tag {
-    display: inline-block;
-    margin: 0 0.2rem 0.15rem 0;
-    padding: 0.05rem 0.35rem;
-    font-size: 0.68rem;
-    color: var(--muted);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    text-transform: none;
-    letter-spacing: 0;
-  }
-
-  .cats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .cats button {
-    padding: 0.22rem 0.55rem;
-    font-size: 0.74rem;
-    color: var(--muted);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    cursor: pointer;
-  }
-
-  .cats button.active {
-    color: var(--text);
-    border-color: var(--blue);
-    background: color-mix(in srgb, var(--blue) 18%, var(--bg));
-  }
-
-  .balance-row {
-    display: grid;
-    grid-template-columns: 70px 1fr auto auto auto;
-    align-items: center;
-    gap: 0.7rem;
-    padding: 0.45rem 0;
-    border-top: 1px solid var(--border);
-    font-size: 0.8rem;
-  }
-
-  .side {
-    font-weight: 600;
-  }
-
-  .side.red {
-    color: #ff4d4d;
-  }
-
-  .side.blue {
-    color: #3d7dff;
-  }
-
-  .bar {
-    height: 10px;
-    background: var(--bg);
-    border-radius: 999px;
-    overflow: hidden;
-  }
-
-  .fill {
-    height: 100%;
-    border-radius: 999px;
-  }
-
-  .fill.red {
-    background: #ff4d4d;
-  }
-
-  .fill.blue {
-    background: #3d7dff;
-  }
-
-  .fill.spectator {
-    background: #9aa4b2;
-  }
-
-  .empty {
-    color: var(--muted);
-    font-size: 0.8rem;
-    line-height: 1.5;
-  }
-
-  .error {
-    color: #f0b429;
-    font-size: 0.78rem;
-  }
+  .period-picker { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .8rem; font-size: .78rem; }
+  .period-picker select, .period-picker input { max-width: min(100%, 420px); padding: .3rem .5rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+  .advanced { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: .5rem; }
+  .advanced h3 { font-size: .9rem; margin: 0 0 .4rem; }
+  .note { font-size: .78rem; line-height: 1.45; margin: 0 0 .9rem; }
+  .breakdowns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .breakdown, .heatmap { padding: .8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; }
+  .breakdown h4, .heatmap h4 { margin: 0 0 .7rem; font-size: .82rem; }
+  .place { display: flex; justify-content: space-between; gap: .7rem; font-size: .78rem; margin-top: .5rem; }
+  .place b { font-variant-numeric: tabular-nums; }
+  .place-track { height: 5px; border-radius: 5px; background: var(--panel); margin-top: .2rem; overflow: hidden; }
+  .place-track span { display: block; height: 100%; background: var(--blue); border-radius: inherit; }
+  .heatmap { margin-top: 1rem; }
+  .heat-head { display: flex; justify-content: space-between; gap: .7rem; align-items: baseline; }
+  .heat-head strong { font-size: .9rem; font-variant-numeric: tabular-nums; }
+  .heat-grid { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .35rem; }
+  .heat-cell { min-height: 3.2rem; padding: .25rem; border-radius: 5px; display: flex; flex-direction: column; justify-content: space-between; font-size: .68rem; font-variant-numeric: tabular-nums; }
+  .heat-cell strong { font-size: .72rem; align-self: flex-end; }
+  .level-0 { background: #263342; color: #a9b8c8; }
+  .level-1 { background: #287c78; color: #f0fafa; }
+  .level-2 { background: #4ab080; color: #071b16; }
+  .level-3 { background: #d6bf64; color: #272009; }
+  .level-4 { background: #e7824c; color: #2b1006; }
+  .heat-legend { display: flex; justify-content: flex-end; align-items: center; gap: .2rem; margin-top: .6rem; font-size: .69rem; color: var(--muted); }
+  .heat-legend i { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; }
+  .empty { color: var(--muted); font-size: .8rem; line-height: 1.5; }
+  .error { color: #f0b429; font-size: .78rem; }
+  @media (max-width: 720px) { .breakdowns { grid-template-columns: 1fr; } .heat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 </style>

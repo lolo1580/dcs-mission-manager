@@ -33,11 +33,11 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Feature | Status | Details |
 |---|---|---|
 | Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser and retained history; view currently hidden |
-| Advanced stats | ✅ Phase 4 | Pilots, weapons, airframes, balance, network, recorded-mission selector and mission-by-mission trends (score, kills, landings) in **Career & statistics** |
+| Advanced stats | ✅ Phase 4 | Pilots, weapons, airframes, balance, network, recorded-mission selector and mission-by-mission trends (score, kills, landings) on the **Statistics** page |
 | Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **220 airfields listed, 146 mappable** across 6 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts. A bundled dataset covers Caucasus and Cold War Germany when DCS cannot be read |
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
-| Career | ✅ New | The player's logbook: rank, squadron, awards, hours and kills per airframe — shown atop the statistics |
+| Career | ✅ New | A separate **Career** page with the player's logbook, favourite maps and countries, and a 30-day daily activity heatmap |
 | Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the cockpit panels (PZ55/PZ70, DCS-BIOS, mappings) and the **player-profile backup** as sub-tabs |
 | Profile backup | ✅ New | Save/restore the logbook, bindings, options and scripts (and optionally kneeboard, missions, mods) as a portable zip, from the CLI, the API or Settings |
 | Local by design | ✅ New | One self-contained Windows `.exe`, no server and no container: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |
@@ -331,6 +331,19 @@ dcsmanager purge --source test --dry-run  # show what would be deleted, delete n
 ```
 
 Statistics accept `?includeTest=1` to include simulated sessions deliberately.
+The **Career** and **Statistics** pages each have an independent period selector
+(today, current week or month, last 6 or 12 months, all time, or a custom date
+range). Periods select whole missions by their local start date. For a selected
+period, Career shows a pilot's missions recorded by DCS Manager. All time shows
+the DCS logbook. DCS does not date its logbook totals, so historical flight
+hours, rank, awards and per-airframe totals cannot be filtered by period.
+
+Career insights count missions by map and country for the selected pilot. The
+heatmap estimates cockpit time from manager snapshots over the last 30 days,
+independent of the selected ranking period; long gaps are excluded. Earlier
+records did not store the country. To collect it for future flights, update the
+Lua scripts with DCS closed through **Settings → DCS installation → Install /
+update scripts**.
 
 ---
 

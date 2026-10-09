@@ -349,6 +349,56 @@ func TestAirframeMissionCountAndTrendUseFinalSnapshots(t *testing.T) {
 	}
 }
 
+func TestDateWindowUsesMissionStartAcrossStatistics(t *testing.T) {
+	svc, database := setup(t)
+	pilot, err := database.UpsertPlayer("pilot", "Pilot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, flight := range []struct {
+		name  string
+		start int64
+	}{
+		{"Older", 1_700_000_000_000},
+		{"Recent", 1_800_000_000_000},
+	} {
+		mission, err := database.StartMission(flight.name, "Caucasus", db.SourceLive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := database.SQL().Exec(`UPDATE missions SET started_at = ? WHERE id = ?`, flight.start, mission); err != nil {
+			t.Fatal(err)
+		}
+		if err := database.SaveStats(mission, pilot, model.Player{ID: 1, Name: "Pilot", UnitType: "F-16C_50", Score: 10, KillsAir: 1}); err != nil {
+			t.Fatal(err)
+		}
+		if err := database.SaveEvent(mission, model.Event{Event: "kill", Args: []any{1, "F-16C_50", 2, 0, "Su-27", 1, "AIM-120C"}, RealTS: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scope := Scope{Mode: "career", FromMs: 1_750_000_000_000, BeforeMs: 1_850_000_000_000}
+	overview, err := svc.Overview(scope)
+	if err != nil || overview.Missions != 1 || overview.Kills != 1 {
+		t.Fatalf("overview = %+v, err = %v", overview, err)
+	}
+	pilots, err := svc.Pilots(scope)
+	if err != nil || len(pilots) != 1 || pilots[0].Score != 10 {
+		t.Fatalf("pilots = %+v, err = %v", pilots, err)
+	}
+	weapons, err := svc.Weapons(scope)
+	if err != nil || len(weapons) != 1 || weapons[0].Kills != 1 {
+		t.Fatalf("weapons = %+v, err = %v", weapons, err)
+	}
+	engines, err := svc.Engines(scope)
+	if err != nil || len(engines) == 0 {
+		t.Fatalf("engines = %+v, err = %v", engines, err)
+	}
+	trend, err := svc.TrendWithScope("", 20, scope)
+	if err != nil || len(trend) != 1 || trend[0].Name != "Recent" {
+		t.Fatalf("trend = %+v, err = %v", trend, err)
+	}
+}
+
 // TestRepeatedSnapshotsAreNotSummed locks the fix for stats being multiplied by
 // the sampling rate: the hook resends the same cumulative counters every few
 // seconds, and summing every snapshot read 3 kills for a single kill.

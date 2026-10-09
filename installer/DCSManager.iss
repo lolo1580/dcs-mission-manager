@@ -1,6 +1,6 @@
 ; DCS Manager custom per-user setup. Inno Setup 6.7+.
 #ifndef AppVersion
-  #define AppVersion "1.0.0-beta.5"
+  #define AppVersion "1.0.0-beta.12"
 #endif
 #ifndef StageDir
   #define StageDir "..\dist\staging"
@@ -56,6 +56,10 @@ french.WelcomeLabel1=Bienvenue dans DCS Manager
 french.WelcomeLabel2=Votre compagnon DCS : statistiques, aérodromes et panels.%n%nInstallation pour votre compte Windows, sans droits administrateur. Vos profils restent séparés du programme.
 english.WelcomeLabel1=Welcome to DCS Manager
 english.WelcomeLabel2=Your DCS companion: statistics, airfields and panels.%n%nInstalls for your Windows account, without administrator rights. Your profiles stay separate from the application.
+french.ExistingInstall=Version %1 déjà installée. Installation de la version %2 ; vos données et profils restent en place.
+english.ExistingInstall=Version %1 is already installed. Installing version %2; your data and profiles stay in place.
+french.NewInstall=Aucune version installée détectée. Installation de la version %1.
+english.NewInstall=No installed version detected. Installing version %1.
 french.DesktopShortcut=Créer un raccourci sur le Bureau
 english.DesktopShortcut=Create a desktop shortcut
 french.DCSTitle=Votre installation DCS
@@ -128,6 +132,23 @@ function SetupSucceeded: Boolean;
 begin
   Result := ConfigurationOK;
 end;
+function InstalledVersion: String;
+var
+  Key, InstallDir: String;
+begin
+  Result := '';
+#ifdef TestBuild
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{4702E2AA-9F0C-47F0-AF11-8EBDF30A08B2}_is1';
+#else
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{7AB2C798-84D8-4E39-9E70-FCE89A30D640}_is1';
+#endif
+  if RegQueryStringValue(HKCU, Key, 'DisplayVersion', Result) then
+  begin
+    { Ignore a stale uninstall entry if its recorded program folder is gone. }
+    if RegQueryStringValue(HKCU, Key, 'InstallLocation', InstallDir) and
+       not FileExists(AddBackslash(InstallDir) + 'dcsmanager.exe') then Result := '';
+  end;
+end;
 procedure ChooseFolder(Page: TInputQueryWizardPage; Index: Integer);
 var Folder: String;
 begin
@@ -157,6 +178,7 @@ procedure InitializeWizard;
 var
   ResultCode: Integer;
   DetectionFile: String;
+  ExistingVersion: String;
 begin
   ConfigurationOK := False;
   DataRoot := ExpandConstant('{localappdata}\DCS Manager');
@@ -189,7 +211,13 @@ begin
     end;
   end;
   WizardForm.WelcomeLabel1.Caption := CustomMessage('WelcomeLabel1');
-  WizardForm.WelcomeLabel2.Caption := CustomMessage('WelcomeLabel2');
+  ExistingVersion := InstalledVersion();
+  if ExistingVersion <> '' then
+    WizardForm.WelcomeLabel2.Caption := CustomMessage('WelcomeLabel2') + #13#10#13#10 +
+      FmtMessage(CustomMessage('ExistingInstall'), [ExistingVersion, '{#AppVersion}'])
+  else
+    WizardForm.WelcomeLabel2.Caption := CustomMessage('WelcomeLabel2') + #13#10#13#10 +
+      FmtMessage(CustomMessage('NewInstall'), ['{#AppVersion}']);
 end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin

@@ -369,11 +369,17 @@ func (d *Device) Read(buf []byte, timeout time.Duration) (int, error) {
 	return n, nil
 }
 
-// Write sends one output report (a feature/output report driving an LED or LCD).
+// Write sends one report driving a panel LED or LCD. Logitech panels expect a
+// feature report; WriteFile can report success without changing their display.
 func (d *Device) Write(report []byte) (int, error) {
 	if len(report) == 0 {
 		return 0, errors.New("hid: empty report")
 	}
+	if sr, _, _ := procHidDSetFeature.Call(uintptr(d.handle),
+		uintptr(unsafe.Pointer(&report[0])), uintptr(len(report))); sr != 0 {
+		return len(report), nil
+	}
+	// Keep output-report support for devices that reject feature reports.
 	var written uint32
 	r, _, callErr := procWriteFile.Call(
 		uintptr(d.handle),
@@ -383,12 +389,6 @@ func (d *Device) Write(report []byte) (int, error) {
 		0,
 	)
 	if r == 0 {
-		// A feature report goes through HidD_SetFeature; some drivers refuse a
-		// plain WriteFile on the output report.
-		if sr, _, _ := procHidDSetFeature.Call(uintptr(d.handle),
-			uintptr(unsafe.Pointer(&report[0])), uintptr(len(report))); sr != 0 {
-			return len(report), nil
-		}
 		return 0, fmt.Errorf("hid: WriteFile: %w", callErr)
 	}
 	return int(written), nil

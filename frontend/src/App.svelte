@@ -3,6 +3,7 @@
   import logo from './assets/logo.png';
   import DebriefPanel from './lib/DebriefPanel.svelte';
   import CareerPanel from './lib/CareerPanel.svelte';
+  import StatsPanel from './lib/StatsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
   import SettingsPanel from './lib/SettingsPanel.svelte';
   import { connected, feedStatus, mission, fetchTheatres, connect } from './lib/units.js';
@@ -13,13 +14,14 @@
   // The Debriefs view is built from the redesign mockup: the shell is a sidebar +
   // topbar, and each view keeps its existing panel. Debriefs stays hidden for
   // now (the panel is still in place) — restore its entry below to re-enable it.
-  let tab = 'stats';
+  let tab = 'career';
 
   // Views grouped in the sidebar, like the mockup: analysis, reference, config.
   const groups = [
     {
       label: 'nav.analysis',
       items: [
+        { id: 'career', label: 'tab.career', icon: 'M12 3l2.5 5 5.5.8-4 3.9 1 5.5-5-2.6-5 2.6 1-5.5-4-3.9 5.5-.8z' },
         { id: 'stats', label: 'tab.stats', icon: 'M4 20V10M10 20V4M16 20v-7M22 20H2' },
         { id: 'debriefs', label: 'tab.debriefs', hidden: true, icon: 'M6 2h9l5 5v15H6zM15 2v5h5M9 13h6M9 17h6' },
       ],
@@ -40,6 +42,7 @@
 
   // Per-view subtitle, shown under the title in the topbar.
   const subtitles = {
+    career: 'sub.career',
     stats: 'sub.stats',
     debriefs: 'sub.debriefs',
     aerodromes: 'sub.aerodromes',
@@ -101,10 +104,15 @@
           {$t('update.available')}: {$updateInfo.latestVersion}
         </a>
       {/if}
-      <span class="live">
-        <span class="dot" class:on={$connected}></span>
-        {$connected ? $t('app.connected') : $t('app.offline')}
-      </span>
+      <div class="status-row">
+        <span class="live">
+          <span class="dot" class:on={$connected}></span>
+          {$connected ? $t('app.connected') : $t('app.offline')}
+        </span>
+        {#if $updateInfo?.currentVersion}
+          <span class="installed-version" title="DCS Manager {$updateInfo.currentVersion}">v{$updateInfo.currentVersion}</span>
+        {/if}
+      </div>
     </div>
   </aside>
 
@@ -148,9 +156,13 @@
         <div class="view">
           <DebriefPanel />
         </div>
-      {:else if tab === 'stats'}
+      {:else if tab === 'career'}
         <div class="view">
           <CareerPanel />
+        </div>
+      {:else if tab === 'stats'}
+        <div class="view">
+          <StatsPanel />
         </div>
       {:else if tab === 'settings'}
         <div class="view">
@@ -282,6 +294,19 @@
     color: var(--blue);
     font-size: 0.8rem;
     overflow-wrap: anywhere;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  .installed-version {
+    color: var(--muted);
+    font-size: 0.7rem;
+    white-space: nowrap;
   }
 
   .live {

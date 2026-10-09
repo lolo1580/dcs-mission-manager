@@ -22,6 +22,12 @@ func (s *Server) scopeFromRequest(r *http.Request) stats.Scope {
 	// Test sessions are excluded unless explicitly requested, so the dashboard
 	// never presents simulated data as a real career.
 	sc.IncludeTest = q.Get("includeTest") == "1"
+	if from, err := strconv.ParseInt(q.Get("from"), 10, 64); err == nil && from > 0 {
+		sc.FromMs = from
+	}
+	if before, err := strconv.ParseInt(q.Get("before"), 10, 64); err == nil && before > 0 {
+		sc.BeforeMs = before
+	}
 	if sc.Mode == "mission" {
 		if id, err := strconv.ParseInt(q.Get("missionId"), 10, 64); err == nil && id > 0 {
 			sc.MissionID = id
@@ -52,7 +58,7 @@ func (s *Server) handleStatsTrend(w http.ResponseWriter, r *http.Request) {
 	if !s.statsReady(w) {
 		return
 	}
-	points, err := s.stats.Trend(r.URL.Query().Get("ucid"), 20)
+	points, err := s.stats.TrendWithScope(r.URL.Query().Get("ucid"), 20, s.scopeFromRequest(r))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

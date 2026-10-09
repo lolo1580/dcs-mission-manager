@@ -10,6 +10,9 @@ export const careerPlayers = writable([]);
 export const careerCurrent = writable('');
 export const careerError = writable('');
 export const careerLoading = writable(false);
+export const careerPeriod = writable('total');
+export const careerDateFrom = writable('');
+export const careerDateTo = writable('');
 
 /** Which profile is shown. Defaults to the first returned. */
 export const careerIndex = writable(0);
