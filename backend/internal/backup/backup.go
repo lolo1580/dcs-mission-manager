@@ -162,7 +162,7 @@ func Create(savedGames, outDir string, ids []string, appVersion string) (Archive
 		return Archive{}, errors.New("DCS Saved Games folder not found")
 	}
 	if info, err := os.Stat(savedGames); err != nil || !info.IsDir() {
-		return Archive{}, fmt.Errorf("Saved Games folder %q is not a directory", savedGames)
+		return Archive{}, fmt.Errorf("the Saved Games folder %q is not a directory", savedGames)
 	}
 	if outDir == "" {
 		return Archive{}, errors.New("no output directory for the backup")

@@ -104,7 +104,7 @@ func (d *DB) SyncFlightPlans(since int64, ownerID int64, admin bool, limit int) 
 	          FROM flight_plans WHERE sync_revision > ?`
 	args := []any{since}
 	if ownerID != 0 && !admin {
-		query += ` AND (owner_id = ? OR visibility = 'squadron')`
+		query += ` AND (owner_id = ? OR visibility = 'squadron' OR owner_id IS NULL OR owner_id = 0)`
 		args = append(args, ownerID)
 	}
 	query += ` ORDER BY sync_revision ASC, id ASC LIMIT ?`
@@ -124,7 +124,7 @@ func (d *DB) SyncChecklists(since int64, ownerID int64, admin bool, limit int) (
 	          FROM checklists WHERE sync_revision > ?`
 	args := []any{since}
 	if ownerID != 0 && !admin {
-		query += ` AND (owner_id = ? OR visibility = 'squadron')`
+		query += ` AND (owner_id = ? OR visibility = 'squadron' OR owner_id IS NULL OR owner_id = 0)`
 		args = append(args, ownerID)
 	}
 	query += ` ORDER BY sync_revision ASC, id ASC LIMIT ?`

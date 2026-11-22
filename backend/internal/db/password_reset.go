@@ -47,6 +47,12 @@ func (d *DB) UsePasswordReset(tokenHash string, now int64) error {
 	return nil
 }
 
+// DeleteUserPasswordResets removes outstanding reset tokens for an account.
+func (d *DB) DeleteUserPasswordResets(userID int64) error {
+	_, err := d.sql.Exec(`DELETE FROM password_resets WHERE user_id = ?`, userID)
+	return err
+}
+
 // PrunePasswordResets removes expired or consumed tokens.
 func (d *DB) PrunePasswordResets(now int64) error {
 	_, err := d.sql.Exec(

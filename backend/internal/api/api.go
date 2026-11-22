@@ -231,7 +231,9 @@ func (s *Server) Handler() http.Handler {
 	if s.Mode() == "server" {
 		h = s.authMiddleware(h)
 	}
-	h = s.tokenGuard(h)
+	if s.Mode() != "server" {
+		h = s.tokenGuard(h)
+	}
 	h = s.originGuard(h)
 	return h
 }

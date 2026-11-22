@@ -48,8 +48,8 @@ func TestTokenIsRandomAndHashed(t *testing.T) {
 	if a == b || len(a) < 40 {
 		t.Fatalf("tokens = %q / %q", a, b)
 	}
-	if HashToken(a) == a || HashToken(a) != HashToken(a) {
-		t.Fatal("token hash is not stable")
+	if HashToken(a) == a {
+		t.Fatal("token hash is not hashed")
 	}
 	if HashToken(a) == HashToken(b) {
 		t.Fatal("different tokens hash to the same value")

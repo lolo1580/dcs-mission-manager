@@ -94,7 +94,7 @@ func (d *DB) ChecklistsFor(ownerID int64, admin bool, limit int) ([]checklist.Ch
 	          FROM checklists WHERE deleted_at IS NULL`
 	var args []any
 	if ownerID != 0 && !admin {
-		query += ` AND (owner_id = ? OR visibility = 'squadron')`
+		query += ` AND (owner_id = ? OR visibility = 'squadron' OR owner_id IS NULL OR owner_id = 0)`
 		args = append(args, ownerID)
 	}
 	query += ` ORDER BY updated_at DESC, id DESC LIMIT ?`
@@ -131,7 +131,7 @@ func (d *DB) ChecklistFor(uid string, ownerID int64, admin bool) (checklist.Chec
 	          FROM checklists WHERE uid = ? AND deleted_at IS NULL`
 	args := []any{uid}
 	if ownerID != 0 && !admin {
-		query += ` AND (owner_id = ? OR visibility = 'squadron')`
+		query += ` AND (owner_id = ? OR visibility = 'squadron' OR owner_id IS NULL OR owner_id = 0)`
 		args = append(args, ownerID)
 	}
 	return scanChecklist(d.sql.QueryRow(query, args...))

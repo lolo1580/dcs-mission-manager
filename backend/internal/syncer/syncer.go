@@ -68,6 +68,14 @@ func Save(root, serverURL, token string) (Settings, error) {
 	} else {
 		serverURL = user.ServerURL
 	}
+	if serverURL != user.ServerURL {
+		// A cursor and a token belong to one server; switching servers must pull
+		// from zero and must not send the previous server's token to the new one.
+		user.SyncCursor = 0
+		if strings.TrimSpace(token) == "" {
+			user.SyncToken = ""
+		}
+	}
 	user.ServerURL = serverURL
 	if token = strings.TrimSpace(token); token != "" {
 		user.SyncToken = token

@@ -125,7 +125,7 @@ func (d *DB) FlightPlansFor(ownerID int64, admin bool, limit int) ([]flightplan.
 	          FROM flight_plans WHERE deleted_at IS NULL`
 	var args []any
 	if ownerID != 0 && !admin {
-		query += ` AND (owner_id = ? OR visibility = 'squadron')`
+		query += ` AND (owner_id = ? OR visibility = 'squadron' OR owner_id IS NULL OR owner_id = 0)`
 		args = append(args, ownerID)
 	}
 	query += ` ORDER BY updated_at DESC, id DESC LIMIT ?`
@@ -165,7 +165,7 @@ func (d *DB) FlightPlanFor(id, ownerID int64, admin bool) (flightplan.Plan, erro
 	          FROM flight_plans WHERE id = ? AND deleted_at IS NULL`
 	args := []any{id}
 	if ownerID != 0 && !admin {
-		query += ` AND (owner_id = ? OR visibility = 'squadron')`
+		query += ` AND (owner_id = ? OR visibility = 'squadron' OR owner_id IS NULL OR owner_id = 0)`
 		args = append(args, ownerID)
 	}
 	return scanFlightPlan(d.sql.QueryRow(query, args...))

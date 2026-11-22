@@ -3,7 +3,10 @@
   import { t } from './i18n.js';
 
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const token = params.get('token') ?? '';
+  const hashParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    : new URLSearchParams();
+  const token = hashParams.get('token') ?? params.get('token') ?? '';
 
   let password = '';
   let confirmation = '';

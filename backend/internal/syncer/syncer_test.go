@@ -70,4 +70,15 @@ func TestSettingsRoundTrip(t *testing.T) {
 	if loaded.LastSync == 0 || loaded.LastResult != "3 mission(s)" {
 		t.Fatalf("loaded = %+v", loaded)
 	}
+
+	if err := SaveCursor(root, 42); err != nil {
+		t.Fatal(err)
+	}
+	switched, err := Save(root, "http://another-server:8080", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if switched.SyncCursor != 0 {
+		t.Fatalf("cursor was not reset after a server change: %+v", switched)
+	}
 }

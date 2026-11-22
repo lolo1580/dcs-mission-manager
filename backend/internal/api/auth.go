@@ -194,6 +194,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if s.login == nil {
+		s.login = newLoginLimiter()
+	}
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use POST"})
@@ -283,6 +286,10 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "mode": "desktop", "authenticated": true})
 		return
 	}
+	if s.auth == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"enabled": false, "mode": "server", "authenticated": false})
+		return
+	}
 	user, ok := s.sessionUser(r)
 	if !ok {
 		writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "mode": "server", "authenticated": false, "user": nil})
@@ -347,6 +354,9 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if s.login == nil {
+		s.login = newLoginLimiter()
+	}
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use POST"})
@@ -389,6 +399,7 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		ttl = 30 * time.Minute
 	}
 	now := time.Now()
+	_ = s.auth.DeleteUserPasswordResets(user.ID)
 	if err := s.auth.CreatePasswordReset(user.ID, auth.HashToken(token), now.Add(ttl).UnixMilli()); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -397,7 +408,7 @@ func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	if base == "" {
 		base = "http://localhost:8080"
 	}
-	link := base + "/reset?token=" + url.QueryEscape(token)
+	link := base + "/reset#token=" + url.QueryEscape(token)
 	sender := mailer.Sender{
 		Host: s.cfg.SMTPHost, Port: s.cfg.SMTPPort,
 		User: s.cfg.SMTPUser, Password: s.cfg.SMTPPassword, From: s.cfg.SMTPFrom,
@@ -443,16 +454,21 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
+	// Consume the token first: the conditional update makes concurrent uses of
+	// the same link impossible.
+	if err := s.auth.UsePasswordReset(hash, time.Now().UnixMilli()); errors.Is(err, sql.ErrNoRows) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "reset link was already used"})
+		return
+	} else if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
 	if err := s.auth.SetPassword(user.ID, encoded); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	if err := s.auth.DeleteUserSessions(user.ID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-	if err := s.auth.UsePasswordReset(hash, time.Now().UnixMilli()); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "reset link was already used"})
 		return
 	}
 	_ = s.auth.Audit(user.ID, "password_reset", r.RemoteAddr)

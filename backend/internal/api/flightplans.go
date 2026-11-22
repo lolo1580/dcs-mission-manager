@@ -200,6 +200,8 @@ func (s *Server) saveFlightPlan(w http.ResponseWriter, r *http.Request, id int64
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "only the owner can edit this flight plan"})
 			return
 		}
+		// The uid is the synchronisation identity; a save must never change it.
+		plan.UID = existing.UID
 	}
 	if err := validateFlightPlan(&plan, true); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
