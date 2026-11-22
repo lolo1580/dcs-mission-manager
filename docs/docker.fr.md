@@ -12,8 +12,25 @@ Le desktop continue de fonctionner quand le serveur est absent.
 ```bash
 cp .env.example .env
 # Modifie .env, au minimum DCSMANAGER_ADMIN_PASSWORD.
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+Par défaut, Compose récupère l’image publiée
+`ghcr.io/lolo1580/dcs-mission-manager:<version>`. Utilise
+`docker compose up -d --build` pour la construire localement depuis ce dépôt.
+
+Si le paquet est privé, authentifie-toi d’abord :
+
+```bash
+echo "<jeton-github>" | docker login ghcr.io -u <utilisateur-github> --password-stdin
+```
+
+Le workflow de release GitHub publie les images `linux/amd64` et `linux/arm64`
+à chaque tag de version. Le tag de version et `latest` (versions stables
+uniquement) sont poussés sur GHCR. La CI publie aussi les images `main` et
+`sha-<commit>` (amd64) à chaque push sur `main`, pour tester le dernier code
+sans build local.
 
 Ouvre `http://<ip-du-serveur>:8080`. Le premier compte est créé à partir de
 `DCSMANAGER_ADMIN_USER` et `DCSMANAGER_ADMIN_PASSWORD` **uniquement si la table
@@ -29,7 +46,7 @@ Pour un NAS, construis les deux architectures avec Buildx :
 
 ```bash
 docker buildx build --platform linux/amd64,linux/arm64 \
-  --build-arg VERSION=2.1.0 -t dcsmanager-web:2.1.0 .
+  --build-arg VERSION=2.1.0 -t ghcr.io/lolo1580/dcs-mission-manager:2.1.0 --push .
 ```
 
 L’image tourne avec l’UID 10001 et le volume nommé est créé avec le bon
@@ -128,9 +145,10 @@ docker run --rm -v "$PWD":/backup \
   sh -c 'cd /data && tar xzf /backup/dcsmanager-data.tgz'
 docker compose start
 
-# Mise à jour
+# Mise à jour vers l’image publiée
 git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 Le schéma de la base est migré automatiquement au démarrage. Le healthcheck
@@ -145,7 +163,8 @@ nommé une fois avant de démarrer la 2.1.0 :
 docker compose down
 docker run --rm -v "$PWD/data":/from -v dcsmanager_data:/to alpine \
   sh -c 'cp -a /from/. /to/'
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 `docker compose down -v` supprime aussi le volume nommé. Ne l’utilise pas sans

@@ -128,11 +128,14 @@ jobs:
   docker:
     name: Docker image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Build image
-        run: docker build --build-arg VERSION=ci -t dcsmanager-web:ci .
+        run: docker build --build-arg VERSION=main-${GITHUB_SHA::7} -t dcsmanager-web:ci .
 
       - name: Validate compose file
         env:
@@ -146,6 +149,10 @@ jobs:
             -e DCSMANAGER_ADMIN_PASSWORD=ci-password-123 \
             -v dcsmanager-ci-data:/data \
             -p 18080:8080 \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
             dcsmanager-web:ci
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:18080/api/health; then
@@ -155,6 +162,22 @@ jobs:
           done
           docker logs dcsmanager-ci
           exit 1
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish main image (amd64)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker tag dcsmanager-web:ci ghcr.io/${{ github.repository }}:main
+          docker tag dcsmanager-web:ci ghcr.io/${{ github.repository }}:sha-${GITHUB_SHA::7}
+          docker push ghcr.io/${{ github.repository }}:main
+          docker push ghcr.io/${{ github.repository }}:sha-${GITHUB_SHA::7}
 
       - name: Cleanup
         if: always()

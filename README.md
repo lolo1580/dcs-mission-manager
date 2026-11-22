@@ -319,7 +319,9 @@ The optional server is a separate container; the desktop never depends on it.
 
 ```bash
 cp .env.example .env         # set DCSMANAGER_ADMIN_PASSWORD
-docker compose up -d --build
+docker compose pull          # ghcr.io/lolo1580/dcs-mission-manager
+docker compose up -d
+# or: docker compose up -d --build   # build locally
 ```
 
 Open `http://<server-ip>:8080`, sign in as the administrator, create a desktop

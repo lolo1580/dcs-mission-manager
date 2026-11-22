@@ -2,22 +2,24 @@ ARG VERSION=dev
 
 # Build the web UI first: Vite writes into backend/internal/api/dist, which the
 # Go binary embeds. The final image is a small Alpine runtime with no Node or Go.
-FROM node:22-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 RUN cd frontend && npm ci
 COPY frontend ./frontend
 RUN cd frontend && npm run build
 
-FROM golang:1.26-alpine AS backend
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS backend
 ARG VERSION
+ARG TARGETOS=linux
+ARG TARGETARCH
 RUN apk add --no-cache ca-certificates
 WORKDIR /src/backend
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
 COPY --from=frontend /src/backend/internal/api/dist ./internal/api/dist
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -buildvcs=false \
     -ldflags="-s -w -X main.Version=${VERSION}" \
     -o /out/dcsmanager ./cmd/dcsmanager
 

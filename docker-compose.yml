@@ -14,7 +14,7 @@ services:
       dockerfile: Dockerfile
       args:
         VERSION: "${DCSMANAGER_VERSION:-2.1.0}"
-    image: dcsmanager-web:${DCSMANAGER_VERSION:-2.1.0}
+    image: ghcr.io/lolo1580/dcs-mission-manager:${DCSMANAGER_VERSION:-2.1.0}
     restart: unless-stopped
     stop_grace_period: 30s
     ports:

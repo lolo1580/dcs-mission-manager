@@ -332,7 +332,9 @@ lui.
 
 ```bash
 cp .env.example .env         # définis DCSMANAGER_ADMIN_PASSWORD
-docker compose up -d --build
+docker compose pull          # ghcr.io/lolo1580/dcs-mission-manager
+docker compose up -d
+# ou : docker compose up -d --build   # construction locale
 ```
 
 Ouvre `http://<ip-du-serveur>:8080`, connecte-toi en administrateur, crée un

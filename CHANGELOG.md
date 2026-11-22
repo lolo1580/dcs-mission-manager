@@ -30,7 +30,8 @@ to [semantic versioning](https://semver.org/).
 - **Docker hardening**: a named data volume isolated from the desktop's `./data`,
   graceful SIGTERM shutdown, a database-aware healthcheck, versioned image
   labels/build args, a read-only root filesystem with dropped capabilities, and
-  a CI job that builds and smoke-tests the image.
+  a CI job that builds and smoke-tests the image. Version tags also publish
+  multi-architecture `amd64`/`arm64` images to GHCR.
 
 ### Security
 

@@ -31,7 +31,8 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 - **Durcissement Docker** : volume de données nommé et isolé du `./data` du
   desktop, arrêt propre sur SIGTERM, healthcheck conscient de la base, image
   versionnée, système de fichiers racine en lecture seule avec capacités
-  supprimées, et job CI qui construit et teste l’image.
+  supprimées, et job CI qui construit et teste l’image. Les tags de version
+  publient aussi des images multi-architectures `amd64`/`arm64` sur GHCR.
 
 ### Sécurité
 
