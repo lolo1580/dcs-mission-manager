@@ -109,21 +109,21 @@
 
   async function createMappings() {
     const names = (mappings?.aircraft ?? []).map((a) => a.name);
-    const selected = names.filter((name) => mappingSelected.has(name));
-    if (selected.length === 0) {
+    const chosen = names.filter((name) => mappingSelected.has(name));
+    if (chosen.length === 0) {
       error = $t('backup.mappings.selectOne');
       return;
     }
     // Selecting every aircraft means a full mapping backup, including root
     // files such as disabled.lua.
-    const aircraft = selected.length === names.length ? [] : selected;
+    const aircraft = chosen.length === names.length ? [] : chosen;
     mappingBusy = true;
     error = '';
     notice = '';
     try {
       const res = await postJSON('/api/backup/mappings', { aircraft });
       notice = $t('backup.mappings.saved', {
-        count: selected.length,
+        count: chosen.length,
         name: res.backup.name,
       });
       await reload();

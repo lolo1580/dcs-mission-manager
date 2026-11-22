@@ -28,6 +28,8 @@ type QuarantineItem struct {
 
 // Quarantine lists both mods and liveries kept in the two quarantine roots.
 func (s *Service) Quarantine() ([]QuarantineItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	roots := []string{
 		dcsdata.ModsQuarantineDir(s.savedGames),
 		dcsdata.LiveriesQuarantineDir(s.savedGames),

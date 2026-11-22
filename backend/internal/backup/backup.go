@@ -344,7 +344,11 @@ func List(dir string) ([]Archive, error) {
 		if e.IsDir() || !strings.HasSuffix(strings.ToLower(e.Name()), ".zip") {
 			continue
 		}
-		a, err := readArchive(filepath.Join(dir, e.Name()))
+		path := filepath.Join(dir, e.Name())
+		if info, err := os.Lstat(path); err != nil || info.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		a, err := readArchive(path)
 		if err != nil {
 			continue
 		}
@@ -391,6 +395,16 @@ func readArchive(path string) (Archive, error) {
 	return a, nil
 }
 
+// CategoriesOf reads an archive's manifest categories without listing the whole
+// backup directory. It is used by the restore guard that protects mappings.
+func CategoriesOf(path string) ([]string, error) {
+	a, err := readArchive(path)
+	if err != nil {
+		return nil, err
+	}
+	return a.Categories, nil
+}
+
 // RestoreResult reports what a restore did (or would do, on a dry run).
 type RestoreResult struct {
 	Files        int    `json:"files"`
@@ -410,6 +424,9 @@ type RestoreResult struct {
 func Restore(archivePath, savedGames string, dryRun bool) (RestoreResult, error) {
 	if savedGames == "" {
 		return RestoreResult{}, errors.New("DCS Saved Games folder not found")
+	}
+	if info, err := os.Lstat(archivePath); err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return RestoreResult{}, errors.New("archive not found or not a regular file")
 	}
 	zr, err := zip.OpenReader(archivePath)
 	if err != nil {

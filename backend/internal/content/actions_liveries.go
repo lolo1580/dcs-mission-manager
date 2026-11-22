@@ -189,13 +189,23 @@ func (s *Service) classifyLiveries(ids []string, requestedAircraft string) (Acti
 
 	var result ActionResult
 	result.Action = "classify"
+	seenTargets := map[string]bool{}
+	for _, m := range moves {
+		if filepath.Clean(m.src) == filepath.Clean(m.target) {
+			continue
+		}
+		if seenTargets[m.target] {
+			return result, fmt.Errorf("deux livrées ciblent le même dossier: %s", m.target)
+		}
+		seenTargets[m.target] = true
+		if _, err := os.Stat(m.target); err == nil {
+			return result, fmt.Errorf("la cible existe déjà: %s", m.target)
+		}
+	}
 	for _, m := range moves {
 		if filepath.Clean(m.src) == filepath.Clean(m.target) {
 			result.Skipped = append(result.Skipped, m.rel)
 			continue
-		}
-		if _, err := os.Stat(m.target); err == nil {
-			return result, fmt.Errorf("la cible existe déjà: %s", m.target)
 		}
 		if err := moveDir(m.src, m.target); err != nil {
 			return result, err

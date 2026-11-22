@@ -168,7 +168,13 @@ func (s *Service) CommitImport(id string, selections []ImportSelection, replace 
 	}
 	var plans []planned
 	conflicts := map[string]bool{}
+	seenSelections := map[string]bool{}
+	seenTargets := map[string]bool{}
 	for _, selection := range selections {
+		if seenSelections[selection.ID] {
+			continue
+		}
+		seenSelections[selection.ID] = true
 		item, ok := byID[selection.ID]
 		if !ok {
 			return ImportResult{}, fmt.Errorf("élément d’import inconnu: %s", selection.ID)
@@ -177,6 +183,10 @@ func (s *Service) CommitImport(id string, selections []ImportSelection, replace 
 		if err != nil {
 			return ImportResult{}, err
 		}
+		if seenTargets[targetRel] {
+			return ImportResult{}, fmt.Errorf("%w : deux éléments ciblent %s", ErrConflict, targetRel)
+		}
+		seenTargets[targetRel] = true
 		target, err := safeJoin(s.savedGames, targetRel)
 		if err != nil {
 			return ImportResult{}, err
@@ -209,26 +219,8 @@ func (s *Service) CommitImport(id string, selections []ImportSelection, replace 
 	s.Invalidate()
 	var result ImportResult
 	for _, plan := range plans {
-		if info, err := os.Stat(plan.target); err == nil && info.IsDir() {
-			qid, err := s.quarantineTarget(plan.target, plan.targetRel)
-			if err != nil {
-				return result, err
-			}
-			result.Quarantined = append(result.Quarantined, qid)
-		}
-		if plan.item.Kind == "mod" {
-			parts := strings.Split(plan.targetRel, "/")
-			if len(parts) >= 3 {
-				disabled := filepath.Join(dcsdata.DisabledModsDir(s.savedGames), parts[1], parts[2])
-				if info, err := os.Stat(disabled); err == nil && info.IsDir() {
-					qid, err := s.quarantineMod(parts[1], parts[2], "disabled", disabled)
-					if err != nil {
-						return result, err
-					}
-					result.Quarantined = append(result.Quarantined, qid)
-				}
-			}
-		}
+		// Extract and validate the new content before moving the old target to
+		// quarantine: a broken archive must not remove a working install.
 		stage := filepath.Join(dir, "stage", plan.item.ID)
 		_ = os.RemoveAll(stage)
 		var selected []string
@@ -245,7 +237,35 @@ func (s *Service) CommitImport(id string, selections []ImportSelection, replace 
 		if info, err := os.Stat(src); err != nil || !info.IsDir() {
 			return result, errors.New("contenu extrait introuvable")
 		}
+
+		var quarantined []string
+		if info, err := os.Stat(plan.target); err == nil && info.IsDir() {
+			qid, err := s.quarantineTarget(plan.target, plan.targetRel)
+			if err != nil {
+				return result, err
+			}
+			quarantined = append(quarantined, qid)
+			result.Quarantined = append(result.Quarantined, qid)
+		}
+		if plan.item.Kind == "mod" {
+			parts := strings.Split(plan.targetRel, "/")
+			if len(parts) >= 3 {
+				disabled := filepath.Join(dcsdata.DisabledModsDir(s.savedGames), parts[1], parts[2])
+				if info, err := os.Stat(disabled); err == nil && info.IsDir() {
+					qid, err := s.quarantineMod(parts[1], parts[2], "disabled", disabled)
+					if err != nil {
+						return result, err
+					}
+					quarantined = append(quarantined, qid)
+					result.Quarantined = append(result.Quarantined, qid)
+				}
+			}
+		}
 		if err := moveDir(src, plan.target); err != nil {
+			// Put the previous content back when the final move fails.
+			for i := len(quarantined) - 1; i >= 0; i-- {
+				_, _ = s.restoreQuarantine(quarantined[i])
+			}
 			return result, err
 		}
 		result.Installed = append(result.Installed, ImportInstalled{
@@ -300,13 +320,10 @@ func (s *Service) quarantineTarget(target, targetRel string) (string, error) {
 	if strings.HasPrefix(targetRel, "Mods"+string(os.PathSeparator)) || strings.HasPrefix(targetRel, "Mods/") {
 		parts := strings.Split(filepath.ToSlash(targetRel), "/")
 		if len(parts) >= 3 {
-			root := dcsdata.ModsDir(s.savedGames)
 			state := "active"
 			if strings.HasPrefix(filepath.Clean(target), filepath.Clean(dcsdata.DisabledModsDir(s.savedGames))) {
-				root = dcsdata.DisabledModsDir(s.savedGames)
 				state = "disabled"
 			}
-			_ = root
 			return s.quarantineMod(parts[1], strings.Join(parts[2:], "/"), state, target)
 		}
 		return "", errors.New("cible de mod invalide")
@@ -341,6 +358,8 @@ func (s *Service) importDir(id string) (string, error) {
 
 // CancelImport removes an inspected archive and its staging.
 func (s *Service) CancelImport(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	dir, err := s.importDir(id)
 	if err != nil {
 		return err
@@ -350,6 +369,8 @@ func (s *Service) CancelImport(id string) error {
 
 // CleanupImports removes abandoned uploads older than maxAge.
 func (s *Service) CleanupImports(maxAge time.Duration) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	root := s.importRoot()
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -618,6 +639,12 @@ func buildLiveryItem(index int, root string, entries []archiveEntry, meta map[st
 	name, _, textures := dcsdata.ParseLiveryDescription(meta[metaPath(root, "description.lua")])
 	if aircraft == "" {
 		aircraft = dcsdata.InferAircraft(name, textures)
+	}
+	for _, texture := range textures {
+		if strings.HasPrefix(strings.ReplaceAll(texture, "\\", "/"), "../") {
+			item.Warnings = append(item.Warnings, ImportWarning{Code: "external_dependencies"})
+			break
+		}
 	}
 	item.Aircraft = aircraft
 	item.Structure = structure

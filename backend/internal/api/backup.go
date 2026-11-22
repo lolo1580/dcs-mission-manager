@@ -123,6 +123,24 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if !req.DryRun {
+		categories, err := backup.CategoriesOf(path)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		if containsCategory(categories, "input") {
+			running, err := s.dcsRunningNow()
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "impossible de vérifier si DCS est fermé"})
+				return
+			}
+			if running {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "Ferme DCS avant de restaurer les mappings."})
+				return
+			}
+		}
+	}
 
 	res, err := backup.Restore(path, s.cfg.SavedGames, req.DryRun)
 	if err != nil {
@@ -212,14 +230,16 @@ func (s *Server) handleBackupMappingsRestore(w http.ResponseWriter, r *http.Requ
 	if check == nil {
 		check = install.DCSRunning
 	}
-	running, err := check()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "impossible de vérifier si DCS est fermé"})
-		return
-	}
-	if running {
-		writeJSON(w, http.StatusConflict, map[string]string{"error": "Ferme DCS avant de restaurer les mappings."})
-		return
+	if !req.DryRun {
+		running, err := check()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "impossible de vérifier si DCS est fermé"})
+			return
+		}
+		if running {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "Ferme DCS avant de restaurer les mappings."})
+			return
+		}
 	}
 	list, err := backup.List(s.backupDir())
 	if err != nil {
@@ -279,6 +299,23 @@ func (s *Server) handleBackupDownload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
 	http.ServeFile(w, r, path)
+}
+
+func containsCategory(categories []string, want string) bool {
+	for _, category := range categories {
+		if strings.EqualFold(category, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) dcsRunningNow() (bool, error) {
+	check := s.dcsRunning
+	if check == nil {
+		check = install.DCSRunning
+	}
+	return check()
 }
 
 // safeJoin resolves name under dir and refuses a result that escapes it.

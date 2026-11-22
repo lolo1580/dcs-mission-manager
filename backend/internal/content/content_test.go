@@ -117,6 +117,36 @@ livery = {
 	}
 }
 
+func TestClassifyPreflightLeavesFilesInPlace(t *testing.T) {
+	svc, sg := testService(t)
+	for _, name := range []string{"A", "B"} {
+		writeFile(t, filepath.Join(sg, "Liveries", name, "description.lua"), `name = "`+name+`"`)
+	}
+	// The target for B already exists, so neither A nor B may move.
+	writeFile(t, filepath.Join(sg, "Liveries", "F-5E-3", "B", "description.lua"), `name = "Existing"`)
+	scan, err := dcsdata.ScanLiveries(sg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]string{}
+	for _, livery := range scan.Liveries {
+		ids[livery.Name] = livery.ID
+	}
+	if _, err := svc.ActionLivery(LiveryActionRequest{
+		Action:   "classify",
+		IDs:      []string{ids["A"], ids["B"]},
+		Aircraft: "F-5E-3",
+	}); err == nil {
+		t.Fatal("classify should fail on an existing target")
+	}
+	if _, err := os.Stat(filepath.Join(sg, "Liveries", "A", "description.lua")); err != nil {
+		t.Fatal("A was moved despite the failed preflight")
+	}
+	if _, err := os.Stat(filepath.Join(sg, "Liveries", "F-5E-3", "A")); !os.IsNotExist(err) {
+		t.Fatal("A target was created")
+	}
+}
+
 func TestLiveryQuarantineNeedsForceAndRestores(t *testing.T) {
 	svc, sg := testService(t)
 	writeFile(t, filepath.Join(sg, "Liveries", "A", "description.lua"), `
@@ -233,6 +263,71 @@ func TestZIPImportRejectsTraversal(t *testing.T) {
 	})
 	if _, err := svc.InspectUpload(bytes.NewReader(archive), "evil.zip"); err == nil {
 		t.Fatal("traversal archive was accepted")
+	}
+}
+
+func TestSafeJoinAndElement(t *testing.T) {
+	root := t.TempDir()
+	for _, rel := range []string{".", "..", "../x", "a/../../x"} {
+		if _, err := safeJoin(root, rel); err == nil {
+			t.Errorf("safeJoin accepted %q", rel)
+		}
+	}
+	for _, name := range []string{"CON", "nul.txt", "a:b", "a?b", "..", ""} {
+		if err := safeElement(name); err == nil {
+			t.Errorf("safeElement accepted %q", name)
+		}
+	}
+	for _, name := range []string{"F-16C_50", "A-4E-C", "Tacview"} {
+		if err := safeElement(name); err != nil {
+			t.Errorf("safeElement rejected %q: %v", name, err)
+		}
+	}
+}
+
+func TestCommitImportRejectsDuplicateTargets(t *testing.T) {
+	svc, sg := testService(t)
+	archive := makeZip(t, map[string]string{
+		"Mods/aircraft/A/entry.lua": "a",
+		"Mods/tech/B/entry.lua":     "b",
+	})
+	preview, err := svc.InspectUpload(bytes.NewReader(archive), "two.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Items) != 2 {
+		t.Fatalf("items = %+v", preview.Items)
+	}
+	selections := []ImportSelection{
+		{ID: preview.Items[0].ID, Category: "aircraft", Name: "Same"},
+		{ID: preview.Items[1].ID, Category: "aircraft", Name: "Same"},
+	}
+	if _, err := svc.CommitImport(preview.ID, selections, false); !errors.Is(err, ErrConflict) {
+		t.Fatalf("err = %v, want ErrConflict", err)
+	}
+	if _, err := os.Stat(filepath.Join(sg, "Mods", "aircraft", "Same")); !os.IsNotExist(err) {
+		t.Fatal("duplicate-target import wrote a target")
+	}
+}
+
+func TestCancelImportRemovesStaging(t *testing.T) {
+	svc, _ := testService(t)
+	archive := makeZip(t, map[string]string{
+		"Mods/aircraft/Cancel/entry.lua": "x",
+	})
+	preview, err := svc.InspectUpload(bytes.NewReader(archive), "cancel.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(svc.importRoot(), preview.ID)
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatal("import staging missing")
+	}
+	if err := svc.CancelImport(preview.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatal("import staging was not removed")
 	}
 }
 

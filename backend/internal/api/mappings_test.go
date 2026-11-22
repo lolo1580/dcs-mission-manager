@@ -104,9 +104,32 @@ func TestBackupMappings(t *testing.T) {
 	}
 
 	srv.dcsRunning = func() (bool, error) { return true, nil }
+	// A dry run stays available while DCS is open; it does not write anything.
+	rec = httptest.NewRecorder()
+	srv.handleBackupMappingsRestore(rec, httptest.NewRequest(http.MethodPost, "/api/backup/mappings/restore", bytes.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("dry run with DCS running = %d %s", rec.Code, rec.Body.String())
+	}
+	// A real restore is refused.
+	body, _ = json.Marshal(map[string]any{"name": created.Backup.Name, "dryRun": false})
 	rec = httptest.NewRecorder()
 	srv.handleBackupMappingsRestore(rec, httptest.NewRequest(http.MethodPost, "/api/backup/mappings/restore", bytes.NewReader(body)))
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("restore with DCS running = %d %s", rec.Code, rec.Body.String())
+	}
+
+	// The generic restore endpoint also refuses to overwrite mappings while DCS
+	// is open, but its dry run stays available.
+	body, _ = json.Marshal(map[string]any{"name": created.Backup.Name, "dryRun": false})
+	rec = httptest.NewRecorder()
+	srv.handleBackupRestore(rec, httptest.NewRequest(http.MethodPost, "/api/backup/restore", bytes.NewReader(body)))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("generic restore with DCS running = %d %s", rec.Code, rec.Body.String())
+	}
+	body, _ = json.Marshal(map[string]any{"name": created.Backup.Name, "dryRun": true})
+	rec = httptest.NewRecorder()
+	srv.handleBackupRestore(rec, httptest.NewRequest(http.MethodPost, "/api/backup/restore", bytes.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("generic dry run with DCS running = %d %s", rec.Code, rec.Body.String())
 	}
 }

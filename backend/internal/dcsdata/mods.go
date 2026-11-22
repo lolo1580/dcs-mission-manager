@@ -1,6 +1,7 @@
 package dcsdata
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -173,13 +174,12 @@ var (
 // is deliberately best-effort: a mod with a different entry.lua still lists.
 func (m *InstalledMod) readMetadata() {
 	path := filepath.Join(m.Path, "entry.lua")
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return
 	}
-	if len(data) > 512*1024 {
-		data = data[:512*1024]
-	}
+	defer f.Close()
+	data, _ := io.ReadAll(io.LimitReader(f, 512*1024))
 	text := string(data)
 	if v := firstMatch(modVersionRE, text); v != "" {
 		m.Version = v

@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-// safeJoin resolves rel under root and refuses anything that escapes it.
+// safeJoin resolves rel under root and refuses anything that escapes it or names
+// the root itself.
 func safeJoin(root, rel string) (string, error) {
 	root = filepath.Clean(root)
 	rel = strings.TrimSpace(rel)
@@ -18,7 +19,10 @@ func safeJoin(root, rel string) (string, error) {
 		return "", errors.New("chemin vide")
 	}
 	clean := filepath.Clean(filepath.Join(root, filepath.FromSlash(rel)))
-	if clean != root && !strings.HasPrefix(clean, root+string(os.PathSeparator)) {
+	if clean == root {
+		return "", errors.New("la racine elle-même n’est pas une cible valide")
+	}
+	if !strings.HasPrefix(clean, root+string(os.PathSeparator)) {
 		return "", errors.New("chemin hors de la racine autorisée")
 	}
 	return clean, nil
@@ -30,11 +34,21 @@ func safeElement(name string) error {
 	if name == "" || name == "." || name == ".." {
 		return errors.New("nom invalide")
 	}
-	if strings.ContainsAny(name, `/\:`) {
+	if strings.ContainsAny(name, `/\:*?"<>|`) {
 		return errors.New("nom invalide")
 	}
 	if strings.HasSuffix(name, " ") || strings.HasSuffix(name, ".") {
 		return errors.New("nom Windows invalide")
+	}
+	base := strings.ToUpper(name)
+	if dot := strings.IndexByte(base, '.'); dot >= 0 {
+		base = base[:dot]
+	}
+	switch base {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		return errors.New("nom réservé Windows")
 	}
 	return nil
 }

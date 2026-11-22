@@ -125,7 +125,15 @@ func CreateMappings(savedGames, outDir string, aircraft []string, appVersion str
 	if err := createMappingsTo(savedGames, inputDir, path, selected, appVersion); err != nil {
 		return Archive{}, err
 	}
-	return readArchive(path)
+	a, err := readArchive(path)
+	if err != nil {
+		return Archive{}, err
+	}
+	if a.Entries == 0 {
+		_ = os.Remove(path)
+		return Archive{}, fmt.Errorf("aucun fichier de mapping dans la sélection")
+	}
+	return a, nil
 }
 
 func normalizeAircraft(inputDir string, aircraft []string) ([]string, error) {
@@ -159,12 +167,14 @@ func normalizeAircraft(inputDir string, aircraft []string) ([]string, error) {
 func uniqueMappingName(dir string) string {
 	base := "dcsmanager-mappings-" + time.Now().Format("20060102-150405")
 	name := base + ".zip"
-	for i := 1; ; i++ {
-		if _, err := os.Stat(filepath.Join(dir, name)); os.IsNotExist(err) {
+	for i := 1; i <= 100; i++ {
+		_, err := os.Stat(filepath.Join(dir, name))
+		if os.IsNotExist(err) || (err != nil && !os.IsExist(err)) {
 			return name
 		}
 		name = fmt.Sprintf("%s-%d.zip", base, i)
 	}
+	return fmt.Sprintf("%s-%d.zip", base, time.Now().UnixNano())
 }
 
 func createMappingsTo(savedGames, inputDir, path string, aircraft []string, appVersion string) (err error) {

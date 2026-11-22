@@ -67,6 +67,7 @@
       selections = next;
     } catch (err) {
       error = err.message;
+      if (fileInput) fileInput.value = '';
     } finally {
       busy = false;
     }
@@ -101,7 +102,6 @@
 
   function close() {
     if (busy) return;
-    if (preview && !committed) cancelImport(preview.id);
     open = false;
   }
 

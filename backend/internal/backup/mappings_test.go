@@ -114,3 +114,41 @@ func TestCreateMappingsSelection(t *testing.T) {
 		t.Fatal("invalid aircraft accepted")
 	}
 }
+
+func TestRestoreMappingsKeepsUnselectedAircraft(t *testing.T) {
+	sg := t.TempDir()
+	out := t.TempDir()
+	viper := filepath.Join(sg, "Config", "Input", "F-16C_50", "keyboard", "Keyboard.diff.lua")
+	hornet := filepath.Join(sg, "Config", "Input", "FA-18C_hornet", "keyboard", "Keyboard.diff.lua")
+	for _, path := range []string{viper, hornet} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(viper, []byte("viper-old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hornet, []byte("hornet-old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a, err := CreateMappings(sg, out, []string{"F-16C_50"}, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(viper, []byte("viper-new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hornet, []byte("hornet-new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Restore(a.Path, sg, false); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(viper); string(data) != "viper-old" {
+		t.Fatalf("viper = %q", data)
+	}
+	if data, _ := os.ReadFile(hornet); string(data) != "hornet-new" {
+		t.Fatalf("unselected hornet was overwritten: %q", data)
+	}
+}
