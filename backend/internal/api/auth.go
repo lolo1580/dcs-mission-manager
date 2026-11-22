@@ -93,6 +93,8 @@ func (s *Server) desktopGuard(next http.Handler) http.Handler {
 		"/api/mission":           true,
 		"/api/modules":           true,
 		"/api/mods":              true,
+		"/api/content":           true,
+		"/api/liveries":          true,
 		"/api/career":            true,
 		"/api/backup":            true,
 		"/api/backup/categories": true,
@@ -106,6 +108,8 @@ func (s *Server) desktopGuard(next http.Handler) http.Handler {
 		"/api/backup/",
 		"/api/scripts/",
 		"/api/maintenance/",
+		"/api/content/",
+		"/api/liveries/",
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path

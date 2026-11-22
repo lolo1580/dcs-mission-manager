@@ -98,6 +98,17 @@ func TestServerAuthAndUploadFlow(t *testing.T) {
 		t.Fatalf("maintenance = %d", maintRec.Code)
 	}
 
+	// The local content manager is desktop-only too.
+	contentReq := httptest.NewRequest(http.MethodGet, "/api/content/status", nil)
+	for _, cookie := range cookies {
+		contentReq.AddCookie(cookie)
+	}
+	contentRec := httptest.NewRecorder()
+	handler.ServeHTTP(contentRec, contentReq)
+	if contentRec.Code != http.StatusNotFound {
+		t.Fatalf("content = %d", contentRec.Code)
+	}
+
 	// Create a personal token.
 	tokenReq := httptest.NewRequest(http.MethodPost, "/api/auth/tokens",
 		strings.NewReader(`{"name":"Desktop"}`))

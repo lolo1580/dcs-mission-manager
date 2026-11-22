@@ -19,6 +19,7 @@ import (
 	"dcsmanager/internal/aerodrome"
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
+	"dcsmanager/internal/content"
 	"dcsmanager/internal/db"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/debuglog"
@@ -98,6 +99,7 @@ type Server struct {
 	logbook         dcsdata.Logbook
 	mods            []dcsdata.InstalledMod
 	scripts         dcsdata.ScriptStatus
+	content         *content.Service
 	scriptInstallMu sync.Mutex
 	dcsRunning      func() (bool, error)
 	commander       Commander
@@ -211,6 +213,11 @@ func (s *Server) SetLogbook(lb dcsdata.Logbook) {
 // SetMods installs the list of mods found under Saved Games\DCS\Mods.
 func (s *Server) SetMods(mods []dcsdata.InstalledMod) {
 	s.mods = mods
+}
+
+// SetContent installs the local mod/livery manager. It is nil in server mode.
+func (s *Server) SetContent(c *content.Service) {
+	s.content = c
 }
 
 // SetScripts installs the DCS-side script status picture.
@@ -407,6 +414,16 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/mods", s.handleMods)
 	mux.HandleFunc("/api/scripts", s.handleScripts)
 	mux.HandleFunc("/api/scripts/install", s.handleScriptInstall)
+	mux.HandleFunc("/api/content/status", s.handleContentStatus)
+	mux.HandleFunc("/api/content/mods", s.handleContentMods)
+	mux.HandleFunc("/api/content/liveries", s.handleContentLiveries)
+	mux.HandleFunc("/api/content/quarantine", s.handleContentQuarantine)
+	mux.HandleFunc("/api/content/mods/action", s.handleContentModAction)
+	mux.HandleFunc("/api/content/liveries/action", s.handleContentLiveryAction)
+	mux.HandleFunc("/api/content/liveries/thumbnail", s.handleContentThumbnail)
+	mux.HandleFunc("/api/content/import/inspect", s.handleContentImportInspect)
+	mux.HandleFunc("/api/content/import/commit", s.handleContentImportCommit)
+	mux.HandleFunc("/api/content/import/", s.handleContentImportCancel)
 	mux.HandleFunc("/api/debug", s.handleDebug)
 	mux.HandleFunc("/api/log", s.handleLog)
 	mux.Handle("/", s.webHandler())

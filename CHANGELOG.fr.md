@@ -7,6 +7,33 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet adhère
 au [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [2.1.0] - 2026-11-22
+
+### Ajouté
+
+- Une page **Mods & skins** réservée au desktop : parcourir les mods actifs et
+  désactivés, les activer/désactiver, les mettre dans une corbeille restaurable
+  et ouvrir leur dossier.
+- **Import d’archives** ZIP, 7z et RAR, avec aperçu avant installation,
+  modification de la catégorie/de l’appareil/du nom, gestion des conflits et
+  mise en quarantaine des éléments remplacés. Les décodeurs sont en Go pur et
+  embarqués dans le binaire.
+- **Scan des livrées** : structure standard, livrées à plat, packs mal placés et
+  livrées incluses dans les mods, avec métadonnées `description.lua`, détection
+  des dépendances et aperçu quand le pack fournit une image.
+- **Classement des livrées** dans `Liveries\<Appareil>\<Livrée>`, en préservant
+  les dépendances relatives `../`.
+- Une catégorie de sauvegarde **Livrées**, et les mods désactivés sont désormais
+  inclus dans la catégorie **Mods**.
+
+### Sécurité
+
+- Les archives sont extraites dans un dossier temporaire ; les chemins absolus,
+  `..`, liens symboliques, noms réservés Windows, archives chiffrées et contenus
+  surdimensionnés sont refusés.
+- DCS doit être fermé pour modifier le contenu, et le profil serveur n’expose
+  jamais l’API de contenu.
+
 ## [2.0.0] - 2026-11-22
 
 ### Ajouté

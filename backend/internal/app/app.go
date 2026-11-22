@@ -31,6 +31,7 @@ import (
 	"dcsmanager/internal/category"
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
+	"dcsmanager/internal/content"
 	"dcsmanager/internal/db"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/dcsdir"
@@ -253,6 +254,13 @@ func Run(onReady func(addr string)) error {
 
 	srv := api.New(cfg, store, liveStore, database, statsService, airfields, chartCatalog, tcpListener)
 	srv.SetVersion(Version)
+	contentDataDir := filepath.Dir(cfg.DBPath)
+	if contentDataDir == "" {
+		contentDataDir = "data"
+	}
+	contentSvc := content.New(cfg.SavedGames, contentDataDir)
+	_ = contentSvc.CleanupImports(2 * time.Hour)
+	srv.SetContent(contentSvc)
 	// Debug lines are streamed to the UI once the API can broadcast them, and echo
 	// to the file/console log so a problem can still be read after the fact (and in
 	// window mode, where there is no console).

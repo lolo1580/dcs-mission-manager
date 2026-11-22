@@ -43,6 +43,7 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Flight planning | ✅ New | Route editor with worldwide airports and DCS airfields, wind-corrected navlog and printable DCS briefing |
 | Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the **player-profile backup** and the debug log as sub-tabs |
 | Profile backup | ✅ New | Save/restore the logbook, bindings, options and scripts (and optionally kneeboard, missions, mods) as a portable zip, from the CLI, the API or Settings |
+| Mods & skins | ✅ New | A dedicated library page: enable/disable mods, quarantine and restore, import ZIP/7z/RAR archives, browse liveries, detect flat or misplaced packs, and classify them. See [docs/mods-skins.md](docs/mods-skins.md) |
 | Local by design | ✅ New | The desktop is one self-contained Windows `.exe`: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |
 | Web server (Docker) | ✅ New | Optional multi-user web application: accounts, roles, audit log, personal desktop tokens and one-way upload of finished missions. The desktop works without it; see [docs/docker.md](docs/docker.md) |
 | Shared documents | ✅ New | Flight plans and checklists have an owner and `private`/`squadron` visibility; desktop ↔ server sync is last-write-wins with tombstones and conflict copies |

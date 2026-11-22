@@ -32,6 +32,12 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    label: 'nav.library',
+    items: [
+      { id: 'mods', path: '/mods', label: 'tab.mods', subtitle: 'sub.mods', icon: 'M4 7l8-4 8 4-8 4zM4 12l8 4 8-4M4 17l8 4 8-4' },
+    ],
+  },
+  {
     label: 'nav.config',
     items: [
       { id: 'settings', path: '/settings', label: 'tab.settings', subtitle: 'sub.settings', icon: 'M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2' },

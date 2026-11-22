@@ -64,7 +64,11 @@ var Categories = []Category{
 	},
 	{
 		ID: "mods", Label: "Mods", Default: false, Large: true,
-		Paths: []string{"Mods"},
+		Paths: []string{"Mods", "Mods.disabled"},
+	},
+	{
+		ID: "liveries", Label: "Liveries", Default: false, Large: true,
+		Paths: []string{"Liveries"},
 	},
 }
 

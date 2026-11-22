@@ -19,6 +19,7 @@
     fmtSize,
   } from './install.js';
   import { t } from './i18n.js';
+  import { navigate } from './router.js';
   import UpdatePanel from './UpdatePanel.svelte';
 
   onMount(loadInstall);
@@ -137,6 +138,7 @@
     <h3>
       {$t('install.mods')}
       <span class="count">{$mods.length} · {fmtSize($modsTotalBytes)}</span>
+      <button class="refresh" type="button" on:click={() => navigate('mods')}>{$t('install.manageContent')}</button>
     </h3>
     {#if $mods.length === 0}
       <p class="empty">{$t('install.noMods')}</p>

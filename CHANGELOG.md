@@ -7,6 +7,31 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [semantic versioning](https://semver.org/).
 
+## [2.1.0] - 2026-11-22
+
+### Added
+
+- A **Mods & skins** library page, desktop only: browse enabled and disabled
+  mods, enable/disable them, move them to a restorable trash, and open their
+  folder.
+- **Archive import** for ZIP, 7z and RAR, with a preview before installation,
+  category/aircraft/name overrides, conflict handling and quarantine of replaced
+  items. The decoders are pure Go and embedded in the binary.
+- **Livery scanning** for the standard layout, flat liveries, misplaced packs
+  and liveries bundled in mods, with `description.lua` metadata, dependency
+  detection and preview images when the pack ships one.
+- **Livery classification** into `Liveries\<Aircraft>\<Livery>`, preserving
+  relative `../` dependencies.
+- A **Liveries** backup category, and disabled mods are now included in the
+  **Mods** backup category.
+
+### Security
+
+- Archives are extracted in a staging folder; absolute paths, `..`, symlinks,
+  Windows reserved names, encrypted archives and oversized content are refused.
+- DCS must be closed for content changes, and the server profile never exposes
+  the content API.
+
 ## [2.0.0] - 2026-11-22
 
 ### Added

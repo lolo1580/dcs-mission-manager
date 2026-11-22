@@ -9,6 +9,7 @@
   import FlightPlanPanel from './lib/FlightPlanPanel.svelte';
   import ChecklistsPanel from './lib/ChecklistsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
+  import ModsPanel from './lib/ModsPanel.svelte';
   import SettingsPanel from './lib/SettingsPanel.svelte';
   import ProfilePanel from './lib/ProfilePanel.svelte';
   import AdminPanel from './lib/AdminPanel.svelte';
@@ -239,6 +240,8 @@
         <div class="view"><FlightPlanPanel /></div>
       {:else if $routeID === 'checklists'}
         <div class="view"><ChecklistsPanel /></div>
+      {:else if $routeID === 'mods'}
+        <div class="view"><ModsPanel /></div>
       {:else if $routeID === 'settings'}
         <div class="view"><SettingsPanel /></div>
       {:else}
