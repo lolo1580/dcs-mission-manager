@@ -6,9 +6,9 @@
 
 [🇬🇧 English](README.md) | 🇫🇷 Français
 
-Un compagnon tout-en-un pour **DCS World** : collecte des débriefings,
-statistiques avancées, référence des aérodromes et cartes
-aéronautiques. Il tourne
+Un compagnon tout-en-un pour **DCS World** — collecte des débriefings,
+statistiques avancées, référence des aérodromes, cartes aéronautiques et
+planification de vol. Il tourne
 **en local, sur la même machine Windows que DCS** : un seul `dcsmanager.exe`, ni serveur,
 ni conteneur, rien à configurer. Il s'ouvre dans **sa propre fenêtre**, comme un
 logiciel classique : pas de navigateur à lancer, aucune adresse à retenir.
@@ -39,47 +39,41 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 
 | Fonction | État | Détail |
 |---|---|---|
-| Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique conservé ; vue actuellement masquée |
-| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau, choix d’une mission enregistrée et évolution par mission (score, kills, atterrissages), dans la page **Statistiques** |
+| Débriefings | ✅ Phase 3 | Envoi réseau de `debrief.log`, parseur Lua, historique conservé, fusionné avec les missions dans la page **Vols** avec la chronologie complète |
+| Vue d'ensemble | ✅ Nouveau | Heures de vol, missions, victoires, ratio victoires/morts, dernier vol, état DCS, plans enregistrés et check-lists récentes |
+| Check-lists | ✅ Nouveau | 13 modèles génériques, création/modification/duplication/suppression, import/export JSON/CSV et exécution avec progression par appareil |
+| Stats avancées | ✅ Phase 4 | Pilotes, armes, engins, balance, réseau, choix d'une mission enregistrée et évolution par mission (score, kills, atterrissages), dans la page **Statistiques** |
 | Aérodromes | ✅ Phase 6 | Lus depuis les fichiers de terrain de DCS : **220 aérodromes listés, 146 plaçables** sur 6 cartes installées, avec Tower/TACAN/ILS/VOR/RSBN/NDB, et leurs cartes. Un jeu embarqué couvre le Caucase et l'Allemagne Guerre froide si DCS est introuvable |
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
 | Carrière | ✅ Nouveau | Une page **Carrière** distincte avec le carnet du joueur, les cartes et pays favoris et une heatmap quotidienne sur 30 jours |
-| Paramètres | ✅ Nouveau | Un onglet regroupant les modules installés, l'installation DCS (mods, état des scripts, `Export.lua` partagé), les panneaux de cockpit (PZ55/PZ70, DCS-BIOS, associations) et la **sauvegarde du profil joueur** en sous-onglets |
+| Planification de vol | ✅ Nouveau | Éditeur de route avec aéroports mondiaux et aérodromes DCS, navlog corrigé du vent et briefing DCS imprimable |
+| Paramètres | ✅ Nouveau | Un onglet regroupant les modules installés, l'installation DCS (mods, état des scripts, `Export.lua` partagé), la **sauvegarde du profil joueur** et le journal de debug en sous-onglets |
 | Sauvegarde du profil | ✅ Nouveau | Sauvegarder/restaurer le logbook, les commandes (bindings), les options et les scripts (et en option kneeboard, missions, mods) dans un zip portable, depuis la CLI, l'API ou les Paramètres |
-| Local par conception | ✅ Nouveau | Un `.exe` Windows autonome, ni serveur ni conteneur : persistance SQLite dans `data/`, et toutes les lectures (terrains, Saved Games) se font sur la même machine que DCS |
+| Local par conception | ✅ Nouveau | Le desktop est un `.exe` Windows autonome : persistance SQLite dans `data/`, et toutes les lectures (terrains, Saved Games) se font sur la même machine que DCS |
+| Serveur web (Docker) | ✅ Nouveau | Application web multi-utilisateurs optionnelle : comptes, rôles, journal d’audit, jetons desktop personnels et envoi des missions terminées. Le desktop fonctionne sans ; voir [docs/docker.fr.md](docs/docker.fr.md) |
+| Documents partagés | ✅ Nouveau | Les plans de vol et check-lists ont un propriétaire et une visibilité `privée`/`escadrille` ; la synchro desktop ↔ serveur est en dernière écriture gagnante, avec tombstones et copies de conflit |
+| Outils d’escadrille | ✅ Nouveau | Tableau de bord agrégé, filtres par envoyeur et par pilote, « mes vols », mise en évidence des noms DCS, association compte ↔ pilote, sauvegarde serveur et restauration des conflits |
+| Récupération du mot de passe | ✅ Nouveau | Liens de réinitialisation SMTP optionnels, à usage unique et avec expiration ; un administrateur peut toujours réinitialiser un mot de passe |
 
 > La carte temps réel (et son imagerie) a été **retirée**. La télémétrie des unités
 > est toujours reçue et échantillonnée : la position actuelle sert à l'onglet
 > Aérodromes (aérodrome le plus proche), et les échantillons restent stockés en
-> base pour une éventuelle analyse future. L'interface affiche la carrière, les
-> statistiques, les aérodromes et les paramètres ; les débriefs restent collectés.
-### Panneaux et installation Lua
+> base pour une éventuelle analyse future. L'interface affiche la vue d'ensemble,
+> les vols et débriefs, la carrière, les statistiques, la planification de vol,
+> les check-lists, les aérodromes et les paramètres.
+### Installation Lua
 
-Les PZ55/PZ70 sont lus directement en HID, **sans vJoy ni pilote Windows supplémentaire**.
-L’éditeur visuel propose molette selon le contexte, positions personnalisées,
-règles LED, sources LCD et import/export portable. Sept profils sont fournis :
-F/A-18C, F-16C, F-5E-3, M-2000C, A-10C, JF-17 et AV-8B. Le Hornet possède
-20 attributions et trois sources LED de train.
-
-Les attributions restent dans DCS Manager ; aucun périphérique supplémentaire
-n’apparaît dans le menu Commandes de DCS. DCS-BIOS reste nécessaire aux commandes
-existantes et aux LED. Le trim F/A-18C utilise notre plugin Lua sur UDP local 7780,
-avec file limitée, accusés de réception et relâchement automatique. Certaines
-touches restent sans attribution ; le LCD est facultatif.
-Le trim expérimental est désactivé à chaque démarrage ; sa case dédiée ne doit
-être activée que pour l’essai. La couper annule les impulsions en attente sans remettre le trim de l’avion à zéro.
-**Le mouvement physique du trim, les LED et le multijoueur restent à vérifier dans
-DCS.** Un accusé confirme uniquement l’absence d’erreur de l’appel Lua.
+Le gestionnaire lit les sessions DCS via un petit export Lua installé dans le
+dossier *Saved Games* de DCS. Il transporte la télémétrie des unités, les
+événements, les joueurs et le chat ; les mêmes scripts alimentent la collecte des
+débriefs et les statistiques.
 
 Fermer DCS, puis ouvrir **Paramètres → Installation DCS → Installer / mettre à jour
-les scripts**. L’installateur détecte Saved Games, installe les quatre fichiers
+les scripts**. L’installateur détecte Saved Games, installe les trois fichiers
 embarqués, conserve les autres exports et les réglages existants, et affiche les
 sauvegardes. Il refuse l’installation si DCS.exe tourne. Relancer DCS après
-l’installation. Pendant le développement, utiliser `dcsmanager-panels.exe`.
-
-Voir la [bibliothèque de profils](profiles/panels/README.fr.md) et
-[l’installation, les tests et le retour arrière du plugin](docs/plugin-panels-dcs.fr.md).
+l’installation.
 
 ### Statistiques avancées (prévues)
 
@@ -147,7 +141,7 @@ côté de la base), puisqu'un exécutable lancé au double-clic n'a pas de conso
 
 ### Côté développement / manager
 
-- **Go 1.25+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
+- **Go 1.26+** - <https://go.dev/dl/> (`winget install GoLang.Go`)
 - **Node.js 20+** — <https://nodejs.org/> (uniquement pour builder le frontend)
 - **Git**
 
@@ -209,8 +203,8 @@ statistiques.
 
 ## Configuration
 
-Toute la configuration passe par **variables d'environnement** (préfixe `DCSMANAGER_`) avec des
-défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
+Toute la configuration passe par **variables d'environnement** (préfixe `DCSMANAGER_`, conservé
+pour compatibilité) avec des défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 
 | Variable | Défaut | Description |
 |---|---|---|
@@ -219,6 +213,18 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7776` | Adresse d'écoute UDP (télémétrie des unités). Pas 7778 : **DCS-BIOS possède ce port**, et les deux sont censés tourner ensemble |
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | Adresse d'écoute TCP (events + commandes) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | Chemin de la base SQLite |
+| `DCSMANAGER_MODE` | `desktop` | `server` lance l’application web multi-utilisateurs sans ingestion DCS |
+| `DCSMANAGER_ADMIN_USER` | *(vide)* | Premier administrateur, créé uniquement si la table des utilisateurs est vide |
+| `DCSMANAGER_ADMIN_PASSWORD` | *(vide)* | Mot de passe du premier administrateur (10 caractères minimum) ; ignoré dès qu’un compte existe |
+| `DCSMANAGER_SECURE_COOKIES` | `false` | Marque les cookies de session `Secure` derrière HTTPS |
+| `DCSMANAGER_SMTP_HOST` | *(vide)* | Hôte SMTP pour la récupération par email ; vide désactive la fonction |
+| `DCSMANAGER_SMTP_PORT` | `587` | Port SMTP (STARTTLS) |
+| `DCSMANAGER_SMTP_USER` | *(vide)* | Nom d’utilisateur SMTP |
+| `DCSMANAGER_SMTP_PASSWORD` | *(vide)* | Mot de passe SMTP |
+| `DCSMANAGER_SMTP_FROM` | `no-reply@localhost` | Adresse d’envoi des emails de réinitialisation |
+| `DCSMANAGER_PUBLIC_URL` | `http://localhost:8080` | URL publique utilisée dans les liens de réinitialisation |
+| `DCSMANAGER_PASSWORD_RESET_TTL` | `1800` | Durée de vie d’un lien, en secondes |
+| `DCSMANAGER_DATA_ROOT` | `%LOCALAPPDATA%\DCS Manager` | Remplace le dossier de données utilisateur (portable et tests) |
 | `DCSMANAGER_DB_ENABLED` | `true` | Activer la persistance (sinon tout en mémoire) |
 | `DCSMANAGER_THEATRE` | `Caucasus` | Théâtre par défaut |
 | `DCSMANAGER_UNIT_TTL` | `5` (secondes) | Délai avant qu'une unité silencieuse disparaisse |
@@ -231,7 +237,7 @@ défauts raisonnables. Aucune n'est nécessaire pour une installation normale.
 | `DCSMANAGER_CHARTS_DIR` | `./maps_dcs` | Scans de cartes aéronautiques (approches, plans de mouvement) |
 | `DCSMANAGER_SOURCE` | *(auto)* | Force la source de la session : `live` ou `test` (voir plus bas) |
 | `DCSMANAGER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
-| `DCSMANAGER_DEBUG` | `false` | Journal de débogage en direct (actions, requêtes API, panneaux). Activable aussi depuis Paramètres → Débogage |
+| `DCSMANAGER_DEBUG` | `false` | Journal de débogage en direct (actions, requêtes API, export DCS). Activable aussi depuis Paramètres → Débogage |
 
 ### Côté DCS — `Saved Games\DCS\Config\dcsmanager.cfg`
 
@@ -262,9 +268,7 @@ Les scripts se placent dans le dossier *Saved Games* de DCS :
 ├─ Config\
 │   └─ dcsmanager.cfg          ← configuration de l'adresse backend
 └─ Scripts\
-    ├─ Export.lua             ← télémétrie et plugin panels ; fusion avec les exports existants
-    ├─ DCSManager\
-    │   └─ PanelCommands.lua  ← récepteur trim F/A-18C (UDP 127.0.0.1:7780)
+    ├─ Export.lua             ← télémétrie ; fusion avec les exports existants
     └─ Hooks\
         └─ dcsmanager.lua      ← événements, joueurs, chat (Phases 2+)
 ```
@@ -273,7 +277,7 @@ Les scripts se placent dans le dossier *Saved Games* de DCS :
 2. Ouvre **Paramètres → Installation DCS**, vérifie le dossier détecté, puis clique
    **Installer / mettre à jour les scripts**. Exports et configuration existants
    sont conservés ; les fichiers modifiés sont sauvegardés. L’état s’actualise immédiatement.
-3. Lance DCS et charge une mission. DCS-BIOS s’installe séparément pour les panels.
+3. Lance DCS et charge une mission.
 
 Alternative PowerShell depuis le dossier de l’exécutable :
 
@@ -310,6 +314,7 @@ L’application s’ouvre ensuite dans sa propre fenêtre.
 ```powershell
 dcsmanager                 # ouvre le manager dans une fenêtre native
 dcsmanager serve           # lance le serveur seul ; UI sur http://localhost:8080
+dcsmanager server          # application web multi-utilisateurs (Docker/LAN)
 dcsmanager install-lua     # installe/fusionne les scripts Lua dans Saved Games
 dcsmanager uninstall-lua   # retire le bloc installé (garde la config)
 dcsmanager status          # installed / outdated / missing, par fichier
@@ -318,6 +323,21 @@ dcsmanager backup          # sauvegarde le profil joueur DCS dans une archive po
 dcsmanager restore         # restaure une archive de profil dans Saved Games
 dcsmanager version
 ```
+
+### Application web Docker
+
+Le serveur optionnel est un conteneur séparé ; le desktop ne dépend jamais de
+lui.
+
+```bash
+cp .env.example .env         # définis DCSMANAGER_ADMIN_PASSWORD
+docker compose up -d --build
+```
+
+Ouvre `http://<ip-du-serveur>:8080`, connecte-toi en administrateur, crée un
+jeton desktop dans **Mon profil → Jetons desktop**, puis colle-le sur le desktop
+dans **Paramètres → Synchronisation serveur**. Instructions complètes, HTTPS et
+sauvegarde : [docs/docker.fr.md](docs/docker.fr.md).
 
 ### Sessions de test et `purge`
 
@@ -403,7 +423,7 @@ DCS Manager/
 ├─ frontend/                 # Svelte + Vite
 │   └─ src/
 │       ├─ App.svelte
-│       └─ lib/              # panneaux et stores
+│       └─ lib/              # composants et stores
 ├─ maps_dcs/                 # scans de cartes aéronautiques (local, non versionné)
 ├─ tools/                    # émetteur de télémétrie de test
 └─ docs/                     # documentation
@@ -420,6 +440,11 @@ DCS Manager/
 - [x] **Phase 4 bis — Collecte de télémétrie** : les positions et pertes restent enregistrées ; les cartes analytiques et calculs de sorties ont été retirés
 - [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, binaire unique autonome
 - [x] **Phase 6 — Aérodromes** : fréquences et cartes lues depuis les fichiers DCS
+- [x] **Planification de vol** : aéroports mondiaux et aérodromes DCS, navlog corrigé du vent, briefing DCS
+- [x] **Refonte UI et check-lists** : pages adressables, vue d’ensemble, vols, check-lists avec modèles et import/export
+- [x] **Serveur multi-utilisateurs (Docker)** : comptes, rôles, jetons personnels, journal d’audit et envoi desktop
+- [x] **Documents partagés** : propriété, visibilité et synchronisation bidirectionnelle des plans et check-lists
+- [x] **Outils d’escadrille** : filtres, noms de pilotes, sauvegarde serveur et restauration des conflits
 - [ ] **Phase 1 — Live map** : retirée ; la télémétrie est toujours collectée
 
 Le plan complet et détaillé est disponible dans le fichier de plan du projet.

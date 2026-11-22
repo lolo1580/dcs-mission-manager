@@ -3,6 +3,9 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"dcsmanager/internal/model"
@@ -28,7 +31,123 @@ func (d *DB) SaveDebrief(rec model.Debrief) (model.Debrief, error) {
 		return rec, err
 	}
 	rec.ID, err = res.LastInsertId()
-	return rec, err
+	if err != nil {
+		return rec, err
+	}
+	// A solo or offline flight may have no live player snapshots. The debrief is
+	// then the only source of pilot/landing data, so import it for the statistics
+	// views. Importing is idempotent per mission.
+	if err := d.importDebriefStats(rec); err != nil {
+		log.Printf("db: debrief #%d statistics import: %v", rec.ID, err)
+	}
+	return rec, nil
+}
+
+// BackfillDebriefStats imports pilot statistics for debriefs saved before the
+// import existed. Missions that already have live player_stats are left alone.
+func (d *DB) BackfillDebriefStats() error {
+	recs, err := d.Debriefs(200)
+	if err != nil {
+		return err
+	}
+	for _, rec := range recs {
+		if err := d.importDebriefStats(rec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// importDebriefStats turns the debrief summary into player_stats rows. DCS
+// debriefs carry the pilot names and the takeoff/land counts; live statistics
+// are preferred when they exist, so the import is skipped for a mission that
+// already has snapshots.
+func (d *DB) importDebriefStats(rec model.Debrief) error {
+	if rec.MissionID == 0 {
+		return nil
+	}
+	// The live session often arrives as "tempMission" before the debrief names
+	// the .miz. Replace only generic names, never a user-visible real mission.
+	if name := missionNameFromDebrief(rec); name != "" {
+		_, _ = d.sql.Exec(`UPDATE missions SET name = ?
+			WHERE id = ? AND (name = '' OR name = 'tempMission'
+			OR name = 'Unknown mission' OR name = 'Session without mission')`, name, rec.MissionID)
+	}
+	var existing int
+	if err := d.sql.QueryRow(`SELECT COUNT(*) FROM player_stats WHERE mission_id = ?`, rec.MissionID).Scan(&existing); err != nil {
+		return err
+	}
+	if existing > 0 {
+		return nil
+	}
+	pilots := rec.Parsed.Summary.Pilots
+	if len(pilots) == 0 && strings.TrimSpace(rec.Parsed.Callsign) != "" {
+		pilots = []string{rec.Parsed.Callsign}
+	}
+	if len(pilots) == 0 {
+		return nil
+	}
+
+	unitType, side := "", 0
+	for _, ev := range rec.Parsed.Events {
+		if ev.InitiatorUnitType != "" {
+			unitType = ev.InitiatorUnitType
+			side = ev.InitiatorCoalition
+			break
+		}
+	}
+
+	for _, name := range pilots {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		playerID, err := d.UpsertPlayer("", name)
+		if err != nil {
+			return err
+		}
+		p := model.Player{Name: name, UnitType: unitType, Side: side}
+		if len(pilots) == 1 {
+			// The summary is mission-wide. With one pilot it is that pilot's.
+			p.Landings = rec.Parsed.Summary.Landings
+			p.Crashes = rec.Parsed.Summary.Crashes
+			p.Ejects = rec.Parsed.Summary.Ejections
+			p.KillsAir = rec.Parsed.Summary.Kills
+		} else {
+			// With several pilots, only per-event counts are attributable.
+			for _, ev := range rec.Parsed.Events {
+				if !strings.EqualFold(ev.InitiatorPilot, name) {
+					continue
+				}
+				switch strings.ToLower(ev.Type) {
+				case "land":
+					p.Landings++
+				case "crash":
+					p.Crashes++
+				case "eject", "ejection":
+					p.Ejects++
+				case "shot down", "kill", "killed":
+					p.KillsAir++
+				}
+			}
+		}
+		if err := d.SaveStats(rec.MissionID, playerID, p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// missionNameFromDebrief derives a readable name from the .miz path when the
+// live session only had a placeholder.
+func missionNameFromDebrief(rec model.Debrief) string {
+	raw := strings.TrimSpace(rec.Parsed.MissionFilePath)
+	if raw == "" {
+		return ""
+	}
+	base := filepath.Base(strings.ReplaceAll(raw, "\\", "/"))
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	return strings.TrimSpace(base)
 }
 
 // Debriefs returns recent debriefs (metadata only, newest first).

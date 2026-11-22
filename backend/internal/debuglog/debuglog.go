@@ -2,8 +2,8 @@
 //
 // Debug logging is off by default: the manager is quiet unless the operator asks
 // for it, from the Settings tab or with DCSMANAGER_DEBUG. When on, a line is kept
-// for the notable actions (HTTP requests, panel inputs and the commands they
-// produce, DCS-BIOS frames, mission transitions, debrief transfers) and streamed
+// for the notable actions (HTTP requests, DCS export frames, mission
+// transitions, debrief transfers) and streamed
 // to the UI, so the manager can be watched live instead of digging in a file.
 package debuglog
 
@@ -20,8 +20,8 @@ type Line struct {
 	At int64 `json:"at"`
 	// Level is "info", "warn" or "error".
 	Level string `json:"level"`
-	// Area is the component that logged it ("http", "panel", "dcsbios", "mapping",
-	// "mission", "debrief", "app"…), so the UI can colour or filter by source.
+	// Area is the component that logged it ("http", "mission", "debrief",
+	// "tracker", "app"…), so the UI can colour or filter by source.
 	Area string `json:"area"`
 	// Message is the human sentence.
 	Message string `json:"message"`

@@ -7,9 +7,87 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet adhère
 au [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [2.0.0] - 2026-11-22
 
 ### Ajouté
+
+- Un **serveur Docker multi-utilisateurs** optionnel : comptes et rôles, connexion
+  par session, jetons desktop personnels, journal d'audit, tableau de bord
+  d'escadrille et envoi des missions terminées. Le desktop fonctionne sans.
+- Une **synchronisation serveur** dans les paramètres du desktop : URL du
+  serveur, jeton personnel, test de connexion et envoi des missions réelles
+  récentes, également tenté au démarrage et après chaque débrief.
+- Une sous-commande `server`, un `Dockerfile` multi-étapes, un
+  `docker-compose.yml` et la documentation LAN/HTTPS.
+- `DCSMANAGER_DATA_ROOT` remplace le dossier de données utilisateur, pour les
+  installations portables et les tests.
+- Une coque redessinée avec navigation groupée, routes adressables
+  (`/overview`, `/flights`, `/checklists`, …) et rail d'icônes responsive sur
+  les écrans étroits.
+- Une page **Vue d'ensemble** : heures de vol, missions, victoires, ratio
+  victoires/morts, dernier vol, état DCS, plans enregistrés et check-lists
+  récentes.
+- Une page **Vols** qui fusionne missions et débriefs, avec recherche, filtres
+  par source et par débrief, et la chronologie complète des événements.
+- Des **check-lists** : 13 modèles génériques, création/modification/
+  duplication/suppression, import/export JSON et CSV, et un mode d'exécution
+  avec progression locale, raccourcis clavier et grandes cibles tactiles. La
+  progression est conservée par appareil.
+- Les plans de vol portent un `uid` stable et un compteur de révision, pour
+  survivre à l'export/import et permettre une synchronisation ultérieure.
+- Le tableau de bord serveur propose désormais des **filtres par envoyeur et par
+  pilote**, une bascule **Mes vols**, un marqueur « toi » sur les noms de pilote
+  DCS du compte courant et un téléchargement de **sauvegarde serveur**. Une
+  copie de conflit perdante peut être **restaurée** ou fusionnée champ par champ
+  depuis le même écran.
+- La **récupération du mot de passe par email** est disponible quand SMTP est
+  configuré : les liens sont à usage unique, expirent après 30 minutes et
+  révoquent les sessions existantes.
+- Les plans de vol et check-lists ont désormais un **propriétaire** et une
+  visibilité **privée / escadrille**, avec synchronisation bidirectionnelle
+  desktop ↔ serveur, tombstones de suppression, résolution en dernière écriture
+  gagnante et écran des copies de conflit pour les administrateurs.
+- Une page **Planification de vol** : éditeur de route, recherche d'aéroports,
+  navlog corrigé du vent, estimation carburant et réserve, plans enregistrés.
+- La recherche d’aéroports utilise **48 082 aéroports** du jeu public
+  OurAirports, fusionné avec les aérodromes DCS de la carte choisie (tour,
+  TACAN et ILS affichés).
+- Exports : un **briefing DCS** imprimable.
+- Les débriefs alimentent désormais les statistiques de pilote et d’atterrissage
+  quand les relevés live manquent ; les sessions vides sont exclues des
+  statistiques et les missions prennent le nom du `.miz` au lieu de `tempMission`.
+
+### Modifié
+
+- L’application reste **DCS Manager**. L’exécutable est `dcsmanager.exe` et
+  l’installateur `DCSManager-Setup-*.exe`.
+- Les données utilisateur restent dans `%LOCALAPPDATA%\DCS Manager`. Si un
+  dossier `%LOCALAPPDATA%\Flight Sim Manager` d’une pré-version existe, ses
+  données y sont copiées au premier lancement et le dossier d’origine est
+  conservé.
+- Le nom Flight Sim Manager, utilisé brièvement avant publication, a été
+  abandonné.
+- Le préfixe de variables `DCSMANAGER_*` est conservé, et les fichiers Lua côté
+  DCS gardent leurs noms actuels pour qu'une mise à jour ne charge jamais deux
+  hooks à la fois.
+- La compilation demande désormais **Go 1.26+** ; les mots de passe du serveur
+  utilisent Argon2id via `golang.org/x/crypto`.
+
+### Retiré
+
+- La prise en charge des panneaux de cockpit est entièrement retirée : décodage
+  HID PZ55/PZ70, service HID, liaison DCS-BIOS, associations, sorties LED/LCD,
+  plugin panneaux, ainsi que les réglages, routes API et documents associés. Les
+  panneaux plug-and-play sont mieux servis par leur logiciel constructeur.
+- La page Tacview, le lecteur ACMI et le replay 3D intégré ont été retirés.
+- Le support MSFS, les statistiques multi-simulateur et l’export `.pln` MSFS ont
+  été retirés : l’application est **DCS uniquement**.
+
+### Corrigé
+
+- La table des modules défile au lieu d’être coupée après les lignes visibles.
+- Les graphiques de statistiques affichent un message clair par indicateur au
+  lieu d’axes vides.
 
 - La version installée apparaît à côté de l'état de connexion dans la barre latérale.
 - Filtre de période dans les statistiques du manager : aujourd’hui, semaine,

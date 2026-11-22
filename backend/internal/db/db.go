@@ -6,9 +6,12 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"dcsmanager/internal/idgen"
 
 	_ "modernc.org/sqlite"
 )
@@ -22,6 +25,8 @@ type DB struct {
 	// each insert one, leaving several open missions at a time. It is held only
 	// around the short get-or-create, never around I/O of other kinds.
 	openMissionMu sync.Mutex
+	// syncRevisionMu serialises the server-wide document revision counter.
+	syncRevisionMu sync.Mutex
 }
 
 // Open opens (and migrates) the database at path. Parent directories are
@@ -48,6 +53,9 @@ func Open(path string) (*DB, error) {
 		_ = sqlDB.Close()
 		return nil, err
 	}
+	if err := d.BackfillDebriefStats(); err != nil {
+		log.Printf("db: debrief statistics backfill: %v", err)
+	}
 	return d, nil
 }
 
@@ -71,7 +79,12 @@ CREATE TABLE IF NOT EXISTS missions (
 	source     TEXT NOT NULL DEFAULT 'live',
 	started_at INTEGER NOT NULL,
 	ended_at   INTEGER,
-	winner     TEXT
+	winner     TEXT,
+	-- Import metadata: a mission uploaded by a desktop is identified by its
+	-- owner, the desktop that produced it and the desktop-side mission id.
+	owner_id    INTEGER,
+	client_id   TEXT,
+	external_id INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -133,6 +146,34 @@ CREATE TABLE IF NOT EXISTS meta (
 	value TEXT
 );
 
+-- Saved flight plans. The route is a JSON array of waypoints: a plan is edited
+-- and saved as one document, so there is no benefit in a separate table.
+CREATE TABLE IF NOT EXISTS flight_plans (
+	id             INTEGER PRIMARY KEY AUTOINCREMENT,
+	uid            TEXT NOT NULL,
+	revision       INTEGER NOT NULL DEFAULT 1,
+	owner_id       INTEGER,
+	visibility     TEXT NOT NULL DEFAULT 'private',
+	deleted_at     INTEGER,
+	sync_revision  INTEGER NOT NULL DEFAULT 0,
+	dirty          INTEGER NOT NULL DEFAULT 1,
+	name           TEXT NOT NULL,
+	aircraft       TEXT,
+	departure      TEXT,
+	arrival        TEXT,
+	cruise_alt_ft  INTEGER NOT NULL DEFAULT 0,
+	cruise_tas_kt  INTEGER NOT NULL DEFAULT 0,
+	fuel_burn_pph  REAL NOT NULL DEFAULT 0,
+	reserve_min    INTEGER NOT NULL DEFAULT 0,
+	wind_from_deg  INTEGER NOT NULL DEFAULT 0,
+	wind_kt        INTEGER NOT NULL DEFAULT 0,
+	flight_rules   TEXT NOT NULL DEFAULT 'VFR',
+	notes          TEXT,
+	route          TEXT NOT NULL DEFAULT '[]',
+	created_at     INTEGER NOT NULL,
+	updated_at     INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS debriefs (
 	id         INTEGER PRIMARY KEY AUTOINCREMENT,
 	mission_id INTEGER REFERENCES missions(id),
@@ -141,9 +182,107 @@ CREATE TABLE IF NOT EXISTS debriefs (
 	raw        TEXT,
 	parsed     TEXT NOT NULL,
 	size       INTEGER NOT NULL,
-	created_at INTEGER NOT NULL
+	created_at INTEGER NOT NULL,
+	external_id INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_debriefs_mission ON debriefs(mission_id);
+
+-- Checklists are edited as one document, like flight plans. Progress is kept by
+-- each device, so it is deliberately not stored here.
+CREATE TABLE IF NOT EXISTS checklists (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	uid         TEXT NOT NULL UNIQUE,
+	name        TEXT NOT NULL,
+	aircraft    TEXT,
+	phase       TEXT NOT NULL,
+	description TEXT,
+	source      TEXT NOT NULL DEFAULT 'user',
+	visibility  TEXT NOT NULL DEFAULT 'private',
+	revision    INTEGER NOT NULL DEFAULT 1,
+	owner_id    INTEGER,
+	deleted_at  INTEGER,
+	sync_revision INTEGER NOT NULL DEFAULT 0,
+	dirty       INTEGER NOT NULL DEFAULT 1,
+	items       TEXT NOT NULL DEFAULT '[]',
+	created_at  INTEGER NOT NULL,
+	updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checklists_updated ON checklists(updated_at);
+
+-- Server-wide revision counter for document synchronisation.
+CREATE TABLE IF NOT EXISTS server_meta (
+	key   TEXT PRIMARY KEY,
+	value INTEGER NOT NULL DEFAULT 0
+);
+
+-- Versions rejected by last-write-wins, kept for inspection.
+CREATE TABLE IF NOT EXISTS conflict_copies (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	kind       TEXT NOT NULL,
+	uid        TEXT NOT NULL,
+	owner_id   INTEGER,
+	revision   INTEGER,
+	updated_at INTEGER,
+	payload    TEXT NOT NULL,
+	reason     TEXT,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_conflict_owner ON conflict_copies(owner_id);
+
+-- Accounts, sessions and personal tokens. They are unused by the desktop
+-- binary, but keeping one schema means a desktop database can become a server
+-- database without a conversion step.
+CREATE TABLE IF NOT EXISTS users (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+	display_name  TEXT,
+	email         TEXT,
+	password_hash TEXT NOT NULL,
+	role          TEXT NOT NULL DEFAULT 'member',
+	active        INTEGER NOT NULL DEFAULT 1,
+	dcs_names     TEXT NOT NULL DEFAULT '[]',
+	created_at    INTEGER NOT NULL,
+	last_login_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+	token_hash TEXT PRIMARY KEY,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	created_at INTEGER NOT NULL,
+	expires_at INTEGER NOT NULL,
+	user_agent TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+	token_hash TEXT PRIMARY KEY,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	created_at INTEGER NOT NULL,
+	expires_at INTEGER NOT NULL,
+	used_at    INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_resets_expiry ON password_resets(expires_at);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	name         TEXT NOT NULL,
+	token_hash   TEXT NOT NULL UNIQUE,
+	created_at   INTEGER NOT NULL,
+	last_used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+	id      INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	action  TEXT NOT NULL,
+	detail  TEXT,
+	real_ts INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(real_ts);
 
 -- Position and telemetry samples over time.
 CREATE TABLE IF NOT EXISTS track_positions (
@@ -191,6 +330,15 @@ CREATE INDEX IF NOT EXISTS idx_losses_ts ON losses(real_ts);
 	const indexes = `
 CREATE INDEX IF NOT EXISTS idx_missions_source ON missions(source);
 CREATE INDEX IF NOT EXISTS idx_stats_player_ts ON player_stats(player_id, real_ts);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_flight_plans_uid ON flight_plans(uid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_missions_import
+	ON missions(owner_id, client_id, external_id) WHERE external_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_debriefs_import
+	ON debriefs(mission_id, external_id) WHERE external_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_flight_plans_sync ON flight_plans(sync_revision);
+CREATE INDEX IF NOT EXISTS idx_checklists_sync ON checklists(sync_revision);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)
+	WHERE email IS NOT NULL AND email <> '';
 `
 
 	if _, err := d.sql.Exec(schema); err != nil {
@@ -238,6 +386,89 @@ func (d *DB) migrations() error {
 	}
 	if err := d.ensureColumn("player_stats", "country", "TEXT"); err != nil {
 		return err
+	}
+	// Flight plans gained a stable identifier and a revision counter for future
+	// synchronisation. Existing plans get an identifier before the unique index
+	// is created.
+	if err := d.ensureColumn("flight_plans", "uid", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("flight_plans", "revision", "INTEGER NOT NULL DEFAULT 1"); err != nil {
+		return err
+	}
+	// Server imports: a mission uploaded by a desktop is identified by its
+	// owner, client and desktop-side id. The columns are empty on the desktop.
+	if err := d.ensureColumn("missions", "owner_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("missions", "client_id", "TEXT"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("missions", "external_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("debriefs", "external_id", "INTEGER"); err != nil {
+		return err
+	}
+	// Document ownership and synchronisation.
+	if err := d.ensureColumn("users", "email", "TEXT"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("flight_plans", "owner_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("flight_plans", "visibility", "TEXT NOT NULL DEFAULT 'private'"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("flight_plans", "deleted_at", "INTEGER"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("flight_plans", "sync_revision", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("flight_plans", "dirty", "INTEGER NOT NULL DEFAULT 1"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("checklists", "owner_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("checklists", "deleted_at", "INTEGER"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("checklists", "sync_revision", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("checklists", "dirty", "INTEGER NOT NULL DEFAULT 1"); err != nil {
+		return err
+	}
+	return d.backfillFlightPlanUIDs()
+}
+
+// backfillFlightPlanUIDs gives an identifier to plans written by a version that
+// predates the uid column.
+func (d *DB) backfillFlightPlanUIDs() error {
+	rows, err := d.sql.Query(`SELECT id FROM flight_plans WHERE uid IS NULL OR uid = ''`)
+	if err != nil {
+		return err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, id := range ids {
+		if _, err := d.sql.Exec(`UPDATE flight_plans SET uid = ? WHERE id = ?`, idgen.New("fp_"), id); err != nil {
+			return err
+		}
 	}
 	return nil
 }

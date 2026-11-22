@@ -57,16 +57,13 @@ func TestScriptAutoInstallerPreservesUserFilesAndRefreshesStatus(t *testing.T) {
 	if got, _ := os.ReadFile(cfg); string(got) != string(settings) {
 		t.Fatal("custom configuration overwritten")
 	}
-	if _, err := os.Stat(filepath.Join(root, "Scripts", "DCSManager", "PanelCommands.lua")); err != nil {
-		t.Fatal(err)
-	}
 	invoke()
 	backups, _ = filepath.Glob(export + ".bak-*")
 	if len(backups) != 1 {
 		t.Fatal("repeat installation not idempotent")
 	}
 	status := s.scriptStatusNow()
-	if len(status.Managed) != 4 {
+	if len(status.Managed) != 3 {
 		t.Fatal("stale script status")
 	}
 	for _, st := range status.Managed {

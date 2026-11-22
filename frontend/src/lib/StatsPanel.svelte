@@ -5,10 +5,16 @@
     statTab, STAT_TABS, scopeMode, statsPeriod, statsDateFrom, statsDateTo,
     selectedMissionID, statsMissions, statsMissionsError, statsTrend,
     trendPilotUCID, trendLoading, trendError, statsError, statsLoading,
-    statsNetwork, statsEnabled, loadStats, loadStatsMissions, loadTrend, fmtNum,
+    statsNetwork, statsEnabled,
+    loadStats, loadStatsMissions, loadTrend, fmtNum,
   } from './stats.js';
   import { t } from './i18n.js';
+  import { sessionUser, isServer } from './session.js';
   import StatsTrend from './StatsTrend.svelte';
+
+  function isMine(name) {
+    return $isServer && ($sessionUser?.dcsNames ?? []).includes(name);
+  }
 
   const STAT_TAB_KEYS = {
     pilots: 'stats.pilots', weapons: 'stats.weapons', engines: 'stats.engines',
@@ -197,7 +203,10 @@
               {#each $statsPilots as p, i}
                 <tr>
                   <td class="medal">{medal(i)}</td>
-                  <td class="name" title={p.ucid}>{p.name}</td>
+                  <td class="name" title={p.ucid}>
+                    {p.name}
+                    {#if isMine(p.name)}<span class="you">{$t('stats.you')}</span>{/if}
+                  </td>
                   <td class="num">{p.score}</td>
                   <td class="num">{p.killsAir}/{p.killsCar}/{p.killsShip}</td>
                   <td class="num">{p.deaths}</td>
@@ -402,6 +411,16 @@
     text-overflow: ellipsis;
   }
 
+  .you {
+    margin-left: 0.3rem;
+    padding: 0.02rem 0.3rem;
+    color: var(--blue);
+    background: var(--blue-soft);
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 600;
+  }
+
   /* ---- Statistics ---- */
 
   .stats {
@@ -410,6 +429,7 @@
 
   .stats-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.7rem;
     margin-bottom: 0.7rem;

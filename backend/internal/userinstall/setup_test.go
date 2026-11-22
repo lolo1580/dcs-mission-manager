@@ -21,7 +21,7 @@ func put(t *testing.T, path, value string) {
 func TestMigrationAndUpgradePreserveData(t *testing.T) {
 	root, portable, sg, game := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
 	put(t, filepath.Join(game, "bin-mt", "DCS.exe"), "fixture")
-	put(t, filepath.Join(portable, "data", "dcsmanager.db"), "original")
+	put(t, filepath.Join(portable, "data", config.DatabaseFile), "original")
 	put(t, filepath.Join(portable, "data", "profiles", "mapping.json"), "mapping")
 	if err := os.Mkdir(filepath.Join(portable, "maps_dcs"), 0755); err != nil {
 		t.Fatal(err)
@@ -30,16 +30,16 @@ func TestMigrationAndUpgradePreserveData(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, base := range []string{root, portable} {
-		data, err := os.ReadFile(filepath.Join(base, "data", "dcsmanager.db"))
+		data, err := os.ReadFile(filepath.Join(base, "data", config.DatabaseFile))
 		if err != nil || string(data) != "original" {
 			t.Fatalf("migration corrupted %s: %s %v", base, data, err)
 		}
 	}
-	put(t, filepath.Join(root, "data", "dcsmanager.db"), "installed changes")
+	put(t, filepath.Join(root, "data", config.DatabaseFile), "installed changes")
 	if _, err := Configure(root, "", portable, ""); err != nil {
 		t.Fatal(err)
 	}
-	data, _ := os.ReadFile(filepath.Join(root, "data", "dcsmanager.db"))
+	data, _ := os.ReadFile(filepath.Join(root, "data", config.DatabaseFile))
 	if string(data) != "installed changes" {
 		t.Fatal("upgrade overwrote installed data")
 	}
@@ -59,7 +59,7 @@ func TestMigrationAndUpgradePreserveData(t *testing.T) {
 func TestInvalidConfigurationDoesNotImport(t *testing.T) {
 	root, portable := t.TempDir(), t.TempDir()
 	put(t, filepath.Join(root, "settings.json"), "invalid json")
-	put(t, filepath.Join(portable, "data", "dcsmanager.db"), "original")
+	put(t, filepath.Join(portable, "data", config.DatabaseFile), "original")
 	if _, err := Configure(root, "", portable, ""); err == nil {
 		t.Fatal("invalid settings accepted")
 	}

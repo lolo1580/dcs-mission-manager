@@ -87,6 +87,12 @@ dcsmanager version
 | `internal/db` | SQLite persistence (pure Go) |
 | `internal/tracker` | Position history and loss detection |
 | `internal/stats` | Statistical aggregations (Phase 4) |
+| `internal/flightplan` | Flight plan model, navlog and DCS briefing |
+| `internal/checklist` | Checklist model and validation |
+| `internal/idgen` | Short random identifiers for plans and checklists |
+| `internal/auth` | Password hashing (Argon2id), session and API token primitives |
+| `internal/syncer` | Optional desktop → server mission upload |
+| `internal/airportdata` | Embedded worldwide airport dataset (OurAirports, public domain) |
 
 ## Frontend
 
@@ -95,12 +101,47 @@ versioned), then embedded into the Go binary via `//go:embed`. Result: **a singl
 executable** contains the backend and the interface. If the frontend has not been
 built, a fallback page is served automatically.
 
-The UI is organised in pages: **Career**, **Statistics**, **Airfields**
-(reference data, frequencies and charts) and **Settings**, which groups the installed
-modules, the DCS-side install (scripts and mods) and the cockpit panels as sub-tabs.
-There is no live map, no mission library, no analysis view and no DCS-configuration
-view any more; the Debriefs view is also hidden. Unit telemetry is still received
-and sampled, and current position feeds the airfields tab.
+The UI is organised in addressable pages: **Overview**, **Flights** (missions
+and debriefs), **Career**, **Statistics**, **Flight planning**, **Checklists**,
+**Airfields** (reference data, frequencies and charts) and **Settings**, which
+groups the installed modules, the DCS-side install (scripts and mods), the
+profile backup and the debug log as sub-tabs. A small history router uses
+`history.pushState`; the Go handler already falls back to `index.html`, so a
+reload on `/checklists` works. The server profile shows **Squadron**, **Flights**,
+**Statistics**, **Flight planning**, **Checklists**, **Airfields**, **My profile**
+and, for administrators, **Administration**.
+There is no live map and no analysis view any more. Unit telemetry is still
+received and sampled, and current position feeds the airfields tab.
+
+## Server mode
+
+The same binary exposes a second profile, `dcsmanager server` (or
+`DCSMANAGER_MODE=server`). It opens the same SQLite schema but:
+
+- never opens the UDP/TCP telemetry ports and never reads Saved Games;
+- requires a session for every API call except health, login and the session
+  probe; desktop-only routes return 404;
+- boots the first administrator from `DCSMANAGER_ADMIN_USER` and
+  `DCSMANAGER_ADMIN_PASSWORD` when the users table is empty;
+- stores Argon2id password hashes, sessions and personal API tokens, and
+  records account changes in an audit log;
+- can send **single-use password-reset links** when SMTP is configured
+  (`DCSMANAGER_SMTP_*`); without SMTP, an administrator resets passwords;
+- exposes an administrator **database backup** (`VACUUM INTO` + zip) and a
+  **conflict merge** screen (restore the losing version or choose fields);
+- accepts `POST /api/sync/upload` from a desktop token, upserting missions by
+  `(owner, client, desktop id)` so a retry does not duplicate data.
+
+The desktop uploads finished live missions from **Settings → Server sync**. The
+server serves the shared flights, statistics, plans and checklists through the
+same Svelte application, with a server-specific navigation and login page.
+Plans and checklists carry an owner, a private/squadron visibility and a
+server-wide revision. The desktop pulls changes, then pushes the documents
+changed locally (tracked by a per-document dirty flag), using last-write-wins
+for concurrent edits and tombstones for deletions. The losing version is kept in
+`conflict_copies` and shown under **Administration**.
+`Dockerfile` and `docker-compose.yml` package the profile for Linux; see
+[docs/docker.md](docker.md).
 
 ## Application window
 

@@ -71,9 +71,11 @@ func (d *DB) MissionsSince(sinceID int64, limit int) ([]model.Mission, error) {
 		limit = 1000
 	}
 	rows, err := d.sql.Query(
-		`SELECT id, name, COALESCE(theatre,''), COALESCE(source,'live'), started_at,
-		        COALESCE(ended_at,0), COALESCE(winner,'')
-		 FROM missions WHERE id > ? ORDER BY id ASC LIMIT ?`, sinceID, limit)
+		`SELECT m.id, m.name, COALESCE(m.theatre,''), COALESCE(m.source,'live'), m.started_at,
+		        COALESCE(m.ended_at,0), COALESCE(m.winner,''), COALESCE(m.owner_id,0),
+		        COALESCE(u.username,'')
+		 FROM missions m LEFT JOIN users u ON u.id = m.owner_id
+		 WHERE m.id > ? ORDER BY m.id ASC LIMIT ?`, sinceID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +85,7 @@ func (d *DB) MissionsSince(sinceID int64, limit int) ([]model.Mission, error) {
 	for rows.Next() {
 		var m model.Mission
 		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source,
-			&m.StartedAt, &m.EndedAt, &m.Winner); err != nil {
+			&m.StartedAt, &m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

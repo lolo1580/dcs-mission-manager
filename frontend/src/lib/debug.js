@@ -2,8 +2,8 @@
  * Debug store: the runtime debug switch and the live log it records.
  *
  * Debug logging is off by default. When on, the backend pushes a line for every
- * notable action (HTTP requests, panel inputs and the commands they produce,
- * DCS-BIOS frames, mission and debrief transitions), which is shown here and in
+ * notable action (HTTP requests, DCS export frames, mission and debrief
+ * transitions), which is shown here and in
  * the file log. Handy to watch "what is the manager doing?" without a console.
  */
 import { writable, derived } from 'svelte/store';

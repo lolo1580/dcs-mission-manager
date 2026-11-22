@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"dcsmanager/internal/db"
+	"dcsmanager/internal/model"
 	"dcsmanager/internal/stats"
 )
 
@@ -32,9 +33,16 @@ func (s *Server) scopeFromRequest(r *http.Request) stats.Scope {
 		if id, err := strconv.ParseInt(q.Get("missionId"), 10, 64); err == nil && id > 0 {
 			sc.MissionID = id
 		} else if s.db != nil {
-			// Only live missions appear by default: the newest test run must not
-			// make the Mission view look empty while career stats exclude tests.
-			if list, err := s.db.MissionsWithSource(db.SourceLive, 1); err == nil && len(list) > 0 {
+			// Only live missions with actual data appear by default: the newest
+			// test run or an empty menu session must not make the Mission view
+			// look broken while career stats exclude them.
+			list, err := s.db.MissionsWithSource(db.SourceLive, 1)
+			if l, ok := s.db.(interface {
+				MissionsWithData(string, int) ([]model.Mission, error)
+			}); ok {
+				list, err = l.MissionsWithData(db.SourceLive, 1)
+			}
+			if err == nil && len(list) > 0 {
 				sc.MissionID = list[0].ID
 			}
 		}
@@ -47,6 +55,11 @@ func (s *Server) handleStatsMissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, err := s.db.MissionsWithSource(db.SourceLive, 200)
+	if l, ok := s.db.(interface {
+		MissionsWithData(string, int) ([]model.Mission, error)
+	}); ok {
+		list, err = l.MissionsWithData(db.SourceLive, 200)
+	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

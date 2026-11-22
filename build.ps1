@@ -1,4 +1,4 @@
-# DCS Manager — build script (Windows / PowerShell)
+# DCS Manager - build script (Windows / PowerShell)
 #
 # Usage:
 #   .\build.ps1              # Windows installer (dist/DCSManager-Setup-*.exe)

@@ -31,7 +31,6 @@ func setup(t *testing.T) (*Installer, string) {
 
 	luaDir := filepath.Join(root, "dcs-lua")
 	mustWrite(t, filepath.Join(luaDir, "Export.lua"), distExport)
-	mustWrite(t, filepath.Join(luaDir, "PanelCommands.lua"), "return function() return {} end\n")
 	mustWrite(t, filepath.Join(luaDir, "Hooks", "dcsmanager.lua"), distHooks)
 	mustWrite(t, filepath.Join(luaDir, "Config", "dcsmanager.cfg"), distConfig)
 
@@ -208,6 +207,9 @@ func TestUninstallRemovesBlockAndKeepsRest(t *testing.T) {
 	if _, err := in.Install(DefaultTargets()); err != nil {
 		t.Fatal(err)
 	}
+	// A panel plugin left by an older version must be cleaned up even though the
+	// current build no longer ships it.
+	mustWrite(t, filepath.Join(sg, "Scripts", "DCSManager", "PanelCommands.lua"), "return function() return {} end\n")
 
 	results, err := in.Uninstall()
 	if err != nil {

@@ -9,8 +9,20 @@ import (
 
 	"dcsmanager/internal/category"
 	"dcsmanager/internal/db"
+	"dcsmanager/internal/model"
 	"dcsmanager/internal/stats"
 )
+
+// TestUnknownAPIRouteIsNotSPA checks that a removed or unknown API endpoint
+// answers 404 instead of falling back to index.html with a 200.
+func TestUnknownAPIRouteIsNotSPA(t *testing.T) {
+	s := &Server{}
+	rec := httptest.NewRecorder()
+	s.webHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/does-not-exist", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown API route status = %d, want 404", rec.Code)
+	}
+}
 
 // TestStatsEndpointsDegradeWithoutDatabase guards a real panic: stats.New
 // returns a non-nil service even when the database is disabled
@@ -63,6 +75,13 @@ func TestMissionScopeDefaultsToLatestLiveMission(t *testing.T) {
 	defer database.Close()
 	live, err := database.StartMission("Real flight", "Caucasus", db.SourceLive)
 	if err != nil {
+		t.Fatal(err)
+	}
+	playerID, err := database.UpsertPlayer("u-test", "Pilot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SaveStats(live, playerID, model.Player{Name: "Pilot"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := database.StartMission("Fixture", "Caucasus", db.SourceTest); err != nil {

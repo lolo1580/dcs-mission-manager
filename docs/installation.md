@@ -37,7 +37,7 @@ enregistrée, ainsi que le dépannage.
 
 Pour **construire l’installateur depuis les sources** uniquement, il faut en plus :
 
-- **Go 1.25+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
+- **Go 1.26+** - <https://go.dev/dl/> (`winget install GoLang.Go`)
 - **Node.js 20+** — <https://nodejs.org/>
 - **Git**
 - **Inno Setup 6.7+**
@@ -73,7 +73,7 @@ compte Windows, sans droits administrateur. Les données sont conservées dans
 ### 2.2 Installer les scripts côté DCS
 
 Dans l’assistant, vérifiez le dossier Saved Games détecté et cochez l’option
-**Installer / mettre à jour les scripts Lua DCS Manager** si vous souhaitez les
+**Installer / mettre à jour les scripts Lua de DCS Manager** si vous souhaitez les
 installer immédiatement. Fermez DCS avant cette étape. Vous pouvez aussi les
 installer plus tard depuis **Paramètres → Installation DCS** dans l’application.
 L’installation fusionne le bloc DCS Manager dans `Export.lua` et conserve les

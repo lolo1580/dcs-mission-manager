@@ -63,6 +63,12 @@ func (sc Scope) filter(column string) (string, []any) {
 			frag += " AND started_at < ?"
 			args = append(args, sc.BeforeMs)
 		}
+		// Empty live sessions (menu time, a mission that never produced a debrief
+		// or a player snapshot, or a recorded flight) are not statistics: they
+		// used to inflate the mission count and leave the charts blank. Only
+		// missions with real data participate.
+		frag += " AND (EXISTS (SELECT 1 FROM player_stats ps WHERE ps.mission_id = missions.id)" +
+			" OR EXISTS (SELECT 1 FROM debriefs d WHERE d.mission_id = missions.id))"
 		frag += ")"
 	}
 	return frag, args
@@ -565,7 +571,6 @@ func (s *Service) Overview(sc Scope) (Overview, error) {
 	if err != nil {
 		return o, err
 	}
-
 	where, args := sc.filter("mission_id")
 	var kills, deaths, crashes, ejects, ff *int
 	row := s.db.QueryRow(`

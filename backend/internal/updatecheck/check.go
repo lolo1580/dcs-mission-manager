@@ -86,9 +86,11 @@ func (c *Checker) Check(ctx context.Context, current string, refresh bool) Resul
 		if !valid || (release.Prerelease != (candidate.pre != "")) {
 			continue
 		}
-		name := "DCSManager-Setup-" + strings.TrimPrefix(release.TagName, "v") + ".exe"
+		version := strings.TrimPrefix(release.TagName, "v")
+		name := "DCSManager-Setup-" + version + ".exe"
+		legacyName := "FlightSimManager-Setup-" + version + ".exe"
 		for _, asset := range release.Assets {
-			if asset.Name != name || !strings.HasPrefix(asset.BrowserDownloadURL, releaseBase+"/download/") {
+			if (asset.Name != name && asset.Name != legacyName) || !strings.HasPrefix(asset.BrowserDownloadURL, releaseBase+"/download/") {
 				continue
 			}
 			if !found || compare(candidate, latest) > 0 {

@@ -1,0 +1,17 @@
+.git
+.github
+**/node_modules
+**/dist
+dist
+*.exe
+*.log
+/data
+/docs
+/maps_dcs
+/old project
+/notes
+/output
+/.playwright-cli
+/Logo
+/.env
+/.env.*

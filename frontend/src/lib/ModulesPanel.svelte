@@ -138,7 +138,8 @@
   {:else if $visibleModules.length === 0}
     <p class="empty">{$t('modules.noMatch')}</p>
   {:else}
-    <table>
+    <div class="table-wrap">
+      <table>
       <thead>
         <tr>
           <th>{$t('modules.col.module')}</th>
@@ -182,7 +183,8 @@
           </tr>
         {/each}
       </tbody>
-    </table>
+      </table>
+    </div>
   {/if}
 </section>
 
@@ -294,11 +296,16 @@
     background: color-mix(in srgb, var(--blue) 18%, var(--bg));
   }
 
+  .table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.78rem;
-    overflow-y: auto;
   }
 
   th {

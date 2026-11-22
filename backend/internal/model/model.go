@@ -179,4 +179,8 @@ type Mission struct {
 	StartedAt int64  `json:"startedAt"`
 	EndedAt   int64  `json:"endedAt,omitempty"`
 	Winner    string `json:"winner,omitempty"`
+	// OwnerID and Uploader are set on a server for a mission uploaded by a
+	// desktop account. They stay empty on the desktop itself.
+	OwnerID  int64  `json:"ownerId,omitempty"`
+	Uploader string `json:"uploader,omitempty"`
 }

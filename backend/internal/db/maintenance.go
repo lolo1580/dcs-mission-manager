@@ -296,15 +296,16 @@ func (d *DB) MissionsWithSource(source string, limit int) ([]model.Mission, erro
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	q := `SELECT id, name, COALESCE(theatre,''), COALESCE(source,'live'), started_at,
-	             COALESCE(ended_at,0), COALESCE(winner,'')
-	      FROM missions`
+	q := `SELECT m.id, m.name, COALESCE(m.theatre,''), COALESCE(m.source,'live'), m.started_at,
+	             COALESCE(m.ended_at,0), COALESCE(m.winner,''), COALESCE(m.owner_id,0),
+	             COALESCE(u.username,'')
+	      FROM missions m LEFT JOIN users u ON u.id = m.owner_id`
 	var args []any
 	if source != "" {
-		q += ` WHERE source = ?`
+		q += ` WHERE m.source = ?`
 		args = append(args, source)
 	}
-	q += ` ORDER BY id DESC LIMIT ?`
+	q += ` ORDER BY m.id DESC LIMIT ?`
 	args = append(args, limit)
 
 	rows, err := d.sql.Query(q, args...)
@@ -317,7 +318,79 @@ func (d *DB) MissionsWithSource(source string, limit int) ([]model.Mission, erro
 	for rows.Next() {
 		var m model.Mission
 		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source,
-			&m.StartedAt, &m.EndedAt, &m.Winner); err != nil {
+			&m.StartedAt, &m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// MissionsForPilot lists missions in which a DCS pilot name appears in the
+// player snapshots. It powers the Flights pilot filter on both profiles.
+func (d *DB) MissionsForPilot(pilot string, limit int) ([]model.Mission, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := d.sql.Query(
+		`SELECT DISTINCT m.id, m.name, COALESCE(m.theatre,''), COALESCE(m.source,'live'),
+		        m.started_at, COALESCE(m.ended_at,0), COALESCE(m.winner,''),
+		        COALESCE(m.owner_id,0), COALESCE(u.username,'')
+		 FROM missions m
+		 LEFT JOIN users u ON u.id = m.owner_id
+		 JOIN player_stats ps ON ps.mission_id = m.id
+		 JOIN players p ON p.id = ps.player_id
+		 WHERE p.name = ? COLLATE NOCASE
+		 ORDER BY m.id DESC LIMIT ?`, pilot, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []model.Mission
+	for rows.Next() {
+		var m model.Mission
+		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source, &m.StartedAt,
+			&m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// MissionsWithData lists missions that have something to show in statistics:
+// either a player snapshot or a debrief. Empty live sessions (menu time, a
+// mission that produced no data) are excluded from the stats mission picker.
+func (d *DB) MissionsWithData(source string, limit int) ([]model.Mission, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	q := `SELECT m.id, m.name, COALESCE(m.theatre,''), COALESCE(m.source,'live'), m.started_at,
+	             COALESCE(m.ended_at,0), COALESCE(m.winner,''), COALESCE(m.owner_id,0),
+	             COALESCE(u.username,'')
+	      FROM missions m LEFT JOIN users u ON u.id = m.owner_id
+	      WHERE (EXISTS (SELECT 1 FROM player_stats ps WHERE ps.mission_id = m.id)
+	          OR EXISTS (SELECT 1 FROM debriefs d WHERE d.mission_id = m.id))`
+	var args []any
+	if source != "" {
+		q += ` AND m.source = ?`
+		args = append(args, source)
+	}
+	q += ` ORDER BY m.id DESC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := d.sql.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []model.Mission
+	for rows.Next() {
+		var m model.Mission
+		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source,
+			&m.StartedAt, &m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

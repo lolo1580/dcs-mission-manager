@@ -2,7 +2,7 @@
   /**
    * Debug: the runtime debug switch and the live log. It is its own sub-tab of
    * Settings, so it can be left open (the log updates over SSE) while the user
-   * drives the panels.
+   * works elsewhere in the manager.
    */
   import { onMount } from 'svelte';
   import {

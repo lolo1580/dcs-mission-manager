@@ -53,26 +53,28 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 french.WelcomeLabel1=Bienvenue dans DCS Manager
-french.WelcomeLabel2=Votre compagnon DCS : statistiques, aérodromes et panels.%n%nInstallation pour votre compte Windows, sans droits administrateur. Vos profils restent séparés du programme.
+french.WelcomeLabel2=Votre compagnon DCS : débriefs, statistiques et aérodromes.%n%nInstallation pour votre compte Windows, sans droits administrateur. Vos profils restent séparés du programme.
 english.WelcomeLabel1=Welcome to DCS Manager
-english.WelcomeLabel2=Your DCS companion: statistics, airfields and panels.%n%nInstalls for your Windows account, without administrator rights. Your profiles stay separate from the application.
+english.WelcomeLabel2=Your DCS companion: debriefs, statistics and airfields.%n%nInstalls for your Windows account, without administrator rights. Your profiles stay separate from the application.
 french.ExistingInstall=Version %1 déjà installée. Installation de la version %2 ; vos données et profils restent en place.
 english.ExistingInstall=Version %1 is already installed. Installing version %2; your data and profiles stay in place.
 french.NewInstall=Aucune version installée détectée. Installation de la version %1.
 english.NewInstall=No installed version detected. Installing version %1.
+french.LegacyInstall=Une installation de Flight Sim Manager a été détectée. Vos données seront copiées dans le dossier DCS Manager au premier lancement ; vous pourrez ensuite désinstaller l’ancienne version.
+english.LegacyInstall=A Flight Sim Manager installation was detected. Your data will be copied into the DCS Manager folder on first launch; the old version can then be uninstalled.
 french.DesktopShortcut=Créer un raccourci sur le Bureau
 english.DesktopShortcut=Create a desktop shortcut
 french.DCSTitle=Votre installation DCS
 english.DCSTitle=Your DCS installation
 french.DCSDescription=Vérifiez les dossiers détectés ou corrigez-les.
 english.DCSDescription=Check the detected folders or select different ones.
-french.DCSHint=Ces dossiers sont facultatifs pour installer l’application. Saved Games est requis pour les scripts Lua. Aucun pilote ni DCS-BIOS n’est installé.
-english.DCSHint=These folders are optional for the application. Saved Games is required for Lua scripts. No driver or DCS-BIOS is installed.
+french.DCSHint=Ces dossiers sont facultatifs pour installer l'application. Saved Games est requis pour les scripts Lua. Aucun pilote ni logiciel tiers n'est installé.
+english.DCSHint=These folders are optional for the application. Saved Games is required for Lua scripts. No driver or third-party software is installed.
 french.GameFolder=Dossier du jeu DCS :
 english.GameFolder=DCS game folder:
 french.SavedGamesFolder=Dossier Saved Games DCS :
 english.SavedGamesFolder=DCS Saved Games folder:
-french.LuaOption=Installer / mettre à jour les scripts Lua DCS Manager
+french.LuaOption=Installer / mettre à jour les scripts Lua de DCS Manager
 english.LuaOption=Install / update DCS Manager Lua scripts
 french.MigrationTitle=Reprendre la version portable
 english.MigrationTitle=Import a portable installation
@@ -97,8 +99,6 @@ Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; Flags: unchecked
 [Files]
 Source: "{#StageDir}\dcsmanager.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "installed-mode"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\profiles\panels\*.json"; DestDir: "{app}\profiles\panels"; Flags: ignoreversion
-Source: "..\docs\plugin-panels-dcs.fr.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "..\docs\installation-windows.fr.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
@@ -148,6 +148,16 @@ begin
     if RegQueryStringValue(HKCU, Key, 'InstallLocation', InstallDir) and
        not FileExists(AddBackslash(InstallDir) + 'dcsmanager.exe') then Result := '';
   end;
+end;
+{ LegacyInstalled reports an installation of the pre-rename product. Its data is
+  copied by the application itself on first launch; the wizard only warns. }
+function LegacyInstalled: Boolean;
+var
+  Folder: String;
+begin
+  Folder := ExpandConstant('{localappdata}\Programs\Flight Sim Manager');
+  Result := FileExists(AddBackslash(Folder) + 'flightsimmanager.exe') or
+            FileExists(AddBackslash(Folder) + 'dcsmanager.exe');
 end;
 procedure ChooseFolder(Page: TInputQueryWizardPage; Index: Integer);
 var Folder: String;
@@ -218,6 +228,9 @@ begin
   else
     WizardForm.WelcomeLabel2.Caption := CustomMessage('WelcomeLabel2') + #13#10#13#10 +
       FmtMessage(CustomMessage('NewInstall'), ['{#AppVersion}']);
+  if LegacyInstalled then
+    WizardForm.WelcomeLabel2.Caption := WizardForm.WelcomeLabel2.Caption + #13#10#13#10 +
+      CustomMessage('LegacyInstall');
 end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin

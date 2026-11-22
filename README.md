@@ -6,7 +6,7 @@
 
 🇬🇧 English | [🇫🇷 Français](README.fr.md)
 
-An all-in-one companion for **DCS World**: debriefing collection, advanced statistics, airfield reference and aeronautical charts. It runs **locally, on the same Windows machine as DCS**: one `dcsmanager.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
+An all-in-one companion for **DCS World** — debriefing collection, advanced statistics, airfield reference, aeronautical charts and flight planning. It runs **locally, on the same Windows machine as DCS**: one `dcsmanager.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
 
 Because it is local, it can read **DCS's own files** — the airfields, frequencies and beacons of every installed map, as well as the Saved Games folder — instead of relying on a hand-maintained dataset.
 
@@ -32,47 +32,39 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 
 | Feature | Status | Details |
 |---|---|---|
-| Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser and retained history; view currently hidden |
+| Debriefings | ✅ Phase 3 | Network transfer of `debrief.log`, Lua parser and retained history, merged with missions in the **Flights** page with the full event timeline |
+| Overview | ✅ New | Flight hours, missions, kills, kill/death ratio, last flight, DCS status, saved plans and recent checklists |
+| Checklists | ✅ New | 13 generic templates, create/edit/duplicate/delete, JSON/CSV import-export and an execution view with per-device progress |
 | Advanced stats | ✅ Phase 4 | Pilots, weapons, airframes, balance, network, recorded-mission selector and mission-by-mission trends (score, kills, landings) on the **Statistics** page |
 | Aerodromes | ✅ Phase 6 | Read from DCS's own terrain files: **220 airfields listed, 146 mappable** across 6 installed maps, with Tower/TACAN/ILS/VOR/RSBN/NDB, and their charts. A bundled dataset covers Caucasus and Cold War Germany when DCS cannot be read |
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
 | Career | ✅ New | A separate **Career** page with the player's logbook, favourite maps and countries, and a 30-day daily activity heatmap |
-| Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the cockpit panels (PZ55/PZ70, DCS-BIOS, mappings) and the **player-profile backup** as sub-tabs |
+| Flight planning | ✅ New | Route editor with worldwide airports and DCS airfields, wind-corrected navlog and printable DCS briefing |
+| Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the **player-profile backup** and the debug log as sub-tabs |
 | Profile backup | ✅ New | Save/restore the logbook, bindings, options and scripts (and optionally kneeboard, missions, mods) as a portable zip, from the CLI, the API or Settings |
-| Local by design | ✅ New | One self-contained Windows `.exe`, no server and no container: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |
+| Local by design | ✅ New | The desktop is one self-contained Windows `.exe`: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |
+| Web server (Docker) | ✅ New | Optional multi-user web application: accounts, roles, audit log, personal desktop tokens and one-way upload of finished missions. The desktop works without it; see [docs/docker.md](docs/docker.md) |
+| Shared documents | ✅ New | Flight plans and checklists have an owner and `private`/`squadron` visibility; desktop ↔ server sync is last-write-wins with tombstones and conflict copies |
+| Squadron tools | ✅ New | Aggregated dashboard, uploader and pilot filters, “my flights”, DCS-name highlighting, account ↔ pilot names, server backup download and conflict restore |
+| Password recovery | ✅ New | Optional SMTP reset links with single-use, expiring tokens; an administrator can still reset a password |
 
 > The live map (and its imagery) has been **removed**. Unit telemetry is still
 > received and sampled: the current position supports the airfields tab (nearest
 > field), and samples remain in the database for possible future analysis. The
-> interface currently shows career, statistics, airfields and settings; debriefs
-> continue to be collected.
+> interface shows the overview, flights and debriefs, career, statistics, flight
+> planning, checklists, airfields and settings.
 
-### Cockpit panels and Lua installation
+### Lua installation
 
-PZ55/PZ70 panels are read directly through HID, **without vJoy or an additional
-Windows driver**. The visual editor supports contextual wheel bindings, custom
-positions, LED rules, LCD sources and portable profile import/export. Seven
-profiles are provided: F/A-18C, F-16C, F-5E-3, M-2000C, A-10C, JF-17 and AV-8B.
-The Hornet has 20 input bindings and three landing-gear LED sources.
-
-Bindings remain in DCS Manager; this does not add controller columns to DCS.
-DCS-BIOS remains required for existing cockpit commands and LED feedback. The
-F/A-18C pitch trim uses our Lua plugin on local UDP port 7780, with a bounded queue,
-acknowledgements and automatic release. Some controls remain unassigned; LCD is optional.
-Experimental trim is off on each application startup; enable its dedicated checkbox
-only for a controlled test. Disabling it cancels pending impulses, without resetting aircraft trim.
-**Physical trim movement, LED behaviour and multiplayer support remain to be
-validated in DCS.** An acknowledgement only confirms an error-free Lua device call.
+The manager reads DCS sessions through a small Lua export installed into DCS's
+*Saved Games* folder. It carries unit telemetry, events, players and chat; the
+same scripts feed debrief collection and statistics.
 
 Close DCS, then open **Settings → DCS install → Install / update scripts**.
-The installer detects Saved Games, installs four bundled files, preserves other
+The installer detects Saved Games, installs three bundled files, preserves other
 exports and existing user settings, and displays backups. It refuses to run while
-DCS.exe is active. Start DCS again after installation. During development,
-the prepared executable is `dcsmanager-panels.exe`.
-
-See the [profile library](profiles/panels/README.fr.md) and
-[plugin installation, tests and rollback](docs/plugin-panels-dcs.fr.md) (French).
+DCS.exe is active. Start DCS again after installation.
 
 ### Advanced statistics (planned)
 
@@ -140,7 +132,7 @@ database), since a double-clicked executable has no console.
 
 ### Development / manager side
 
-- **Go 1.25+** — <https://go.dev/dl/> (`winget install GoLang.Go`)
+- **Go 1.26+** - <https://go.dev/dl/> (`winget install GoLang.Go`)
 - **Node.js 20+** — <https://nodejs.org/> (only to build the frontend)
 - **Git**
 
@@ -200,8 +192,8 @@ mission is saved for the debriefs and the statistics.
 
 ## Configuration
 
-All configuration is done through **environment variables** (prefix `DCSMANAGER_`) with sensible
-defaults. None of them is required for a normal install.
+All configuration is done through **environment variables** (prefix `DCSMANAGER_`, kept for
+compatibility) with sensible defaults. None of them is required for a normal install.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -210,6 +202,18 @@ defaults. None of them is required for a normal install.
 | `DCSMANAGER_UDP_ADDR` | `127.0.0.1:7776` | UDP listening address (unit telemetry). Not 7778: **DCS-BIOS owns that port**, and the two are meant to run together |
 | `DCSMANAGER_TCP_ADDR` | `127.0.0.1:7779` | TCP listening address (events + commands) |
 | `DCSMANAGER_DB_PATH` | `./data/dcsmanager.db` | SQLite database path |
+| `DCSMANAGER_MODE` | `desktop` | `server` runs the multi-user web application without DCS ingestion |
+| `DCSMANAGER_ADMIN_USER` | *(empty)* | First administrator, created only when the users table is empty |
+| `DCSMANAGER_ADMIN_PASSWORD` | *(empty)* | First administrator password (10 characters minimum); ignored once an account exists |
+| `DCSMANAGER_SECURE_COOKIES` | `false` | Mark session cookies `Secure` when served through HTTPS |
+| `DCSMANAGER_SMTP_HOST` | *(empty)* | SMTP host for password-recovery email; empty disables the feature |
+| `DCSMANAGER_SMTP_PORT` | `587` | SMTP port (STARTTLS) |
+| `DCSMANAGER_SMTP_USER` | *(empty)* | SMTP username |
+| `DCSMANAGER_SMTP_PASSWORD` | *(empty)* | SMTP password |
+| `DCSMANAGER_SMTP_FROM` | `no-reply@localhost` | Sender address for reset emails |
+| `DCSMANAGER_PUBLIC_URL` | `http://localhost:8080` | Public URL used in password-reset links |
+| `DCSMANAGER_PASSWORD_RESET_TTL` | `1800` | Reset-link lifetime in seconds |
+| `DCSMANAGER_DATA_ROOT` | `%LOCALAPPDATA%\DCS Manager` | Override the user data folder (portable installs and tests) |
 | `DCSMANAGER_DB_ENABLED` | `true` | Enable persistence (otherwise everything in memory) |
 | `DCSMANAGER_THEATRE` | `Caucasus` | Default theatre |
 | `DCSMANAGER_UNIT_TTL` | `5` (seconds) | Delay before a silent unit disappears |
@@ -222,7 +226,7 @@ defaults. None of them is required for a normal install.
 | `DCSMANAGER_CHARTS_DIR` | `./maps_dcs` | Aeronautical chart scans (approach plates, ground plans) |
 | `DCSMANAGER_SOURCE` | *(auto)* | Force the session source: `live` or `test` (see below) |
 | `DCSMANAGER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
-| `DCSMANAGER_DEBUG` | `false` | Live debug logging (actions, API requests, panels). Also toggled from Settings → Debug |
+| `DCSMANAGER_DEBUG` | `false` | Live debug logging (actions, API requests, DCS export). Also toggled from Settings → Debug |
 
 ### DCS side — `Saved Games\DCS\Config\dcsmanager.cfg`
 
@@ -253,18 +257,16 @@ The scripts go into DCS's *Saved Games* folder:
 ├─ Config\
 │   └─ dcsmanager.cfg          ← backend address configuration
 └─ Scripts\
-    ├─ Export.lua             ← telemetry and panel plugin; merged with existing exports
-    ├─ DCSManager\
-    │   └─ PanelCommands.lua  ← F/A-18C trim receiver (UDP 127.0.0.1:7780)
+    ├─ Export.lua             ← telemetry; merged with existing exports
     └─ Hooks\
-        └─ dcsmanager.lua      ← events, players, chat (Phases 2+)
+        └─ dcsmanager.lua      ← events, players, chat
 ```
 
 1. Close DCS and start the updated application.
 2. Open **Settings → DCS install**, check the detected folder, then click
    **Install / update scripts**. Existing exports and configuration are preserved;
    changed files are backed up. The script status refreshes immediately.
-3. Start DCS and load a mission. DCS-BIOS must be installed separately for the panels.
+3. Start DCS and load a mission.
 
 PowerShell alternative from the executable's folder:
 
@@ -300,6 +302,7 @@ shortcut. The application opens in its own window.
 ```powershell
 dcsmanager                 # opens the manager in a native window
 dcsmanager serve           # starts the server only; UI at http://localhost:8080
+dcsmanager server          # multi-user web application (Docker/LAN)
 dcsmanager install-lua     # installs/merges the Lua scripts into Saved Games
 dcsmanager uninstall-lua   # removes the installed block (keeps the config)
 dcsmanager status          # installed / outdated / missing, per file
@@ -308,6 +311,20 @@ dcsmanager backup          # saves a DCS player profile to a portable archive
 dcsmanager restore         # restores a profile archive into Saved Games
 dcsmanager version
 ```
+
+### Docker web application
+
+The optional server is a separate container; the desktop never depends on it.
+
+```bash
+cp .env.example .env         # set DCSMANAGER_ADMIN_PASSWORD
+docker compose up -d --build
+```
+
+Open `http://<server-ip>:8080`, sign in as the administrator, create a desktop
+token under **My profile → Desktop tokens**, then paste it on the desktop in
+**Settings → Server sync**. Full instructions, HTTPS and backup: see
+[docs/docker.md](docs/docker.md) (French: [docs/docker.fr.md](docs/docker.fr.md)).
 
 ### Test sessions and `purge`
 
@@ -390,7 +407,7 @@ DCS Manager/
 ├─ frontend/                 # Svelte + Vite
 │   └─ src/
 │       ├─ App.svelte
-│       └─ lib/              # panels and stores
+│       └─ lib/              # components and stores
 ├─ maps_dcs/                 # aeronautical chart scans (local, not versioned)
 ├─ tools/                    # test telemetry emitter
 └─ docs/                     # documentation
@@ -407,7 +424,12 @@ DCS Manager/
 - [x] **Phase 4 bis — Telemetry collection**: position and loss samples remain stored; analytical maps and sortie calculations were removed
 - [x] **Phase 5 — Packaging**: CLI, safe Lua injector, single self-contained binary
 - [x] **Phase 6 — Aerodromes**: read from DCS's own terrain files (frequencies, aids, charts)
-- [ ] **Phase 1 — Live map**: removed; telemetry is still collected
+- [x] **Flight planning**: worldwide airports and DCS airfields, wind-corrected navlog, printable DCS briefing
+- [x] **UI redesign and checklists**: addressable pages, overview, flights, checklists with templates and import/export
+- [x] **Multi-user server (Docker)**: accounts, roles, personal tokens, audit log and desktop upload
+- [x] **Shared documents**: ownership, visibility and bidirectional sync for flight plans and checklists
+- [x] **Squadron tools**: filters, account/pilot names, server backup and conflict restore
+- [ ] **Phase 1 - Live map**: removed; telemetry is still collected
 
 The full, detailed plan is available in the project's plan file.
 

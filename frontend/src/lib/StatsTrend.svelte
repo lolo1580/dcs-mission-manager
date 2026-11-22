@@ -22,16 +22,22 @@
 {:else}
   <div class="charts">
     {#each metrics as metric (metric.id)}
-      {@const max = Math.max(1, ...points.map((point) => point[metric.id] ?? 0))}
+      {@const values = points.map((point) => point[metric.id] ?? 0)}
+      {@const max = Math.max(1, ...values)}
+      {@const hasData = values.some((value) => value !== 0)}
       <div class="chart">
         <div class="chart-head"><strong>{$t(metric.label)}</strong><span>0–{max.toLocaleString()}</span></div>
-        <div class="plot" role="img" aria-label={`${$t(metric.label)} · ${points.length} ${$t('stats.missions')}`}>
-          {#each points as point (point.missionId)}
-            <div class="column" title={`${point.name} · ${date(point)} · ${$t(metric.label)}: ${point[metric.id]}`}>
-              <div class="bar {metric.id}" style={`height: ${height(point, metric.id, max)}%`}></div>
-            </div>
-          {/each}
-        </div>
+        {#if hasData}
+          <div class="plot" role="img" aria-label={`${$t(metric.label)} · ${points.length} ${$t('stats.missions')}`}>
+            {#each points as point (point.missionId)}
+              <div class="column" title={`${point.name} · ${date(point)} · ${$t(metric.label)}: ${point[metric.id]}`}>
+                <div class="bar {metric.id}" style={`height: ${height(point, metric.id, max)}%`}></div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="no-data">{$t('stats.trendNoData')}</p>
+        {/if}
         <div class="dates"><span>{date(points[0])}</span><span>{date(points[points.length - 1])}</span></div>
       </div>
     {/each}
@@ -53,5 +59,6 @@
   .dates { margin-top: 0.25rem; font-size: 0.68rem; }
   .hint { font-size: 0.7rem; margin: 0.4rem 0 0; }
   .empty { color: var(--muted); font-size: 0.8rem; }
+  .no-data { height: 100px; margin: 0.6rem 0 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.76rem; border-bottom: 1px solid var(--border); }
   @media (max-width: 780px) { .charts { grid-template-columns: 1fr; } }
 </style>

@@ -1,4 +1,6 @@
-// Package config loads backend configuration from DCSMANAGER_* environment variables.
+// Package config loads backend configuration from DCSMANAGER_* environment
+// variables. The manager is local-only: it runs on the same Windows machine as
+// DCS.
 //
 // The manager is local-only: it runs on the same Windows machine as DCS. That is
 // a deliberate constraint, not a limitation to work around — it is what lets the
@@ -16,6 +18,10 @@ import (
 
 // Config holds the runtime configuration of the backend.
 type Config struct {
+	// Mode is "desktop" (the default) or "server". The desktop mode reads DCS
+	// and listens for its telemetry; the server mode only serves the data the
+	// desktop uploads and never touches a DCS installation.
+	Mode string
 	// HTTPAddr is the listen address of the web UI (HTTP + SSE). It defaults to
 	// the loopback interface: the manager is local, and the API includes a
 	// destructive purge endpoint with no authentication. Set
@@ -68,7 +74,30 @@ type Config struct {
 	// ground plans). They are documents, never shipped: only indexed and
 	// displayed. Empty disables the feature.
 	ChartsDir string
+	// AdminUser and AdminPassword seed the first server administrator when the
+	// users table is empty. They are read only at startup and never stored.
+	AdminUser     string
+	AdminPassword string
+	// SecureCookies marks the session cookie Secure. Set it when the server is
+	// reached through HTTPS (the documented reverse-proxy setup).
+	SecureCookies bool
+	// SMTP configures password-recovery email. Empty host disables the feature.
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string
+	// PublicURL is the address used in reset links.
+	PublicURL string
+	// PasswordResetTTL is how long a reset link remains valid.
+	PasswordResetTTL time.Duration
 }
+
+// EmailRecovery reports whether password-reset emails can be sent.
+func (c Config) EmailRecovery() bool { return c.SMTPHost != "" }
+
+// IsServer reports whether this process runs the multi-user web application.
+func (c Config) IsServer() bool { return c.Mode == "server" }
 
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
@@ -134,24 +163,35 @@ func envBool(key string, def bool) bool {
 // Load reads the configuration from the environment, applying defaults.
 func Load() Config {
 	cfg := Config{
-		HTTPAddr:       env("DCSMANAGER_HTTP_ADDR", "127.0.0.1:8080"),
-		UDPAddr:        env("DCSMANAGER_UDP_ADDR", "127.0.0.1:7776"),
-		TCPAddr:        env("DCSMANAGER_TCP_ADDR", "127.0.0.1:7779"),
-		DBPath:         env("DCSMANAGER_DB_PATH", "./data/dcsmanager.db"),
-		DBEnabled:      envBool("DCSMANAGER_DB_ENABLED", true),
-		APIToken:       env("DCSMANAGER_API_TOKEN", ""),
-		Theatre:        env("DCSMANAGER_THEATRE", "Caucasus"),
-		LogLevel:       strings.ToLower(env("DCSMANAGER_LOG_LEVEL", "info")),
-		Debug:          envBool("DCSMANAGER_DEBUG", false),
-		UnitTTL:        envDuration("DCSMANAGER_UNIT_TTL", 5*time.Second),
-		CategoriesFile: env("DCSMANAGER_CATEGORIES", "./categories.json"),
-		MaxUnits:       envInt("DCSMANAGER_MAX_UNITS", 5000),
-		TrackInterval:  envDuration("DCSMANAGER_TRACK_INTERVAL", 3*time.Second),
-		TrackGrace:     envDuration("DCSMANAGER_TRACK_GRACE", 15*time.Second),
-		TrackRetention: envDuration("DCSMANAGER_TRACK_RETENTION", 24*time.Hour),
-		SavedGames:     savedGamesDir(),
-		DCSInstall:     env("DCSMANAGER_DCS_INSTALL", ""),
-		ChartsDir:      env("DCSMANAGER_CHARTS_DIR", "./maps_dcs"),
+		Mode:             strings.ToLower(env("DCSMANAGER_MODE", "desktop")),
+		HTTPAddr:         env("DCSMANAGER_HTTP_ADDR", "127.0.0.1:8080"),
+		UDPAddr:          env("DCSMANAGER_UDP_ADDR", "127.0.0.1:7776"),
+		TCPAddr:          env("DCSMANAGER_TCP_ADDR", "127.0.0.1:7779"),
+		DBPath:           env("DCSMANAGER_DB_PATH", "./data/dcsmanager.db"),
+		DBEnabled:        envBool("DCSMANAGER_DB_ENABLED", true),
+		APIToken:         env("DCSMANAGER_API_TOKEN", ""),
+		Theatre:          env("DCSMANAGER_THEATRE", "Caucasus"),
+		LogLevel:         strings.ToLower(env("DCSMANAGER_LOG_LEVEL", "info")),
+		Debug:            envBool("DCSMANAGER_DEBUG", false),
+		UnitTTL:          envDuration("DCSMANAGER_UNIT_TTL", 5*time.Second),
+		CategoriesFile:   env("DCSMANAGER_CATEGORIES", "./categories.json"),
+		MaxUnits:         envInt("DCSMANAGER_MAX_UNITS", 5000),
+		TrackInterval:    envDuration("DCSMANAGER_TRACK_INTERVAL", 3*time.Second),
+		TrackGrace:       envDuration("DCSMANAGER_TRACK_GRACE", 15*time.Second),
+		TrackRetention:   envDuration("DCSMANAGER_TRACK_RETENTION", 24*time.Hour),
+		SavedGames:       savedGamesDir(),
+		DCSInstall:       env("DCSMANAGER_DCS_INSTALL", ""),
+		ChartsDir:        env("DCSMANAGER_CHARTS_DIR", "./maps_dcs"),
+		AdminUser:        env("DCSMANAGER_ADMIN_USER", ""),
+		AdminPassword:    env("DCSMANAGER_ADMIN_PASSWORD", ""),
+		SecureCookies:    envBool("DCSMANAGER_SECURE_COOKIES", false),
+		SMTPHost:         env("DCSMANAGER_SMTP_HOST", ""),
+		SMTPPort:         envInt("DCSMANAGER_SMTP_PORT", 587),
+		SMTPUser:         env("DCSMANAGER_SMTP_USER", ""),
+		SMTPPassword:     env("DCSMANAGER_SMTP_PASSWORD", ""),
+		SMTPFrom:         env("DCSMANAGER_SMTP_FROM", "no-reply@localhost"),
+		PublicURL:        env("DCSMANAGER_PUBLIC_URL", "http://localhost:8080"),
+		PasswordResetTTL: envDuration("DCSMANAGER_PASSWORD_RESET_TTL", 30*time.Minute),
 	}
 	if executable, err := os.Executable(); err == nil {
 		if root, err := UserDataRoot(); err == nil {

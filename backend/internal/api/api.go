@@ -14,21 +14,15 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"dcsmanager/internal/aerodrome"
-	"dcsmanager/internal/biosmeta"
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
-	"dcsmanager/internal/dcsbios"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/debuglog"
 	"dcsmanager/internal/live"
-	"dcsmanager/internal/mapping"
-	"dcsmanager/internal/panelplugin"
-	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
 	"dcsmanager/internal/theatre"
@@ -66,7 +60,7 @@ const fallbackPage = `<!doctype html>
   </head>
   <body>
     <main>
-      <h1>DCS Manager — backend is up</h1>
+      <h1>DCS Manager - backend is up</h1>
       <p>The backend is running, but the frontend has not been built yet. This is the embedded fallback page.</p>
       <p>To build the UI:</p>
       <pre><code>cd frontend
@@ -106,12 +100,6 @@ type Server struct {
 	scripts         dcsdata.ScriptStatus
 	scriptInstallMu sync.Mutex
 	dcsRunning      func() (bool, error)
-	panels          *panelservice.Service
-	panelPlugin     *panelplugin.Client
-	bios            *dcsbios.Client
-	mappings        *mapping.Store
-	controls        map[string]*biosmeta.Catalog
-	controlsMu      sync.Mutex
 	commander       Commander
 	hub             *hub
 	theatres        []theatre.Theatre
@@ -120,15 +108,17 @@ type Server struct {
 	// which case it also refuses requests whose Host is not local (DNS
 	// rebinding).
 	localOnly bool
-	// testMode, when on, lets panel inputs reach DCS-BIOS regardless of the sending
-	// switch, so the mapping can be checked live in the Panels test view. Off by
-	// default and off again on restart.
-	testMode atomic.Bool
 	// debug is the runtime debug switch and in-memory log. It may be nil (some
 	// tests build a Server without it), so every use goes through helpers below.
 	debug   *debuglog.Logger
 	version string
 	updates *updatecheck.Checker
+
+	// Server mode: accounts, sessions and the login throttle. auth is nil on
+	// the desktop, where the API is reached only from the local machine.
+	auth  *db.DB
+	mode  string
+	login *loginLimiter
 }
 
 // SetDebug installs the debug logger. It is optional: the endpoints then just
@@ -153,6 +143,10 @@ func (s *Server) debugf(area, format string, args ...any) {
 // New creates a server backed by store. live, database, statsService and
 // commander may be nil.
 func New(cfg config.Config, store *state.Store, liveStore *live.Store, database db.Store, statsService *stats.Service, aerodromes *aerodrome.Catalog, chartCatalog *charts.Catalog, commander Commander) *Server {
+	mode := cfg.Mode
+	if mode == "" {
+		mode = "desktop"
+	}
 	return &Server{
 		cfg:        cfg,
 		store:      store,
@@ -163,6 +157,8 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 		charts:     chartCatalog,
 		commander:  commander,
 		hub:        newHub(),
+		mode:       mode,
+		login:      newLoginLimiter(),
 		theatres:   theatre.All(),
 		chartsDir:  cfg.ChartsDir,
 		localOnly:  isLoopbackAddr(cfg.HTTPAddr),
@@ -173,23 +169,31 @@ func New(cfg config.Config, store *state.Store, liveStore *live.Store, database 
 // SetVersion sets the version embedded by the release build.
 func (s *Server) SetVersion(version string) { s.version = version }
 
+// SetMode switches the API between the desktop profile and the multi-user
+// server profile. It must be called before Handler().
+func (s *Server) SetMode(mode string) {
+	if mode == "" {
+		mode = "desktop"
+	}
+	s.mode = mode
+}
+
+// SetAuth installs the account store used by server mode.
+func (s *Server) SetAuth(database *db.DB) { s.auth = database }
+
+// Mode reports the active profile.
+func (s *Server) Mode() string {
+	if s.mode == "" {
+		return "desktop"
+	}
+	return s.mode
+}
+
 // SetLocalOnly overrides the loopback decision after the real listen address is
 // known. The server is built before `net.Listen`, so `New` can only guess from
 // the configured string; this corrects it to match the socket actually bound.
 func (s *Server) SetLocalOnly(local bool) {
 	s.localOnly = local
-}
-
-// SetTestMode turns the live mapping test on or off. In test mode a panel input is
-// sent to DCS-BIOS even when command sending is not armed, so the mapping can be
-// verified against the cockpit directly from the Panels view.
-func (s *Server) SetTestMode(on bool) {
-	s.testMode.Store(on)
-}
-
-// TestMode reports whether the live mapping test is on.
-func (s *Server) TestMode() bool {
-	return s.testMode.Load()
 }
 
 // SetModules installs the DCS module inventory read from the installation. It is
@@ -222,7 +226,14 @@ func (s *Server) SetScripts(st dcsdata.ScriptStatus) {
 // where the whole manager is exposed beyond loopback.
 func (s *Server) Handler() http.Handler {
 	mux := s.routes()
-	return s.originGuard(s.tokenGuard(s.debugMiddleware(mux)))
+	h := http.Handler(s.debugMiddleware(mux))
+	h = s.desktopGuard(h)
+	if s.Mode() == "server" {
+		h = s.authMiddleware(h)
+	}
+	h = s.tokenGuard(h)
+	h = s.originGuard(h)
+	return h
 }
 
 // debugMiddleware records every API request (method, path, status) when debug is
@@ -355,6 +366,32 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/stats/network", s.handleStatsNetwork)
 	mux.HandleFunc("/api/aerodromes", s.handleAerodromes)
 	mux.HandleFunc("/api/aerodromes/", s.handleAerodrome)
+	mux.HandleFunc("/api/airports", s.handleAirports)
+	mux.HandleFunc("/api/flightplans", s.handleFlightPlans)
+	mux.HandleFunc("/api/flightplans/", s.handleFlightPlans)
+	mux.HandleFunc("/api/checklists", s.handleChecklists)
+	mux.HandleFunc("/api/checklists/", s.handleChecklists)
+	mux.HandleFunc("/api/auth/login", s.handleLogin)
+	mux.HandleFunc("/api/auth/logout", s.handleLogout)
+	mux.HandleFunc("/api/auth/session", s.handleSession)
+	mux.HandleFunc("/api/auth/password", s.handlePassword)
+	mux.HandleFunc("/api/auth/profile", s.handleProfile)
+	mux.HandleFunc("/api/auth/forgot", s.handleForgotPassword)
+	mux.HandleFunc("/api/auth/reset", s.handleResetPassword)
+	mux.HandleFunc("/api/auth/tokens", s.handleTokens)
+	mux.HandleFunc("/api/auth/tokens/", s.handleTokens)
+	mux.HandleFunc("/api/admin/users", s.handleAdminUsers)
+	mux.HandleFunc("/api/admin/users/", s.handleAdminUsers)
+	mux.HandleFunc("/api/admin/audit", s.handleAdminAudit)
+	mux.HandleFunc("/api/admin/backup", s.handleAdminBackup)
+	mux.HandleFunc("/api/sync/upload", s.handleSyncUpload)
+	mux.HandleFunc("/api/sync/settings", s.handleSyncSettings)
+	mux.HandleFunc("/api/sync/test", s.handleSyncTest)
+	mux.HandleFunc("/api/sync/run", s.handleSyncRun)
+	mux.HandleFunc("/api/sync/push", s.handleSyncPush)
+	mux.HandleFunc("/api/sync/pull", s.handleSyncPull)
+	mux.HandleFunc("/api/sync/conflicts", s.handleSyncConflicts)
+	mux.HandleFunc("/api/sync/conflicts/", s.handleSyncConflicts)
 	mux.HandleFunc("/api/charts", s.handleCharts)
 	mux.HandleFunc("/api/charts/file/", s.handleChartFile)
 	mux.HandleFunc("/api/maintenance", s.handleMaintenance)
@@ -368,17 +405,6 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/mods", s.handleMods)
 	mux.HandleFunc("/api/scripts", s.handleScripts)
 	mux.HandleFunc("/api/scripts/install", s.handleScriptInstall)
-	mux.HandleFunc("/api/panels", s.handlePanels)
-	mux.HandleFunc("/api/panels/plugin", s.handlePanelPlugin)
-	mux.HandleFunc("/api/dcsbios", s.handleDCSBIOS)
-	mux.HandleFunc("/api/mappings", s.handleMappings)
-	mux.HandleFunc("/api/mappings/safety", s.handleMappingSafety)
-	mux.HandleFunc("/api/mappings/outputs", s.handleOutputsSafety)
-	mux.HandleFunc("/api/mappings/test", s.handleMappingTest)
-	mux.HandleFunc("/api/aircraft", s.handleAircraft)
-	mux.HandleFunc("/api/controls", s.handleControls)
-	mux.HandleFunc("/api/display/preview", s.handleDisplayPreview)
-	mux.HandleFunc("/api/display/test", s.handleDisplayTest)
 	mux.HandleFunc("/api/debug", s.handleDebug)
 	mux.HandleFunc("/api/log", s.handleLog)
 	mux.Handle("/", s.webHandler())
@@ -487,7 +513,16 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"service": "dcsmanager",
-		"units":   units,
+		"version": s.version,
+		// mode distinguishes the Windows desktop from the multi-user server,
+		// so the embedded UI can show the pages that make sense in each profile.
+		"mode":   s.Mode(),
+		"units":  units,
+		"dcs":    s.Mode() != "server",
+		"sync":   s.Mode() == "server",
+		"auth":   s.Mode() == "server",
+		"local":  s.localOnly,
+		"checks": s.db != nil,
 	})
 }
 
@@ -601,6 +636,10 @@ func (s *Server) webHandler() http.Handler {
 
 	if _, err := fs.Stat(sub, "index.html"); err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				http.NotFound(w, r)
+				return
+			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_, _ = w.Write([]byte(fallbackPage))
 		})
@@ -608,6 +647,12 @@ func (s *Server) webHandler() http.Handler {
 
 	fileServer := http.FileServer(http.FS(sub))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Unknown API routes must not fall back to the SPA: a removed endpoint
+		// should answer 404 instead of pretending index.html is its payload.
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
 		p := strings.TrimPrefix(r.URL.Path, "/")
 		if p != "" {
 			if _, err := fs.Stat(sub, p); err != nil {

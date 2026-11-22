@@ -47,7 +47,7 @@ func TestCheckRequiresInstallerAndRespectsReleaseChannel(t *testing.T) {
 	if got := checker.Check(context.Background(), "1.0.0", false); got.Status != "current" || got.LatestVersion != "1.0.0" {
 		t.Fatalf("stable release result: %+v", got)
 	}
-	if got := checker.Check(context.Background(), "1.0.0-beta.3", false); got.Status != "available" || got.LatestVersion != "1.1.0-beta.1" || got.DownloadURL == "" {
+	if got := checker.Check(context.Background(), "1.0.0-beta.3", false); got.Status != "available" || got.LatestVersion != "1.1.0-beta.1" || !strings.Contains(got.DownloadURL, "DCSManager-Setup") {
 		t.Fatalf("beta release result: %+v", got)
 	}
 	if got := checker.Check(context.Background(), "1.0.0-beta.3", false); got.Status != "available" {

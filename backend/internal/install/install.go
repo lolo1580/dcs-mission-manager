@@ -43,7 +43,6 @@ type Target struct {
 func DefaultTargets() []Target {
 	return []Target{
 		{Source: "Export.lua", DestRel: filepath.Join("Scripts", "Export.lua"), NeedsBlock: true},
-		{Source: "PanelCommands.lua", DestRel: filepath.Join("Scripts", "DCSManager", "PanelCommands.lua"), NeedsBlock: false},
 		{Source: filepath.Join("Hooks", "dcsmanager.lua"), DestRel: filepath.Join("Scripts", "Hooks", "dcsmanager.lua"), NeedsBlock: false},
 		{Source: filepath.Join("Config", "dcsmanager.cfg"), DestRel: filepath.Join("Config", "dcsmanager.cfg"), NeedsBlock: false},
 	}

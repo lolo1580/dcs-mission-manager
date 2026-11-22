@@ -1,4 +1,4 @@
-// Command dcsmanager is the DCS Manager.
+// Command dcsmanager is DCS Manager.
 //
 // It listens for telemetry from the DCS Lua scripts (UDP for positions, TCP for
 // events and players), keeps an in-memory state, persists history to SQLite, and
@@ -45,14 +45,38 @@ func init() {
 }
 
 func main() {
+	// Copy a pre-rename data set before any command resolves the database path.
+	// The server profile has no DCS user data and must not touch the container
+	// home; only the desktop commands run this migration.
+	serverMode := (len(os.Args) > 1 && os.Args[1] == "server") ||
+		strings.EqualFold(os.Getenv("DCSMANAGER_MODE"), "server")
+	if !serverMode {
+		if err := config.PrepareUserData(); err != nil {
+			fmt.Fprintf(os.Stderr, "dcsmanager: migration: %v\n", err)
+			os.Exit(1)
+		}
+	}
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "serve":
+			if config.Load().IsServer() {
+				if err := app.RunServer(); err != nil {
+					fmt.Fprintf(os.Stderr, "dcsmanager: %v\n", err)
+					os.Exit(1)
+				}
+				return
+			}
 			if err := app.Run(nil); err != nil {
 				if errors.Is(err, app.ErrAlreadyRunning) {
 					fmt.Fprintln(os.Stderr, "dcsmanager: another instance is already running (see DCSMANAGER_HTTP_ADDR)")
 					os.Exit(3)
 				}
+				fmt.Fprintf(os.Stderr, "dcsmanager: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "server":
+			if err := app.RunServer(); err != nil {
 				fmt.Fprintf(os.Stderr, "dcsmanager: %v\n", err)
 				os.Exit(1)
 			}
@@ -83,6 +107,13 @@ func main() {
 			return
 		}
 	}
+	if config.Load().IsServer() {
+		if err := app.RunServer(); err != nil {
+			fmt.Fprintf(os.Stderr, "dcsmanager: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	desktop.Run()
 }
 
@@ -92,6 +123,7 @@ func usage() {
 Usage:
   dcsmanager                 Open the manager in a native window (web UI + DCS ingestion)
   dcsmanager serve           Run headless; open http://localhost:8080 in a browser
+  dcsmanager server          Run the multi-user web application (Docker/LAN)
   dcsmanager install-lua     Install the Lua scripts into Saved Games
   dcsmanager uninstall-lua   Remove the installed scripts
   dcsmanager status          Report whether the scripts are installed / up to date

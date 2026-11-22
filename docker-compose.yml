@@ -1,0 +1,38 @@
+# DCS Manager web application (multi-user server).
+#
+# The desktop keeps DCS on the Windows machine. This container only serves the
+# data the desktop uploads and never touches a DCS installation.
+#
+#   copy .env.example .env      # then edit the password
+#   docker compose up -d --build
+#
+services:
+  dcsmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dcsmanager-web:2.0.0
+    restart: unless-stopped
+    ports:
+      - "${DCSMANAGER_PORT:-8080}:8080"
+    environment:
+      DCSMANAGER_ADMIN_USER: "${DCSMANAGER_ADMIN_USER:-admin}"
+      DCSMANAGER_ADMIN_PASSWORD: "${DCSMANAGER_ADMIN_PASSWORD:?Set DCSMANAGER_ADMIN_PASSWORD in .env}"
+      # Set to true when the container is behind an HTTPS reverse proxy.
+      DCSMANAGER_SECURE_COOKIES: "${DCSMANAGER_SECURE_COOKIES:-false}"
+      DCSMANAGER_SMTP_HOST: "${DCSMANAGER_SMTP_HOST:-}"
+      DCSMANAGER_SMTP_PORT: "${DCSMANAGER_SMTP_PORT:-587}"
+      DCSMANAGER_SMTP_USER: "${DCSMANAGER_SMTP_USER:-}"
+      DCSMANAGER_SMTP_PASSWORD: "${DCSMANAGER_SMTP_PASSWORD:-}"
+      DCSMANAGER_SMTP_FROM: "${DCSMANAGER_SMTP_FROM:-no-reply@example.com}"
+      DCSMANAGER_PUBLIC_URL: "${DCSMANAGER_PUBLIC_URL:-http://localhost:8080}"
+      DCSMANAGER_PASSWORD_RESET_TTL: "${DCSMANAGER_PASSWORD_RESET_TTL:-1800}"
+      TZ: "${TZ:-UTC}"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

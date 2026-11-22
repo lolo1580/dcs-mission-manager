@@ -41,6 +41,11 @@
 #   docs/logo.png                 (dark emblem, for the README)
 /Logo/
 
+# Local Docker secrets
+.env
+.env.*
+!.env.example
+
 # Editor / OS
 .vscode/
 .idea/

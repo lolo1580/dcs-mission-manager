@@ -1,15 +1,14 @@
 <script>
   /**
    * Settings: everything that configures the manager or the DCS side, gathered
-   * behind one tab. Its inner sub-tabs are the panels that used to sit in the
-   * main bar on their own — installed modules, the DCS-side scripts and mods, and
-   * the cockpit panels (DCS-BIOS and the Logitech hardware).
+   * behind one tab. Its inner sub-tabs are the modules installed on the DCS side,
+   * the scripts and mods, backups and the debug log.
    */
   import ModulesPanel from './ModulesPanel.svelte';
   import InstallPanel from './InstallPanel.svelte';
-  import PanelsPanel from './PanelsPanel.svelte';
   import BackupPanel from './BackupPanel.svelte';
   import DebugPanel from './DebugPanel.svelte';
+  import SyncPanel from './SyncPanel.svelte';
   import { t } from './i18n.js';
 
   // "install" first: it is the place to check what is set up on the DCS side.
@@ -18,7 +17,7 @@
   const SECTIONS = [
     { id: 'install', label: 'tab.install' },
     { id: 'modules', label: 'tab.modules' },
-    { id: 'panels', label: 'tab.panels' },
+    { id: 'sync', label: 'sync.title' },
     { id: 'backup', label: 'backup.title' },
     { id: 'debug', label: 'debug.title' },
   ];
@@ -36,12 +35,12 @@
       <InstallPanel />
     {:else if section === 'modules'}
       <ModulesPanel />
+    {:else if section === 'sync'}
+      <SyncPanel />
     {:else if section === 'backup'}
       <BackupPanel />
     {:else if section === 'debug'}
       <DebugPanel />
-    {:else}
-      <PanelsPanel />
     {/if}
   </div>
 </section>

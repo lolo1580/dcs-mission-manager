@@ -17,7 +17,7 @@ function Invoke-TestSetup([string]$LogName) {
     if ($taskProcess.ExitCode -ne 0) { throw "Installation: $($taskProcess.ExitCode), voir $taskSmoke" }
 }
 Invoke-TestSetup 'install.log'
-foreach ($taskFile in @('dcsmanager.exe','installed-mode','unins000.exe','profiles\panels\FA-18C_hornet.json')) {
+foreach ($taskFile in @('dcsmanager.exe','installed-mode','unins000.exe','docs\installation-windows.fr.md')) {
     if (!(Test-Path -LiteralPath (Join-Path $taskApp $taskFile))) { throw "Fichier absent: $taskFile" }
 }
 if (!(Test-Path -LiteralPath (Join-Path $taskData 'settings.json'))) { throw 'Préparation utilisateur absente' }

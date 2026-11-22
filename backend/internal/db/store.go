@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"time"
 
+	"dcsmanager/internal/checklist"
+	"dcsmanager/internal/flightplan"
 	"dcsmanager/internal/model"
 )
 
@@ -28,6 +30,7 @@ type Store interface {
 	CountMissions(source string) (int, error)
 	Missions(limit int) ([]model.Mission, error)
 	MissionsWithSource(source string, limit int) ([]model.Mission, error)
+	MissionsForPilot(pilot string, limit int) ([]model.Mission, error)
 	MissionsSince(sinceID int64, limit int) ([]model.Mission, error)
 
 	// Events, chat and statistics snapshots.
@@ -56,6 +59,26 @@ type Store interface {
 	PurgeMission(id int64) (PurgeResult, error)
 	PurgeSource(source string) (PurgeResult, error)
 	PurgeAll() (PurgeResult, error)
+
+	// Flight plans.
+	SaveFlightPlan(plan flightplan.Plan) (flightplan.Plan, error)
+	SaveFlightPlanFor(ownerID int64, plan flightplan.Plan) (flightplan.Plan, error)
+	FlightPlans(limit int) ([]flightplan.Plan, error)
+	FlightPlansFor(ownerID int64, admin bool, limit int) ([]flightplan.Plan, error)
+	FlightPlan(id int64) (flightplan.Plan, error)
+	FlightPlanFor(id, ownerID int64, admin bool) (flightplan.Plan, error)
+	DeleteFlightPlan(id int64) error
+	DeleteFlightPlanFor(id, ownerID int64, admin bool) error
+
+	// Checklists.
+	SaveChecklist(c checklist.Checklist) (checklist.Checklist, error)
+	SaveChecklistFor(ownerID int64, c checklist.Checklist) (checklist.Checklist, error)
+	Checklists(limit int) ([]checklist.Checklist, error)
+	ChecklistsFor(ownerID int64, admin bool, limit int) ([]checklist.Checklist, error)
+	Checklist(uid string) (checklist.Checklist, error)
+	ChecklistFor(uid string, ownerID int64, admin bool) (checklist.Checklist, error)
+	DeleteChecklist(uid string) error
+	DeleteChecklistFor(uid string, ownerID int64, admin bool) error
 
 	// Querier lets the statistics package run its own read queries. It is on the
 	// interface (rather than exposing the raw *sql.DB) so a non-SQLite

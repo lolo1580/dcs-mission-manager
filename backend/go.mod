@@ -1,10 +1,11 @@
 module dcsmanager
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/jchv/go-webview2 v0.0.0-20260205173254-56598839c808
-	golang.org/x/sys v0.47.0
+	golang.org/x/crypto v0.41.0
+	golang.org/x/sys v0.50.0
 	modernc.org/sqlite v1.59.0
 )
 

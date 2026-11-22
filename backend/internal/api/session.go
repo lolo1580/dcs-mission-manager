@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"dcsmanager/internal/model"
 )
@@ -175,6 +176,15 @@ func (s *Server) handleHistoryMissions(w http.ResponseWriter, r *http.Request) {
 			"missions":    missions,
 			"nextSinceId": maxMissionID(missions),
 		})
+		return
+	}
+	if pilot := strings.TrimSpace(r.URL.Query().Get("pilot")); pilot != "" {
+		missions, err := s.db.MissionsForPilot(pilot, limitParam(r, 200))
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"count": len(missions), "missions": missions})
 		return
 	}
 	missions, err := s.db.Missions(limitParam(r, 50))

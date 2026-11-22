@@ -6,7 +6,7 @@ $null = New-Item -ItemType Directory -Path $taskStage -Force
 $taskVersion = (Get-Content -LiteralPath (Join-Path $taskProject 'VERSION') -Raw).Trim()
 function Assert-Native { if ($LASTEXITCODE -ne 0) { throw "Compilation interrompue: code $LASTEXITCODE" } }
 if (!$ISCC) {
-    $taskCandidates = @((Join-Path $taskProject '.tools\inno\ISCC.exe'),"${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe","${env:ProgramFiles}\Inno Setup 7\ISCC.exe")
+    $taskCandidates = @((Join-Path $taskProject '.tools\inno\ISCC.exe'),(Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),(Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe'),"${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe","${env:ProgramFiles}\Inno Setup 7\ISCC.exe")
     $ISCC = $taskCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
     if (!$ISCC) { $taskCommand = Get-Command ISCC.exe -ErrorAction SilentlyContinue; if ($taskCommand) { $ISCC = $taskCommand.Source } }
 }

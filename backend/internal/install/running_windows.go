@@ -29,7 +29,9 @@ func processRunning(manager bool) (bool, error) {
 		name := strings.ToLower(windows.UTF16ToString(entry.ExeFile[:]))
 		match := name == "dcs.exe"
 		if manager {
-			match = (name == "dcsmanager.exe" || name == "dcsmanager-panels.exe") && entry.ProcessID != uint32(os.Getpid())
+			// The pre-release Flight Sim Manager executable is still recognised
+			// so setup refuses to touch Lua scripts while an older copy is open.
+			match = (name == "dcsmanager.exe" || name == "flightsimmanager.exe" || name == "dcsmanager-panels.exe") && entry.ProcessID != uint32(os.Getpid())
 		}
 		if match {
 			return true, nil

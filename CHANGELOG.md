@@ -7,9 +7,79 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0] - 2026-11-22
 
 ### Added
+
+- An optional **multi-user Docker server**: accounts and roles, session login,
+  personal desktop tokens, audit log, a squadron dashboard and one-way upload of
+  finished missions. The desktop works without it.
+- **Server sync** in the desktop settings: server URL, personal token, connection
+  test and an upload of recent live missions, also attempted at startup and
+  after each debrief.
+- A `server` subcommand, a multi-stage `Dockerfile`, `docker-compose.yml`, and
+  LAN/HTTPS documentation.
+- `DCSMANAGER_DATA_ROOT` overrides the user data folder, for portable installs
+  and tests.
+- A redesigned shell with grouped navigation, addressable routes (`/overview`,
+  `/flights`, `/checklists`, …) and a responsive icon rail on narrow screens.
+- An **Overview** page: flight hours, missions, kills, kill/death ratio, last
+  flight, DCS status, saved plans and recent checklists.
+- A **Flights** page merging missions and debriefs, with search, source and
+  debrief filters and the full event timeline.
+- **Checklists**: 13 generic templates, create/edit/duplicate/delete, JSON and
+  CSV import/export, and an execution view with local progress, keyboard
+  shortcuts and wide touch targets. Progress is stored per device.
+- Flight plans carry a stable `uid` and a revision counter, so existing plans
+  survive export/import and can be synchronised later.
+- The server dashboard now shows **uploader and pilot filters**, a **My flights**
+  toggle, a “you” marker on the current account's DCS pilot names, and an
+  administrative **server backup** download. A losing conflict copy can be
+  **restored** or merged field by field from the same screen.
+- **Password recovery by email** is available when SMTP is configured: reset
+  links are single-use, expire after 30 minutes and revoke existing sessions.
+- Flight plans and checklists now have an **owner** and a
+  **private / squadron** visibility, with bidirectional desktop ↔ server
+  synchronisation, deletion tombstones, last-write-wins conflict handling and a
+  conflict-copy screen for administrators.
+- A **Flight planning** page: route editor, airport search, wind-corrected
+  navlog, fuel and reserve estimates, and saved plans.
+- The airport search uses **48,082 airports** from the public-domain
+  OurAirports dataset, merged with the DCS airfields of the selected map
+  (tower, TACAN and ILS shown).
+- Exports: a printable **DCS briefing**.
+- Debriefs now populate pilot and landing statistics when live snapshots are
+  missing; empty live sessions are excluded from statistics and mission names
+  come from the `.miz` path instead of `tempMission`.
+
+### Changed
+
+- The application remains **DCS Manager**. The executable is `dcsmanager.exe` and
+  the installer `DCSManager-Setup-*.exe`.
+- User data stays in `%LOCALAPPDATA%\DCS Manager`. If a pre-release
+  `%LOCALAPPDATA%\Flight Sim Manager` folder exists, its data is copied there on
+  first launch and the original folder is kept.
+- The short-lived Flight Sim Manager naming was reverted before release.
+- The `DCSMANAGER_*` environment prefix is kept, and the DCS-side Lua files keep
+  their existing names so upgrades cannot load two hooks at once.
+- Building now requires **Go 1.26+**; server passwords use Argon2id through
+  `golang.org/x/crypto`.
+
+### Removed
+
+- Cockpit panel support was removed entirely: PZ55/PZ70 HID decoding, the HID
+  service, DCS-BIOS link, panel bindings, LED/LCD output, the panel plugin and
+  the related settings, API routes and documentation. Plug-and-play panels are
+  better served by their own vendor software.
+- The Tacview page, ACMI reader and embedded 3D replay were removed.
+- MSFS support, multi-simulator statistics and the MSFS `.pln` export were
+  dropped: the application is **DCS-only**.
+
+### Fixed
+
+- The settings module table scrolls instead of clipping after the visible rows.
+- Statistics charts show a clear "no data" message per metric instead of empty
+  axes.
 
 - The installed version appears next to the connection status in the sidebar.
 - Manager statistics can be filtered by today, this week, this month, the last

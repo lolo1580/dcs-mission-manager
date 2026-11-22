@@ -230,6 +230,17 @@ func (a *Assembler) store(content []byte, theatre, mission string) {
 		return
 	}
 	data := parsed.ToModel()
+	// The live hook often names the session "tempMission" before the debrief is
+	// available. The .miz path in the debrief is a better human name.
+	if mission == "" || mission == "tempMission" || mission == "Unknown mission" || mission == "Session without mission" {
+		if raw := strings.TrimSpace(data.MissionFilePath); raw != "" {
+			base := filepath.Base(strings.ReplaceAll(raw, "\\", "/"))
+			base = strings.TrimSuffix(base, filepath.Ext(base))
+			if strings.TrimSpace(base) != "" {
+				mission = strings.TrimSpace(base)
+			}
+		}
+	}
 
 	missionID := a.db.OpenMissionID()
 	rec := model.Debrief{

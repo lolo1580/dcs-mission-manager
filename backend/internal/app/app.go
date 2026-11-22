@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -33,19 +32,14 @@ import (
 	"dcsmanager/internal/charts"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
-	"dcsmanager/internal/dcsbios"
 	"dcsmanager/internal/dcsdata"
 	"dcsmanager/internal/dcsdir"
 	"dcsmanager/internal/debriefstore"
 	"dcsmanager/internal/debuglog"
 	"dcsmanager/internal/ingest"
 	"dcsmanager/internal/install"
-	"dcsmanager/internal/led"
 	"dcsmanager/internal/live"
-	"dcsmanager/internal/mapping"
 	"dcsmanager/internal/model"
-	"dcsmanager/internal/panelplugin"
-	"dcsmanager/internal/panelservice"
 	"dcsmanager/internal/source"
 	"dcsmanager/internal/state"
 	"dcsmanager/internal/stats"
@@ -86,6 +80,11 @@ var ErrAlreadyRunning = errors.New("another dcsmanager instance is already runni
 // differ from cfg.HTTPAddr when a port of 0 was requested) so a desktop shell
 // can point its window at the right URL. It runs on its own goroutine.
 func Run(onReady func(addr string)) error {
+	// The product renamed its per-user folder. Copy a pre-2.0 data set before the
+	// configuration resolves the database path; the old folder is left in place.
+	if err := config.PrepareUserData(); err != nil {
+		return fmt.Errorf("migration des données: %w", err)
+	}
 	cfg := config.Load()
 
 	// An instance bound to the configured port is running by definition; starting
@@ -125,6 +124,18 @@ func Run(onReady func(addr string)) error {
 		} else {
 			database = opened
 			defer database.Close()
+			// If the player configured a server, catch up in the background and
+			// retry periodically; each call is a no-op until sync is configured.
+			if concrete, ok := database.(*db.DB); ok {
+				go trySync(concrete)
+				go func() {
+					ticker := time.NewTicker(15 * time.Minute)
+					defer ticker.Stop()
+					for range ticker.C {
+						trySync(concrete)
+					}
+				}()
+			}
 		}
 	}
 
@@ -315,6 +326,9 @@ func Run(onReady func(addr string)) error {
 	debriefs.OnDebrief = func(d model.Debrief) {
 		dbg.Infof("debrief", "stored #%d: %s (%d events)", d.ID, d.Mission, len(d.Parsed.Events))
 		srv.BroadcastMessage(map[string]any{"type": "debrief", "debrief": d})
+		if concrete, ok := database.(*db.DB); ok {
+			go trySync(concrete)
+		}
 	}
 	tcpListener.OnMessage = func(m model.Message) {
 		// Debrief transfers are chunked and reassembled separately.
@@ -334,172 +348,9 @@ func Run(onReady func(addr string)) error {
 	// Every callback is in place: the listener may now accept connections.
 	go tcpListener.Serve(tcpLn)
 
-	// ---- Panels and DCS-BIOS: cockpit hardware ----------------------------
-	// The manager drives Logitech panels directly and speaks DCS-BIOS' protocol,
-	// so a cockpit with either can be watched. Both are best-effort: a machine
-	// without panels or without DCS-BIOS simply sees nothing here.
-	//
-	// ledDriver is declared before the DCS-BIOS client so the frame callback can
-	// reach it, and assigned once the panels and the binding store exist. It is an
-	// atomic pointer because the callback runs on the DCS-BIOS reader goroutine
-	// while the assignment happens on the main one.
-	var ledDriver atomic.Pointer[led.Driver]
-
-	bios := dcsbios.New(dcsbios.DefaultOptions(), func(st dcsbios.State) {
-		srv.BroadcastMessage(map[string]any{
-			"type": "dcsbios",
-			"state": map[string]any{
-				"connected": st.Connected,
-				"aircraft":  st.Aircraft,
-				"frames":    st.Frames,
-			},
-		})
-		// The callback fires on a visible state change (first frame, new aircraft),
-		// not on every frame, so this is a change log rather than a flood.
-		dbg.Infof("dcsbios", "state change: aircraft=%q connected=%v frames=%d", st.Aircraft, st.Connected, st.Frames)
-		// A new aircraft invalidates the panels' displays: what is shown belongs to
-		// the previous one. Forget the cached reports so the next frame redraws them.
-		if d := ledDriver.Load(); d != nil {
-			d.ForgetAll()
-		}
-	})
-	// Every applied frame redraws the outputs: a frame that does not change the
-	// aircraft may still change an exported LED or display value. This is separate
-	// from onChange, which is coalesced and would leave the panels stale.
-	bios.OnFrame = func() {
-		if d := ledDriver.Load(); d != nil {
-			d.Sync()
-		}
-	}
-	if err := bios.Start(); err != nil {
-		log.Printf("dcsbios: listener unavailable: %v", err)
-	} else {
-		defer bios.Stop()
-		log.Printf("dcsbios: listening on %s:%d", dcsbios.DefaultMulticast, dcsbios.DefaultReceivePort)
-	}
-
-	// The binding store sends DCS-BIOS commands when a panel control moves. It
-	// starts disabled on every run: sending into a live cockpit is opt-in.
-	plugin := panelplugin.New()
-	if err := plugin.Start(panelplugin.Address); err != nil {
-		log.Printf("panel plugin: %v", err)
-	}
-	defer plugin.Close()
-	srv.SetPanelPlugin(plugin)
-	mappings := mapping.NewStore(mappingPath(cfg), func(line string) error {
-		identifier, value := parseCommandLine(line)
-		if identifier == panelplugin.TrimCommand {
-			err := plugin.SendTrim(bios.State().Aircraft, fmt.Sprint(value))
-			if err != nil {
-				dbg.Warnf("panel-plugin", "%v", err)
-			}
-			return err
-		}
-		return bios.SendCommand(identifier, value)
-	})
-
-	panelSvc := panelservice.New(panelservice.DefaultOptions(), func(e panelservice.Event) {
-		srv.BroadcastMessage(map[string]any{"type": "panel", "panel": api.PanelEventJSON(e)})
-		switch e.Kind {
-		case panelservice.KindConnected, panelservice.KindDisconnected:
-			dbg.Infof("panel", "%s %s (%s)", e.Model, e.Kind.String(), e.Device)
-		case panelservice.KindError:
-			dbg.Warnf("panel", "%s: %v", e.Model, e.Err)
-		}
-		switch e.Kind {
-		case panelservice.KindInput:
-			for _, mode := range []string{"ALT", "VS", "IAS", "HDG", "CRS"} {
-				if e.Active["KNOB_"+mode] {
-					e.Input.Mode = mode
-					break
-				}
-			}
-			// Show what the input maps to, whether or not sending is armed, so a
-			// binding can be checked without moving a real cockpit.
-			aircraft := bios.State().Aircraft
-			dbg.Infof("panel", "input %s %s=%v (aircraft=%q, commands=%v)",
-				e.Model, e.Input.Control.ID, e.Input.Active, aircraft, mappings.Enabled())
-			if aircraft != "" {
-				if cat, err := srv.LoadCatalog(aircraft); err == nil {
-					if lines := mappings.Simulate(aircraft, e.Input, cat); len(lines) > 0 {
-						srv.BroadcastMessage(map[string]any{
-							"type":     "mapping",
-							"aircraft": aircraft,
-							"model":    string(e.Model),
-							"control":  e.Input.Control.ID,
-							"active":   e.Input.Active,
-							"commands": lines,
-						})
-					}
-					// Send at most once per input, whichever path applies:
-					//   - the normal path sends when the operator armed sending;
-					//   - test mode forces the send even when sending is off.
-					// Never both, or a switch move that is already risky (gear!) would
-					// be sent twice.
-					if mappings.Enabled() {
-						for _, line := range mappings.Apply(aircraft, e.Input, cat) {
-							dbg.Infof("mapping", "sent -> %s", strings.TrimSpace(line))
-							srv.BroadcastMessage(map[string]any{"type": "command", "command": line})
-						}
-					} else if srv.TestMode() {
-						for _, line := range mappings.ApplyForced(aircraft, e.Input, cat) {
-							dbg.Infof("mapping", "test -> %s", strings.TrimSpace(line))
-							srv.BroadcastMessage(map[string]any{"type": "command", "command": line})
-						}
-					}
-				}
-			}
-			// A button press can be what an output binding watches; redraw the panels
-			// (the LCD shows the selector's mode, which may just have changed).
-			if d := ledDriver.Load(); d != nil {
-				d.Sync()
-			}
-		case panelservice.KindConnected:
-			// A panel that just appeared must be driven from the current state rather
-			// than wait for the next DCS-BIOS frame.
-			if d := ledDriver.Load(); d != nil {
-				d.Forget(e.Device)
-				d.Sync()
-			}
-		case panelservice.KindDisconnected:
-			// Drop the cached report: the panel comes back blank and must be redrawn.
-			if d := ledDriver.Load(); d != nil {
-				d.Forget(e.Device)
-			}
-		}
-	})
-	panelSvc.Start()
-	defer panelSvc.Stop()
-
-	// The output driver reads the aircraft's exported values and writes the panel
-	// reports. It shares the API's metadata cache so a catalogue is loaded once.
-	ledDriver.Store(led.New(bios, panelSvc, mappings, srv.LoadCatalog))
-	if d := ledDriver.Load(); d != nil {
-		d.SetLogger(dbg.Infof)
-		d.SetSwitchPos(panelSvc.SelectorMode)
-	}
-
-	srv.SetPanels(panelSvc, bios)
-	srv.SetMappings(mappings)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	// Poll output freshness as well as frames, so a silent DCS-BIOS link clears
-	// stale values and profile edits take effect without a new cockpit event.
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if d := ledDriver.Load(); d != nil {
-					d.Sync()
-				}
-			}
-		}
-	}()
+
 	go srv.RunBroadcast(ctx, time.Second)
 
 	// ---- Tracking: positions and losses ------------------------------------
@@ -617,40 +468,6 @@ func openStore(cfg config.Config) (db.Store, error) {
 	}
 	log.Printf("db: using sqlite %s", cfg.DBPath)
 	return store, nil
-}
-
-// mappingPath is where the panel-to-command bindings live: beside the database, so
-// the whole manager's state sits in one folder.
-func mappingPath(cfg config.Config) string {
-	dir := filepath.Dir(cfg.DBPath)
-	if dir == "" || dir == "." {
-		return "mappings.json"
-	}
-	return filepath.Join(dir, "mappings.json")
-}
-
-// parseCommandLine splits the "IDENTIFIER value\n" line the mapping store builds
-// back into the parts SendCommand wants. A line it cannot parse yields an empty
-// identifier, which SendCommand refuses rather than sending nonsense.
-func parseCommandLine(line string) (string, int) {
-	line = strings.TrimSpace(line)
-	i := strings.LastIndexByte(line, ' ')
-	if i <= 0 {
-		return "", 0
-	}
-	identifier := line[:i]
-	value := 0
-	for _, r := range line[i+1:] {
-		if r == '-' {
-			value = -value
-			continue
-		}
-		if r < '0' || r > '9' {
-			return identifier, value
-		}
-		value = value*10 + int(r-'0')
-	}
-	return identifier, value
 }
 
 // LogFilePath is where a window-mode launch writes its log, since a

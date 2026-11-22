@@ -1,130 +1,177 @@
 <script>
   import ChartViewer from './lib/ChartViewer.svelte';
   import logo from './assets/logo.png';
-  import DebriefPanel from './lib/DebriefPanel.svelte';
+  import OverviewPanel from './lib/OverviewPanel.svelte';
+  import ServerOverview from './lib/ServerOverview.svelte';
+  import FlightsPanel from './lib/FlightsPanel.svelte';
   import CareerPanel from './lib/CareerPanel.svelte';
   import StatsPanel from './lib/StatsPanel.svelte';
+  import FlightPlanPanel from './lib/FlightPlanPanel.svelte';
+  import ChecklistsPanel from './lib/ChecklistsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
   import SettingsPanel from './lib/SettingsPanel.svelte';
+  import ProfilePanel from './lib/ProfilePanel.svelte';
+  import AdminPanel from './lib/AdminPanel.svelte';
+  import LoginPage from './lib/LoginPage.svelte';
+  import ResetPasswordPage from './lib/ResetPasswordPage.svelte';
+  import Toasts from './lib/ui/Toasts.svelte';
   import { connected, feedStatus, mission, fetchTheatres, connect } from './lib/units.js';
   import { t, lang, LANGUAGES, setLang } from './lib/i18n.js';
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { updateInfo, checkForUpdates } from './lib/updates.js';
+  import { NAV_GROUPS, SERVER_NAV_GROUPS, routeID, routeByID, initRouter, navigate } from './lib/router.js';
+  import {
+    appMode,
+    sessionUser,
+    sessionLoading,
+    isServer,
+    isAdmin,
+    loadSession,
+    logout,
+  } from './lib/session.js';
 
-  // The Debriefs view is built from the redesign mockup: the shell is a sidebar +
-  // topbar, and each view keeps its existing panel. Debriefs stays hidden for
-  // now (the panel is still in place) — restore its entry below to re-enable it.
-  let tab = 'career';
+  const SERVER_ROUTES = new Set(SERVER_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)));
+  const DESKTOP_ROUTES = new Set(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)));
+  const resetPath = typeof window !== 'undefined' && (window.location.pathname.replace(/\/+$/, '') || '/') === '/reset';
 
-  // Views grouped in the sidebar, like the mockup: analysis, reference, config.
-  const groups = [
-    {
-      label: 'nav.analysis',
-      items: [
-        { id: 'career', label: 'tab.career', icon: 'M12 3l2.5 5 5.5.8-4 3.9 1 5.5-5-2.6-5 2.6 1-5.5-4-3.9 5.5-.8z' },
-        { id: 'stats', label: 'tab.stats', icon: 'M4 20V10M10 20V4M16 20v-7M22 20H2' },
-        { id: 'debriefs', label: 'tab.debriefs', hidden: true, icon: 'M6 2h9l5 5v15H6zM15 2v5h5M9 13h6M9 17h6' },
-      ],
-    },
-    {
-      label: 'nav.reference',
-      items: [
-        { id: 'aerodromes', label: 'tab.aerodromes', icon: 'M12 3v6M12 15v6M3 12h6M15 12h6' },
-      ],
-    },
-    {
-      label: 'nav.config',
-      items: [
-        { id: 'settings', label: 'tab.settings', icon: 'M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2' },
-      ],
-    },
-  ];
+  $: navGroups = ($isServer ? SERVER_NAV_GROUPS : NAV_GROUPS)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.id !== 'admin' || $isAdmin),
+    }))
+    .filter((group) => group.items.length > 0);
 
-  // Per-view subtitle, shown under the title in the topbar.
-  const subtitles = {
-    career: 'sub.career',
-    stats: 'sub.stats',
-    debriefs: 'sub.debriefs',
-    aerodromes: 'sub.aerodromes',
-    settings: 'sub.settings',
-  };
+  // A server link opened on a desktop-only path (or the reverse) lands on the
+  // profile's home page instead of rendering a page with missing data. These
+  // guards wait until the session probe has finished, so an administrator link
+  // is not redirected away during the first render.
+  $: if (!resetPath && !$sessionLoading && $isServer && !SERVER_ROUTES.has($routeID)) navigate('squadron');
+  $: if (!resetPath && !$sessionLoading && !$isServer && !DESKTOP_ROUTES.has($routeID)) navigate('overview');
+  $: if (!resetPath && !$sessionLoading && $sessionUser && $isServer && $routeID === 'admin' && !$isAdmin) navigate('profile');
 
-  // Title for the current view. A reactive declaration (not a function called in
-  // the template): Svelte tracks `tab` here, whereas `{$t(title())}` referenced
-  // only the function and never re-rendered.
-  $: titleKey = (() => {
-    for (const g of groups) for (const it of g.items) if (it.id === tab) return it.label;
-    return 'app.title';
-  })();
-
-  function goTo(id) {
-    tab = id;
+  // Keep the window title in step with the client-side route. The route is
+  // resolved from the store here (and in the template) rather than through an
+  // intermediate variable, so the first shell render after login is already
+  // correct.
+  $: if (typeof document !== 'undefined') {
+    const current = routeByID($routeID);
+    document.title = resetPath
+      ? `${$t('reset.title')} · ${$t('app.title')}`
+      : $isServer && !$sessionUser
+        ? `${$t('login.title')} · ${$t('app.title')}`
+        : `${$t(current.label)} · ${$t('app.title')}`;
   }
 
-  // Open the live stream once, for the whole application: the mission name in the
-  // topbar, the cockpit-hardware updates and the pause indicator all depend on it.
+  // Open the live stream once, for the whole desktop application. The server
+  // profile has no telemetry, so it never opens it.
   onMount(() => {
-    const stopStream = connect();
-    checkForUpdates();
-    const updateTimer = setInterval(() => checkForUpdates(), 12 * 60 * 60 * 1000);
-    return () => { stopStream(); clearInterval(updateTimer); };
+    const stopRouter = resetPath ? () => {} : initRouter();
+    let stopStream = null;
+    let updateTimer = null;
+    let cancelled = false;
+
+    loadSession().then(() => {
+      if (cancelled || get(isServer)) return;
+      stopStream = connect();
+      checkForUpdates();
+      updateTimer = setInterval(() => checkForUpdates(), 12 * 60 * 60 * 1000);
+    });
+    return () => {
+      cancelled = true;
+      stopRouter();
+      if (stopStream) stopStream();
+      if (updateTimer) clearInterval(updateTimer);
+    };
   });
 
-  // Theatres drive the airfields view: load them once at startup.
-  fetchTheatres().catch(() => {});
+  // Theatres drive the airfields view on both profiles. On the server they are
+  // requested only once a session exists; the endpoint is protected.
+  $: if (!$isServer || $sessionUser) fetchTheatres().catch(() => {});
+
+  async function signOut() {
+    await logout();
+    navigate('squadron');
+  }
 </script>
 
+{#if resetPath}
+  <ResetPasswordPage />
+{:else if $sessionLoading}
+  <div class="boot">
+    <img class="boot-logo" src={logo} alt="" aria-hidden="true" />
+    <p>{$t('app.title')}</p>
+  </div>
+{:else if $isServer && !$sessionUser}
+  <LoginPage />
+{:else}
 <div class="shell">
   <aside>
-    <div class="brand">
+    <a class="brand" href="/overview" on:click|preventDefault={() => navigate('overview')}>
       <img class="logo" src={logo} alt="" aria-hidden="true" />
       <span class="brand-text">
         <strong>{$t('app.title')}</strong>
         <small class="muted">DCS World companion</small>
       </span>
-    </div>
+    </a>
 
     <nav>
-      {#each groups as g (g.label)}
-        <div class="group">{$t(g.label)}</div>
-        {#each g.items as item (item.id)}
-          {#if !item.hidden}
-            <button class="nav-item" class:active={tab === item.id} on:click={() => goTo(item.id)}>
-              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d={item.icon} /></svg>
-              {$t(item.label)}
-            </button>
-          {/if}
+      {#each navGroups as group (group.label)}
+        <div class="group">{$t(group.label)}</div>
+        {#each group.items as item (item.id)}
+          <a
+            class="nav-item"
+            class:active={$routeID === item.id}
+            href={item.path}
+            title={$t(item.label)}
+            aria-current={$routeID === item.id ? 'page' : undefined}
+            on:click|preventDefault={() => navigate(item.id)}
+          >
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d={item.icon} /></svg>
+            <span class="label">{$t(item.label)}</span>
+          </a>
         {/each}
       {/each}
     </nav>
 
     <div class="status">
-      {#if $updateInfo?.status === 'available'}
-        <a class="update-link" href={$updateInfo.downloadUrl} target="_blank" rel="noopener noreferrer">
-          {$t('update.available')}: {$updateInfo.latestVersion}
-        </a>
-      {/if}
-      <div class="status-row">
-        <span class="live">
-          <span class="dot" class:on={$connected}></span>
-          {$connected ? $t('app.connected') : $t('app.offline')}
-        </span>
-        {#if $updateInfo?.currentVersion}
-          <span class="installed-version" title="DCS Manager {$updateInfo.currentVersion}">v{$updateInfo.currentVersion}</span>
+      {#if $isServer}
+        <div class="user">
+          <span class="avatar">{$sessionUser?.username?.slice(0, 2).toUpperCase() ?? '?'}</span>
+          <div class="user-text">
+            <strong class="label">{$sessionUser?.displayName || $sessionUser?.username}</strong>
+            <small class="label">{$isAdmin ? $t('admin.role.admin') : $t('admin.role.member')}</small>
+          </div>
+          <button class="logout" type="button" on:click={signOut} title={$t('login.logout')} aria-label={$t('login.logout')}>⎋</button>
+        </div>
+      {:else}
+        {#if $updateInfo?.status === 'available'}
+          <a class="update-link" href={$updateInfo.downloadUrl} target="_blank" rel="noopener noreferrer">
+            {$t('update.available')}: {$updateInfo.latestVersion}
+          </a>
         {/if}
-      </div>
+        <div class="status-row">
+          <span class="live" title={$connected ? $t('app.connected') : $t('app.offline')}>
+            <span class="dot" class:on={$connected}></span>
+            <span class="label">{$connected ? $t('app.connected') : $t('app.offline')}</span>
+          </span>
+          {#if $updateInfo?.currentVersion}
+            <span class="installed-version label" title="DCS Manager {$updateInfo.currentVersion}">v{$updateInfo.currentVersion}</span>
+          {/if}
+        </div>
+      {/if}
     </div>
   </aside>
 
   <div class="content">
     <header class="topbar">
       <div class="titles">
-        <h1>{$t(titleKey)}</h1>
-        <span class="sub muted">{$t(subtitles[tab] || 'app.title')}</span>
+        <h1>{$t(routeByID($routeID).label)}</h1>
+        <span class="sub muted">{$t(routeByID($routeID).subtitle)}</span>
       </div>
       <span class="spacer"></span>
 
-      {#if $mission}
+      {#if $mission && !$isServer}
         <span class="mission" title={$mission.name}>
           <span class="mission-dot"></span>{$mission.name}
         </span>
@@ -139,53 +186,71 @@
       </label>
     </header>
 
-    {#if $feedStatus === 'waiting'}
-      <div class="pause-banner" title={$t('app.feedWaitingNote')}>
-        <span class="pause-icon">◌</span>
-        {$t('app.feedWaiting')} — <span class="pause-note">{$t('app.feedWaitingNote')}</span>
-      </div>
-    {:else if $feedStatus === 'interrupted'}
-      <div class="pause-banner" title={$t('app.feedStoppedNote')}>
-        <span class="pause-icon">⏸</span>
-        {$t('app.feedStopped')} — <span class="pause-note">{$t('app.feedStoppedNote')}</span>
-      </div>
+    {#if !$isServer}
+      {#if $feedStatus === 'waiting'}
+        <div class="pause-banner" title={$t('app.feedWaitingNote')}>
+          <span class="pause-icon">◌</span>
+          {$t('app.feedWaiting')} — <span class="pause-note">{$t('app.feedWaitingNote')}</span>
+        </div>
+      {:else if $feedStatus === 'interrupted'}
+        <div class="pause-banner" title={$t('app.feedStoppedNote')}>
+          <span class="pause-icon">⏸</span>
+          {$t('app.feedStopped')} — <span class="pause-note">{$t('app.feedStoppedNote')}</span>
+        </div>
+      {/if}
     {/if}
 
     <main>
-      {#if tab === 'debriefs'}
-        <div class="view">
-          <DebriefPanel />
-        </div>
-      {:else if tab === 'career'}
-        <div class="view">
-          <CareerPanel />
-        </div>
-      {:else if tab === 'stats'}
-        <div class="view">
-          <StatsPanel />
-        </div>
-      {:else if tab === 'settings'}
-        <div class="view">
-          <SettingsPanel />
-        </div>
+      {#if $isServer}
+        {#if $routeID === 'squadron'}
+          <div class="view"><ServerOverview /></div>
+        {:else if $routeID === 'flights'}
+          <div class="view"><FlightsPanel /></div>
+        {:else if $routeID === 'stats'}
+          <div class="view"><StatsPanel /></div>
+        {:else if $routeID === 'planner'}
+          <div class="view"><FlightPlanPanel /></div>
+        {:else if $routeID === 'checklists'}
+          <div class="view"><ChecklistsPanel /></div>
+        {:else if $routeID === 'airfields'}
+          <div class="view"><AerodromePanel /></div>
+        {:else if $routeID === 'admin' && $isAdmin}
+          <div class="view"><AdminPanel /></div>
+        {:else if $routeID === 'profile'}
+          <div class="view"><ProfilePanel /></div>
+        {:else}
+          <div class="view"><ServerOverview /></div>
+        {/if}
+      {:else if $routeID === 'overview'}
+        <div class="view"><OverviewPanel /></div>
+      {:else if $routeID === 'flights'}
+        <div class="view"><FlightsPanel /></div>
+      {:else if $routeID === 'career'}
+        <div class="view"><CareerPanel /></div>
+      {:else if $routeID === 'stats'}
+        <div class="view"><StatsPanel /></div>
+      {:else if $routeID === 'planner'}
+        <div class="view"><FlightPlanPanel /></div>
+      {:else if $routeID === 'checklists'}
+        <div class="view"><ChecklistsPanel /></div>
+      {:else if $routeID === 'settings'}
+        <div class="view"><SettingsPanel /></div>
       {:else}
-        <div class="view">
-          <AerodromePanel />
-        </div>
+        <div class="view"><AerodromePanel /></div>
       {/if}
     </main>
   </div>
 </div>
+{/if}
 
 <!-- Modal chart viewer: a scan is displayed whole, on top of everything. -->
 <ChartViewer />
+<Toasts />
 
 <style>
-  /* Sidebar + content, per the redesign mockup. The panels themselves are
-     unchanged; this only moves navigation to a rail and adds a titled topbar. */
   .shell {
     display: grid;
-    grid-template-columns: 224px 1fr;
+    grid-template-columns: 224px minmax(0, 1fr);
     height: 100%;
     min-width: 0;
   }
@@ -203,6 +268,8 @@
     align-items: center;
     gap: 0.6rem;
     padding: 0.9rem 1rem 0.8rem;
+    color: inherit;
+    text-decoration: none;
   }
 
   .logo {
@@ -238,11 +305,11 @@
 
   .group {
     padding: 0.7rem 0.6rem 0.3rem;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     text-transform: uppercase;
     letter-spacing: 0.09em;
-    color: var(--muted);
-    font-weight: 600;
+    color: var(--faint);
+    font-weight: 650;
   }
 
   .nav-item {
@@ -252,11 +319,9 @@
     padding: 0.5rem 0.6rem;
     font-size: 0.84rem;
     color: var(--muted);
-    background: none;
+    text-decoration: none;
     border: 1px solid transparent;
-    border-radius: 9px;
-    cursor: pointer;
-    text-align: left;
+    border-radius: var(--radius);
   }
 
   .nav-item:hover {
@@ -291,7 +356,6 @@
   .update-link {
     display: block;
     margin-bottom: 0.6rem;
-    color: var(--blue);
     font-size: 0.8rem;
     overflow-wrap: anywhere;
   }
@@ -326,6 +390,85 @@
 
   .dot.on {
     background: var(--green);
+    box-shadow: 0 0 0 3px var(--green-soft);
+  }
+
+  .user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .user .avatar {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--blue-soft);
+    color: var(--blue);
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+
+  .user-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+  }
+
+  .user-text strong {
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-text small {
+    color: var(--muted);
+    font-size: 0.66rem;
+  }
+
+  .logout {
+    margin-left: auto;
+    padding: 0.15rem 0.3rem;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+
+  .logout:hover {
+    color: var(--text);
+    border-color: var(--border);
+  }
+
+  .boot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    height: 100%;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .boot-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
   }
 
   .content {
@@ -379,7 +522,7 @@
     color: var(--muted);
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 0.78rem;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -398,8 +541,8 @@
     padding: 0.3rem 0.45rem;
     color: var(--text);
     background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     font-size: 0.8rem;
     cursor: pointer;
   }
@@ -411,9 +554,6 @@
 
   main {
     display: flex;
-    /* Take all the height the topbar and banners leave, and never shrink below
-       the viewport: min-height: 0 is what lets the inner panel scroll instead of
-       stretching the page. */
     flex: 1 1 auto;
     min-height: 0;
     min-width: 0;
@@ -443,5 +583,61 @@
     min-width: 0;
     min-height: 0;
     overflow: auto;
+  }
+
+  /* Narrow windows (tablet, small laptop): keep the navigation usable as an
+     icon rail rather than letting it squeeze the content. */
+  @media (max-width: 900px) {
+    .shell {
+      grid-template-columns: 62px minmax(0, 1fr);
+    }
+
+    .brand {
+      justify-content: center;
+      padding: 0.75rem 0.4rem;
+    }
+
+    .brand-text,
+    .group,
+    .nav-item .label,
+    .status .label {
+      display: none;
+    }
+
+    .nav-item {
+      justify-content: center;
+      padding: 0.55rem 0.4rem;
+    }
+
+    .status {
+      padding: 0.7rem 0.4rem;
+    }
+
+    .status-row,
+    .live {
+      justify-content: center;
+    }
+
+    .installed-version {
+      display: none;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .shell {
+      grid-template-columns: 52px minmax(0, 1fr);
+    }
+
+    .topbar {
+      padding: 0.5rem 0.7rem;
+    }
+
+    .titles .sub {
+      display: none;
+    }
+
+    .mission {
+      display: none;
+    }
   }
 </style>

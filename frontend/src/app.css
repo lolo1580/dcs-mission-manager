@@ -1,12 +1,39 @@
+/* Design tokens. Existing panels use the historical names (--bg, --panel,
+   --border, --text, --muted, --blue, --red, --green); the additional tokens
+   support the redesigned shell, cards and controls. */
 :root {
-  --bg: #0f1419;
-  --panel: #161b22;
-  --border: #2b333d;
-  --text: #e6edf3;
-  --muted: #9da7b3;
-  --blue: #58a6ff;
-  --red: #f85149;
-  --green: #3fb950;
+  --bg: #0b1016;
+  --bg-elevated: #0f1620;
+  --panel: #131b25;
+  --panel-2: #18222e;
+  --border: #26313d;
+  --border-strong: #33404f;
+  --text: #e8eef6;
+  --muted: #96a3b4;
+  --faint: #6f7d8f;
+
+  --blue: #4c9aff;
+  --blue-soft: rgba(76, 154, 255, 0.14);
+  --red: #ff5c5c;
+  --red-soft: rgba(255, 92, 92, 0.14);
+  --green: #3fd07a;
+  --green-soft: rgba(63, 208, 122, 0.14);
+  --amber: #f0a43a;
+  --amber-soft: rgba(240, 164, 58, 0.14);
+
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 13px;
+
+  --shadow: 0 16px 42px rgba(0, 0, 0, 0.45);
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.02), 0 6px 18px rgba(0, 0, 0, 0.18);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
 }
 
 * {
@@ -24,4 +51,132 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: var(--blue);
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Shared button styles used by the redesigned pages. Existing panels keep
+   their local styles. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.7rem;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  border-color: var(--muted);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  color: #04111f;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.btn.primary:hover {
+  background: color-mix(in srgb, var(--blue) 86%, white);
+}
+
+.btn.danger {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border));
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn.ghost:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.field > span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 0.42rem 0.55rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.field textarea {
+  min-height: 70px;
+  resize: vertical;
 }
