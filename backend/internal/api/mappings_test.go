@@ -76,7 +76,27 @@ func TestBackupMappings(t *testing.T) {
 		t.Fatalf("backup = %+v", created.Backup)
 	}
 
-	body, _ := json.Marshal(map[string]any{"name": created.Backup.Name, "dryRun": true})
+	// A selected subset is recorded in the manifest and the archive name.
+	body, _ := json.Marshal(map[string]any{"aircraft": []string{"F-16C_50"}})
+	rec = httptest.NewRecorder()
+	srv.handleBackupMappings(rec, httptest.NewRequest(http.MethodPost, "/api/backup/mappings", bytes.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST selected = %d %s", rec.Code, rec.Body.String())
+	}
+	var selected struct {
+		Backup struct {
+			Name     string   `json:"name"`
+			Aircraft []string `json:"aircraft"`
+		} `json:"backup"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &selected); err != nil {
+		t.Fatal(err)
+	}
+	if len(selected.Backup.Aircraft) != 1 || selected.Backup.Aircraft[0] != "F-16C_50" {
+		t.Fatalf("selected backup = %+v", selected.Backup)
+	}
+
+	body, _ = json.Marshal(map[string]any{"name": created.Backup.Name, "dryRun": true})
 	rec = httptest.NewRecorder()
 	srv.handleBackupMappingsRestore(rec, httptest.NewRequest(http.MethodPost, "/api/backup/mappings/restore", bytes.NewReader(body)))
 	if rec.Code != http.StatusOK {

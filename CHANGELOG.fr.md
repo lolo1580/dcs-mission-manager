@@ -26,8 +26,8 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 - Une catégorie de sauvegarde **Livrées**, et les mods désactivés sont désormais
   inclus dans la catégorie **Mods**.
 - Une **sauvegarde dédiée des mappings de commandes** dans Paramètres >
-  Sauvegarde du profil : inventaire de `Config\Input`, archive en un clic, et
-  restauration/simulation avec DCS fermé.
+  Sauvegarde du profil : inventaire de `Config\Input`, sélection par appareil,
+  archive dédiée, et restauration/simulation avec DCS fermé.
 
 ### Sécurité
 

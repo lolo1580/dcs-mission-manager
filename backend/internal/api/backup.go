@@ -167,6 +167,13 @@ func (s *Server) handleBackupMappings(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		var req struct {
+			Aircraft []string `json:"aircraft"`
+		}
+		if err := decodeJSONBody(r, &req); err != nil && !errors.Is(err, io.EOF) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
+			return
+		}
 		scan, err := backup.ScanInput(s.cfg.SavedGames)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -176,9 +183,9 @@ func (s *Server) handleBackupMappings(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "aucun mapping trouvé dans Config\\Input"})
 			return
 		}
-		a, err := backup.Create(s.cfg.SavedGames, s.backupDir(), []string{"input"}, s.version)
+		a, err := backup.CreateMappings(s.cfg.SavedGames, s.backupDir(), req.Aircraft, s.version)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"backup": a, "mappings": scan})

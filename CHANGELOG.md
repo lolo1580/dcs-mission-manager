@@ -25,8 +25,8 @@ to [semantic versioning](https://semver.org/).
 - A **Liveries** backup category, and disabled mods are now included in the
   **Mods** backup category.
 - A dedicated **control-mapping backup** in Settings > Player profile backup:
-  inventory of `Config\Input`, one-click archive, and restore/dry-run with DCS
-  closed.
+  inventory of `Config\Input`, per-aircraft selection, a mapping-only archive,
+  and restore/dry-run with DCS closed.
 
 ### Security
 

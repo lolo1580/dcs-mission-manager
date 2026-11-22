@@ -14,6 +14,7 @@
   let generalBackups = [];
   let mappings = null;
   let mappingArchives = [];
+  let mappingSelected = new Set();
   let directory = '';
   let savedGames = '';
   let loading = true;
@@ -57,6 +58,13 @@
       );
       mappings = mappingData.mappings ?? null;
       mappingArchives = mappingData.archives ?? [];
+      const names = (mappings?.aircraft ?? []).map((a) => a.name);
+      if (mappingSelected.size === 0) {
+        mappingSelected = new Set(names);
+      } else {
+        const kept = new Set([...mappingSelected].filter((name) => names.includes(name)));
+        mappingSelected = kept.size === 0 ? new Set(names) : kept;
+      }
     } catch (e) {
       error = String(e.message ?? e);
     } finally {
@@ -85,13 +93,39 @@
     }
   }
 
+  function toggleMapping(name) {
+    const next = new Set(mappingSelected);
+    next.has(name) ? next.delete(name) : next.add(name);
+    mappingSelected = next;
+  }
+
+  function selectAllMappings() {
+    mappingSelected = new Set((mappings?.aircraft ?? []).map((a) => a.name));
+  }
+
+  function clearMappings() {
+    mappingSelected = new Set();
+  }
+
   async function createMappings() {
+    const names = (mappings?.aircraft ?? []).map((a) => a.name);
+    const selected = names.filter((name) => mappingSelected.has(name));
+    if (selected.length === 0) {
+      error = $t('backup.mappings.selectOne');
+      return;
+    }
+    // Selecting every aircraft means a full mapping backup, including root
+    // files such as disabled.lua.
+    const aircraft = selected.length === names.length ? [] : selected;
     mappingBusy = true;
     error = '';
     notice = '';
     try {
-      const res = await postJSON('/api/backup/mappings', {});
-      notice = `Mappings sauvegardés dans ${res.backup.name}`;
+      const res = await postJSON('/api/backup/mappings', { aircraft });
+      notice = $t('backup.mappings.saved', {
+        count: selected.length,
+        name: res.backup.name,
+      });
       await reload();
     } catch (e) {
       error = String(e.message ?? e);
@@ -107,9 +141,10 @@
     try {
       const res = await postJSON('/api/backup/mappings/restore', { name: a.name, dryRun });
       const r = res.result;
-      notice = dryRun
-        ? `Simulation : ${r.files} fichier(s) seraient restaurés depuis ${a.name}`
-        : `Mappings restaurés depuis ${a.name}${r.safetyBackup ? ' (copie de sécurité conservée)' : ''}`;
+      notice = $t(dryRun ? 'backup.mappings.dryRun' : 'backup.mappings.restored', {
+        files: r.files,
+        name: a.name,
+      });
     } catch (e) {
       error = String(e.message ?? e);
     } finally {
@@ -181,20 +216,36 @@
         })}
       </p>
       {#if mappings.aircraft?.length}
+        <div class="mapping-tools">
+          <button class="mini" type="button" on:click={selectAllMappings} disabled={mappingBusy}>{$t('backup.mappings.selectAll')}</button>
+          <button class="mini" type="button" on:click={clearMappings} disabled={mappingBusy}>{$t('backup.mappings.selectNone')}</button>
+          <span class="muted">
+            {$t('backup.mappings.selectedCount', {
+              selected: mappingSelected.size,
+              total: mappings.aircraft.length,
+            })}
+          </span>
+        </div>
         <div class="aircraft-list">
-          {#each mappings.aircraft.slice(0, 12) as aircraft (aircraft.name)}
-            <span class="tag">{aircraft.name} <b>{aircraft.files}</b></span>
+          {#each mappings.aircraft as aircraft (aircraft.name)}
+            <label class="aircraft-chip" class:selected={mappingSelected.has(aircraft.name)}>
+              <input
+                type="checkbox"
+                checked={mappingSelected.has(aircraft.name)}
+                on:change={() => toggleMapping(aircraft.name)}
+                disabled={mappingBusy}
+              />
+              <span>{aircraft.name}</span>
+              <b>{aircraft.files}</b>
+            </label>
           {/each}
-          {#if mappings.aircraft.length > 12}
-            <span class="tag">+{mappings.aircraft.length - 12}</span>
-          {/if}
         </div>
       {/if}
     {:else}
       <p class="empty">{$t('backup.mappings.noneFound')}</p>
     {/if}
-    <button class="primary" on:click={createMappings} disabled={mappingBusy || !mappings?.files}>
-      {$t(mappingBusy ? 'backup.mappings.saving' : 'backup.mappings.save')}
+    <button class="primary" on:click={createMappings} disabled={mappingBusy || !mappings?.files || mappingSelected.size === 0}>
+      {$t(mappingBusy ? 'backup.mappings.saving' : 'backup.mappings.save')} ({mappingSelected.size})
     </button>
 
     {#if mappingArchives.length}
@@ -211,7 +262,10 @@
         <tbody>
           {#each mappingArchives as a (a.name)}
             <tr>
-              <td class="name" title={a.name}>{a.name}</td>
+              <td class="name" title={a.name}>
+                {a.name}
+                {#if a.aircraft?.length}<div class="archive-aircraft">{a.aircraft.join(', ')}</div>{/if}
+              </td>
               <td class="num">{fmtDate(a.createdAt)}</td>
               <td class="num">{fmtSize(a.bytes)}</td>
               <td class="actions">
@@ -353,21 +407,70 @@
   .aircraft-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.3rem;
+    gap: 0.35rem;
     margin-bottom: 0.6rem;
   }
 
-  .aircraft-list .tag {
-    color: var(--muted);
-    font-size: 0.68rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0.05rem 0.4rem;
+  .mapping-tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
   }
 
-  .aircraft-list .tag b {
+  .mini {
+    padding: 0.18rem 0.45rem;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+
+  .mini:hover:not(:disabled) {
     color: var(--text);
+    border-color: var(--blue);
+  }
+
+  .aircraft-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.76rem;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .aircraft-chip.selected {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--blue) 45%, var(--border));
+    background: var(--blue-soft);
+  }
+
+  .aircraft-chip input {
+    accent-color: var(--blue);
+  }
+
+  .aircraft-chip b {
+    color: var(--faint);
+    font-size: 0.68rem;
     font-variant-numeric: tabular-nums;
+  }
+
+  .archive-aircraft {
+    max-width: 220px;
+    margin-top: 0.1rem;
+    color: var(--faint);
+    font-size: 0.66rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mappings h4 {

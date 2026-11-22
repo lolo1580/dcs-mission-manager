@@ -129,8 +129,11 @@ type Manifest struct {
 	SavedGames string    `json:"savedGames,omitempty"`
 	AppVersion string    `json:"appVersion,omitempty"`
 	Categories []string  `json:"categories"`
-	Entries    int       `json:"entries"`
-	Bytes      int64     `json:"bytes"`
+	// Aircraft narrows a control-mapping backup to selected folders. Empty
+	// means every aircraft, which is also what older archives mean.
+	Aircraft []string `json:"aircraft,omitempty"`
+	Entries  int      `json:"entries"`
+	Bytes    int64    `json:"bytes"`
 }
 
 // Archive is the metadata of a stored backup.
@@ -139,6 +142,7 @@ type Archive struct {
 	Path       string    `json:"path"`
 	CreatedAt  time.Time `json:"createdAt"`
 	Categories []string  `json:"categories"`
+	Aircraft   []string  `json:"aircraft,omitempty"`
 	Entries    int       `json:"entries"`
 	Bytes      int64     `json:"bytes"`
 	AppVersion string    `json:"appVersion,omitempty"`
@@ -378,6 +382,7 @@ func readArchive(path string) (Archive, error) {
 		if decErr == nil {
 			a.CreatedAt = man.CreatedAt
 			a.Categories = man.Categories
+			a.Aircraft = man.Aircraft
 			a.Entries = man.Entries
 			a.AppVersion = man.AppVersion
 		}
