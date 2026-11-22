@@ -230,8 +230,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.7rem;
-    padding: 1rem;
+    width: 100%;
     max-width: 1000px;
+    margin: 0 auto;
+    padding: 1rem;
   }
 
   .identity {

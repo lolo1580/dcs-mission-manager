@@ -165,37 +165,43 @@
 
   <div class="content">
     <header class="topbar">
-      <div class="titles">
-        <h1>{$t(routeByID($routeID).label)}</h1>
-        <span class="sub muted">{$t(routeByID($routeID).subtitle)}</span>
+      <div class="topbar-inner">
+        <div class="titles">
+          <h1>{$t(routeByID($routeID).label)}</h1>
+          <span class="sub muted">{$t(routeByID($routeID).subtitle)}</span>
+        </div>
+        <span class="spacer"></span>
+
+        {#if $mission && !$isServer}
+          <span class="mission" title={$mission.name}>
+            <span class="mission-dot"></span>{$mission.name}
+          </span>
+        {/if}
+
+        <label class="lang">
+          <select value={$lang} on:change={(e) => setLang(e.currentTarget.value)} aria-label="Language">
+            {#each LANGUAGES as l (l.id)}
+              <option value={l.id}>{l.label}</option>
+            {/each}
+          </select>
+        </label>
       </div>
-      <span class="spacer"></span>
-
-      {#if $mission && !$isServer}
-        <span class="mission" title={$mission.name}>
-          <span class="mission-dot"></span>{$mission.name}
-        </span>
-      {/if}
-
-      <label class="lang">
-        <select value={$lang} on:change={(e) => setLang(e.currentTarget.value)} aria-label="Language">
-          {#each LANGUAGES as l (l.id)}
-            <option value={l.id}>{l.label}</option>
-          {/each}
-        </select>
-      </label>
     </header>
 
     {#if !$isServer}
       {#if $feedStatus === 'waiting'}
         <div class="pause-banner" title={$t('app.feedWaitingNote')}>
-          <span class="pause-icon">◌</span>
-          {$t('app.feedWaiting')} — <span class="pause-note">{$t('app.feedWaitingNote')}</span>
+          <div class="pause-inner">
+            <span class="pause-icon">◌</span>
+            {$t('app.feedWaiting')} — <span class="pause-note">{$t('app.feedWaitingNote')}</span>
+          </div>
         </div>
       {:else if $feedStatus === 'interrupted'}
         <div class="pause-banner" title={$t('app.feedStoppedNote')}>
-          <span class="pause-icon">⏸</span>
-          {$t('app.feedStopped')} — <span class="pause-note">{$t('app.feedStoppedNote')}</span>
+          <div class="pause-inner">
+            <span class="pause-icon">⏸</span>
+            {$t('app.feedStopped')} — <span class="pause-note">{$t('app.feedStoppedNote')}</span>
+          </div>
         </div>
       {/if}
     {/if}
@@ -479,14 +485,20 @@
   }
 
   .topbar {
+    padding: 0.6rem 1.1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .topbar-inner {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.75rem;
     row-gap: 0.35rem;
-    padding: 0.6rem 1.1rem;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
   }
 
   .titles {
@@ -560,14 +572,21 @@
   }
 
   .pause-banner {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.9rem;
-    font-size: 0.78rem;
-    color: #9aa4b2;
+    padding: 0.35rem 1.1rem;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
+  }
+
+  .pause-inner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
+    font-size: 0.78rem;
+    color: #9aa4b2;
   }
 
   .pause-icon {

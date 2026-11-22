@@ -199,8 +199,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
     padding: 1rem;
-    max-width: 1180px;
   }
 
   .stats-grid {
