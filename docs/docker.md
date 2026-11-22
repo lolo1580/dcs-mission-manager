@@ -3,7 +3,7 @@
 The Windows desktop remains the only component that talks to DCS. The server is
 an optional multi-user web application: it receives finished missions from one
 or more desktops, keeps accounts and personal tokens, and serves the shared
-flights, statistics, flight plans and checklists.
+flights, statistics and checklists.
 
 The desktop keeps working when the server is absent.
 
@@ -71,7 +71,7 @@ mission updates it instead of creating a duplicate.
 
 Administrators create accounts from **Administration**:
 
-- `member`: shared flights, statistics, flight plans and checklists;
+- `member`: shared flights, statistics and checklists;
 - `admin`: also accounts, tokens and the audit log.
 
 There is no self-registration. Email recovery is optional and disabled until
@@ -171,11 +171,11 @@ mean to delete the server database.
 - One Docker instance serves one squadron. Multi-tenant hosting is out of scope.
 - The server never reads `Saved Games` or a DCS installation; only the desktop
   does.
-- Flight plans and checklists are owned by the account that created them and can
-  be private or shared with the squadron. The desktop and the server exchange
-  them in both directions; concurrent edits use **last write wins** and the
-  losing copy is kept under **Administration → Sync conflicts**, where it can be
-  restored or merged field by field.
+- Checklists are owned by the account that created them and can be private or
+  shared with the squadron. The desktop and the server exchange them in both
+  directions; concurrent edits use **last write wins** and the losing copy is
+  kept under **Administration → Sync conflicts**, where it can be restored or
+  merged field by field.
 - Deleting a document is synchronised as a tombstone, so it does not reappear
   from another desktop.
 - A shared document can be edited by its owner and by administrators; other

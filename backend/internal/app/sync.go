@@ -61,8 +61,7 @@ func trySync(database *db.DB) {
 	if documentErr != nil {
 		log.Printf("sync: documents: %v", documentErr)
 	}
-	detail := fmt.Sprintf("%d mission(s), %d plan(s), %d checklist(s)",
-		result.Imported, documents.Plans, documents.Checklists)
+	detail := fmt.Sprintf("%d mission(s), %d checklist(s)", result.Imported, documents.Checklists)
 	if uploadErr != nil {
 		detail = "missions error; " + detail
 	}
@@ -77,8 +76,8 @@ func trySync(database *db.DB) {
 	} else {
 		_ = syncer.RecordSync(root, result.Imported, detail, started)
 	}
-	if result.Imported > 0 || documents.Plans > 0 || documents.Checklists > 0 {
-		log.Printf("sync: uploaded %d mission(s), %d plan(s), %d checklist(s) to %s",
-			result.Imported, documents.Plans, documents.Checklists, user.ServerURL)
+	if result.Imported > 0 || documents.Checklists > 0 {
+		log.Printf("sync: uploaded %d mission(s), %d checklist(s) to %s",
+			result.Imported, documents.Checklists, user.ServerURL)
 	}
 }

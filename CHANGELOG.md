@@ -33,6 +33,13 @@ to [semantic versioning](https://semver.org/).
   a CI job that builds and smoke-tests the image. Version tags also publish
   multi-architecture `amd64`/`arm64` images to GHCR.
 
+### Removed
+
+- The **Flight planning** page, its `/api/flightplans` and `/api/airports`
+  endpoints, the worldwide-airport dataset, and new desktop plan
+  synchronisation. Existing plan rows remain in the database but are no longer
+  exposed by the UI.
+
 ### Security
 
 - Archives are extracted in a staging folder; absolute paths, `..`, symlinks,

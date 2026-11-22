@@ -3,7 +3,7 @@
 Le desktop Windows reste le seul composant qui parle à DCS. Le serveur est une
 application web multi-utilisateurs optionnelle : il reçoit les missions
 terminées d’un ou plusieurs desktops, gère les comptes et les jetons, et sert
-les vols, statistiques, plans de vol et check-lists partagés.
+les vols, statistiques et check-lists partagés.
 
 Le desktop continue de fonctionner quand le serveur est absent.
 
@@ -72,7 +72,7 @@ la met à jour au lieu de créer un doublon.
 
 Les administrateurs créent les comptes depuis **Administration** :
 
-- `member` : vols, statistiques, plans et check-lists partagés ;
+- `member` : vols, statistiques et check-lists partagés ;
 - `admin` : en plus, les comptes, les jetons et le journal d’audit.
 
 Pas d’auto-inscription. La récupération par email est optionnelle et désactivée
@@ -178,12 +178,12 @@ vouloir effacer la base du serveur.
   hors périmètre.
 - Le serveur ne lit jamais `Saved Games` ni une installation DCS ; seul le
   desktop le fait.
-- Les plans de vol et check-lists appartiennent au compte qui les a créés et
-  peuvent être privés ou partagés avec l’escadrille. Le desktop et le serveur
-  les échangent dans les deux sens ; les modifications concurrentes utilisent la
-  **dernière écriture gagnante** et la copie perdante est conservée dans
-  **Administration → Conflits de synchronisation**, où elle peut être restaurée
-  ou fusionnée champ par champ.
+- Les check-lists appartiennent au compte qui les a créées et peuvent être
+  privées ou partagées avec l’escadrille. Le desktop et le serveur les échangent
+  dans les deux sens ; les modifications concurrentes utilisent la **dernière
+  écriture gagnante** et la copie perdante est conservée dans **Administration →
+  Conflits de synchronisation**, où elle peut être restaurée ou fusionnée champ
+  par champ.
 - La suppression d’un document est synchronisée comme un tombstone : il ne
   réapparaît pas depuis un autre desktop.
 - Un document partagé est modifiable par son propriétaire et les administrateurs ;

@@ -21,7 +21,6 @@ export const NAV_GROUPS = [
   {
     label: 'nav.plan',
     items: [
-      { id: 'planner', path: '/planner', label: 'tab.planner', subtitle: 'sub.planner', icon: 'M2 12l20-9-9 20-2-9z' },
       { id: 'checklists', path: '/checklists', label: 'tab.checklists', subtitle: 'sub.checklists', icon: 'M5 4h14v16H5zM8 9h8M8 13h8M8 17h5' },
     ],
   },
@@ -59,7 +58,6 @@ export const SERVER_NAV_GROUPS = [
   {
     label: 'nav.plan',
     items: [
-      { id: 'planner', path: '/planner', label: 'tab.planner', subtitle: 'sub.planner', icon: 'M2 12l20-9-9 20-2-9z' },
       { id: 'checklists', path: '/checklists', label: 'tab.checklists', subtitle: 'sub.checklists', icon: 'M5 4h14v16H5zM8 9h8M8 13h8M8 17h5' },
     ],
   },

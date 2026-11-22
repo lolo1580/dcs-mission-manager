@@ -6,7 +6,6 @@
   import FlightsPanel from './lib/FlightsPanel.svelte';
   import CareerPanel from './lib/CareerPanel.svelte';
   import StatsPanel from './lib/StatsPanel.svelte';
-  import FlightPlanPanel from './lib/FlightPlanPanel.svelte';
   import ChecklistsPanel from './lib/ChecklistsPanel.svelte';
   import AerodromePanel from './lib/AerodromePanel.svelte';
   import ModsPanel from './lib/ModsPanel.svelte';
@@ -215,8 +214,6 @@
           <div class="view"><FlightsPanel /></div>
         {:else if $routeID === 'stats'}
           <div class="view"><StatsPanel /></div>
-        {:else if $routeID === 'planner'}
-          <div class="view"><FlightPlanPanel /></div>
         {:else if $routeID === 'checklists'}
           <div class="view"><ChecklistsPanel /></div>
         {:else if $routeID === 'airfields'}
@@ -236,8 +233,6 @@
         <div class="view"><CareerPanel /></div>
       {:else if $routeID === 'stats'}
         <div class="view"><StatsPanel /></div>
-      {:else if $routeID === 'planner'}
-        <div class="view"><FlightPlanPanel /></div>
       {:else if $routeID === 'checklists'}
         <div class="view"><ChecklistsPanel /></div>
       {:else if $routeID === 'mods'}

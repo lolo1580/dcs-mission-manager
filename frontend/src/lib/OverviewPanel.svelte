@@ -15,7 +15,6 @@
   let career = null;
   let missions = [];
   let debriefs = [];
-  let plans = [];
   let modules = { installed: 0, total: 0 };
   let health = null;
   let loading = true;
@@ -31,12 +30,11 @@
     loading = true;
     error = '';
     try {
-      const [ov, ca, mi, de, pl, mo, he] = await Promise.all([
+      const [ov, ca, mi, de, mo, he] = await Promise.all([
         getJSON('/api/stats/overview'),
         getJSON('/api/career'),
         getJSON('/api/history/missions?limit=50'),
         getJSON('/api/debriefs'),
-        getJSON('/api/flightplans'),
         getJSON('/api/modules'),
         getJSON('/api/health'),
       ]);
@@ -44,7 +42,6 @@
       career = ca;
       missions = (mi.missions ?? []).filter((mission) => (mission.source ?? 'live') !== 'test');
       debriefs = (de.debriefs ?? []).slice().sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-      plans = pl.plans ?? [];
       modules = { installed: mo.installed ?? 0, total: mo.total ?? 0 };
       health = he;
     } catch (err) {
@@ -75,7 +72,6 @@
   $: latestTheatre = latestMission?.theatre || latestDebrief?.theatre || '';
   $: latestDate = latestMission?.startedAt || latestDebrief?.createdAt || 0;
   $: recentChecklists = $checklists.slice(0, 3);
-  $: recentPlans = plans.slice(0, 3);
 
   function dateOf(ms) {
     if (!ms) return '—';
@@ -165,19 +161,6 @@
                 <span>{checklist.name}</span>
                 <Badge>{$t(`phase.${checklist.phase}`)}</Badge>
               </li>
-            {/each}
-          </ul>
-        {/if}
-      </Card>
-
-      <Card title={$t('overview.plans')}>
-        <button slot="actions" class="btn ghost" on:click={() => navigate('planner')}>{$t('overview.openPlanner')}</button>
-        {#if recentPlans.length === 0}
-          <p class="meta">{$t('overview.noPlans')}</p>
-        {:else}
-          <ul class="mini-list">
-            {#each recentPlans as plan (plan.uid || plan.id)}
-              <li><span>{plan.name}</span><Badge>{plan.departure} → {plan.arrival}</Badge></li>
             {/each}
           </ul>
         {/if}

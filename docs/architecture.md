@@ -87,12 +87,10 @@ dcsmanager version
 | `internal/db` | SQLite persistence (pure Go) |
 | `internal/tracker` | Position history and loss detection |
 | `internal/stats` | Statistical aggregations (Phase 4) |
-| `internal/flightplan` | Flight plan model, navlog and DCS briefing |
 | `internal/checklist` | Checklist model and validation |
-| `internal/idgen` | Short random identifiers for plans and checklists |
+| `internal/idgen` | Short random identifiers for stored documents |
 | `internal/auth` | Password hashing (Argon2id), session and API token primitives |
-| `internal/syncer` | Optional desktop → server mission upload |
-| `internal/airportdata` | Embedded worldwide airport dataset (OurAirports, public domain) |
+| `internal/syncer` | Optional desktop → server mission and checklist sync |
 
 ## Frontend
 
@@ -102,13 +100,13 @@ executable** contains the backend and the interface. If the frontend has not bee
 built, a fallback page is served automatically.
 
 The UI is organised in addressable pages: **Overview**, **Flights** (missions
-and debriefs), **Career**, **Statistics**, **Flight planning**, **Checklists**,
+and debriefs), **Career**, **Statistics**, **Checklists**, **Mods & skins**,
 **Airfields** (reference data, frequencies and charts) and **Settings**, which
 groups the installed modules, the DCS-side install (scripts and mods), the
 profile backup and the debug log as sub-tabs. A small history router uses
 `history.pushState`; the Go handler already falls back to `index.html`, so a
 reload on `/checklists` works. The server profile shows **Squadron**, **Flights**,
-**Statistics**, **Flight planning**, **Checklists**, **Airfields**, **My profile**
+**Statistics**, **Checklists**, **Airfields**, **My profile**
 and, for administrators, **Administration**.
 There is no live map and no analysis view any more. Unit telemetry is still
 received and sampled, and current position feeds the airfields tab.

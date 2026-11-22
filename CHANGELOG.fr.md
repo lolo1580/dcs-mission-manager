@@ -34,6 +34,13 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
   supprimées, et job CI qui construit et teste l’image. Les tags de version
   publient aussi des images multi-architectures `amd64`/`arm64` sur GHCR.
 
+### Supprimé
+
+- La page **Planification de vol**, ses endpoints `/api/flightplans` et
+  `/api/airports`, le jeu de données mondial des aéroports et la nouvelle
+  synchronisation des plans depuis le desktop. Les plans existants restent en
+  base mais ne sont plus exposés par l’interface.
+
 ### Sécurité
 
 - Les archives sont extraites dans un dossier temporaire ; les chemins absolus,

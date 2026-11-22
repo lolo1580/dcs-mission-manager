@@ -7,8 +7,8 @@
 [🇬🇧 English](README.md) | 🇫🇷 Français
 
 Un compagnon tout-en-un pour **DCS World** — collecte des débriefings,
-statistiques avancées, référence des aérodromes, cartes aéronautiques et
-planification de vol. Il tourne
+statistiques avancées, référence des aérodromes et cartes aéronautiques.
+Il tourne
 **en local, sur la même machine Windows que DCS** : un seul `dcsmanager.exe`, ni serveur,
 ni conteneur, rien à configurer. Il s'ouvre dans **sa propre fenêtre**, comme un
 logiciel classique : pas de navigateur à lancer, aucune adresse à retenir.
@@ -47,13 +47,12 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 | Cartes aéronautiques | ✅ Phase 6 | Approches et plans de mouvement indexés depuis `maps_dcs/` et affichés comme documents |
 | Modules installés | ✅ Nouveau | Terrains, appareils, campagnes et packs techniques, lus depuis l'inventaire de DCS ; **possédé** (acheté) et **installé** (sur le disque) affichés séparément |
 | Carrière | ✅ Nouveau | Une page **Carrière** distincte avec le carnet du joueur, les cartes et pays favoris et une heatmap quotidienne sur 30 jours |
-| Planification de vol | ✅ Nouveau | Éditeur de route avec aéroports mondiaux et aérodromes DCS, navlog corrigé du vent et briefing DCS imprimable |
 | Paramètres | ✅ Nouveau | Un onglet regroupant les modules installés, l'installation DCS (mods, état des scripts, `Export.lua` partagé), la **sauvegarde du profil joueur** et le journal de debug en sous-onglets |
 | Sauvegarde du profil | ✅ Nouveau | Sauvegarder/restaurer le logbook, les commandes (bindings), les options et les scripts (et en option kneeboard, missions, mods) dans un zip portable, depuis la CLI, l'API ou les Paramètres |
 | Mods & skins | ✅ Nouveau | Une page **Bibliothèque** dédiée : activer/désactiver les mods, mettre en quarantaine et restaurer, importer des archives ZIP/7z/RAR, parcourir les livrées, détecter les structures à plat ou les packs mal placés et les classer. Voir [docs/mods-skins.fr.md](docs/mods-skins.fr.md) |
 | Local par conception | ✅ Nouveau | Le desktop est un `.exe` Windows autonome : persistance SQLite dans `data/`, et toutes les lectures (terrains, Saved Games) se font sur la même machine que DCS |
 | Serveur web (Docker) | ✅ Nouveau | Application web multi-utilisateurs optionnelle : comptes, rôles, journal d’audit, jetons desktop personnels et envoi des missions terminées. Le desktop fonctionne sans ; voir [docs/docker.fr.md](docs/docker.fr.md) |
-| Documents partagés | ✅ Nouveau | Les plans de vol et check-lists ont un propriétaire et une visibilité `privée`/`escadrille` ; la synchro desktop ↔ serveur est en dernière écriture gagnante, avec tombstones et copies de conflit |
+| Documents partagés | ✅ Nouveau | Les check-lists ont un propriétaire et une visibilité `privée`/`escadrille` ; la synchro desktop ↔ serveur est en dernière écriture gagnante, avec tombstones et copies de conflit |
 | Outils d’escadrille | ✅ Nouveau | Tableau de bord agrégé, filtres par envoyeur et par pilote, « mes vols », mise en évidence des noms DCS, association compte ↔ pilote, sauvegarde serveur et restauration des conflits |
 | Récupération du mot de passe | ✅ Nouveau | Liens de réinitialisation SMTP optionnels, à usage unique et avec expiration ; un administrateur peut toujours réinitialiser un mot de passe |
 
@@ -61,8 +60,8 @@ Saved Games — au lieu de dépendre d'un jeu de données maintenu à la main.
 > est toujours reçue et échantillonnée : la position actuelle sert à l'onglet
 > Aérodromes (aérodrome le plus proche), et les échantillons restent stockés en
 > base pour une éventuelle analyse future. L'interface affiche la vue d'ensemble,
-> les vols et débriefs, la carrière, les statistiques, la planification de vol,
-> les check-lists, les aérodromes et les paramètres.
+> les vols et débriefs, la carrière, les statistiques, les check-lists, les
+> aérodromes, les mods & skins et les paramètres.
 ### Installation Lua
 
 Le gestionnaire lit les sessions DCS via un petit export Lua installé dans le
@@ -443,10 +442,9 @@ DCS Manager/
 - [x] **Phase 4 bis — Collecte de télémétrie** : les positions et pertes restent enregistrées ; les cartes analytiques et calculs de sorties ont été retirés
 - [x] **Phase 5 — Packaging** : CLI, injecteur Lua sûr, binaire unique autonome
 - [x] **Phase 6 — Aérodromes** : fréquences et cartes lues depuis les fichiers DCS
-- [x] **Planification de vol** : aéroports mondiaux et aérodromes DCS, navlog corrigé du vent, briefing DCS
 - [x] **Refonte UI et check-lists** : pages adressables, vue d’ensemble, vols, check-lists avec modèles et import/export
 - [x] **Serveur multi-utilisateurs (Docker)** : comptes, rôles, jetons personnels, journal d’audit et envoi desktop
-- [x] **Documents partagés** : propriété, visibilité et synchronisation bidirectionnelle des plans et check-lists
+- [x] **Documents partagés** : propriété, visibilité et synchronisation bidirectionnelle des check-lists
 - [x] **Outils d’escadrille** : filtres, noms de pilotes, sauvegarde serveur et restauration des conflits
 - [ ] **Phase 1 — Live map** : retirée ; la télémétrie est toujours collectée
 

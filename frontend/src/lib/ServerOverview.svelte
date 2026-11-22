@@ -13,7 +13,6 @@
   let pilots = [];
   let missions = [];
   let debriefs = [];
-  let plans = 0;
   let checklists = 0;
   let loading = true;
   let error = '';
@@ -28,19 +27,17 @@
     loading = true;
     error = '';
     try {
-      const [ov, pi, mi, de, pl, cl] = await Promise.all([
+      const [ov, pi, mi, de, cl] = await Promise.all([
         getJSON('/api/stats/overview'),
         getJSON('/api/stats/pilots'),
         getJSON('/api/history/missions?limit=100'),
         getJSON('/api/debriefs?limit=100'),
-        getJSON('/api/flightplans'),
         getJSON('/api/checklists'),
       ]);
       overview = ov?.enabled === false ? null : ov;
       pilots = (pi.pilots ?? []).slice().sort((a, b) => b.kills - a.kills).slice(0, 8);
       missions = (mi.missions ?? []).slice().sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
       debriefs = de.debriefs ?? [];
-      plans = (pl.plans ?? []).length;
       checklists = (cl.checklists ?? []).length;
     } catch (err) {
       error = err.message;
@@ -96,7 +93,7 @@
   {:else}
     <section class="grid">
       <StatCard label={$t('squadron.missions')} value={overview?.missions ?? 0} hint={`${hours} h`} tone="blue" icon="M3 12h18M12 3v18" />
-      <StatCard label={$t('squadron.pilots')} value={overview?.players ?? 0} hint={`${plans} plans · ${checklists} checklists`} tone="green" icon="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />
+      <StatCard label={$t('squadron.pilots')} value={overview?.players ?? 0} hint={`${checklists} checklists`} tone="green" icon="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />
       <StatCard label={$t('squadron.kills')} value={overview?.kills ?? 0} hint={`${overview?.crashes ?? 0} crashes`} tone="red" icon="M4 4l16 16M20 4L4 20" />
       <StatCard label={$t('squadron.deaths')} value={overview?.deaths ?? 0} hint={`${overview?.ejections ?? 0} ejections`} tone="amber" icon="M12 3v18M5 10l7 7 7-7" />
     </section>

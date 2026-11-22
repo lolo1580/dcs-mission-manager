@@ -6,7 +6,7 @@
 
 🇬🇧 English | [🇫🇷 Français](README.fr.md)
 
-An all-in-one companion for **DCS World** — debriefing collection, advanced statistics, airfield reference, aeronautical charts and flight planning. It runs **locally, on the same Windows machine as DCS**: one `dcsmanager.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
+An all-in-one companion for **DCS World** — debriefing collection, advanced statistics, airfield reference and aeronautical charts. It runs **locally, on the same Windows machine as DCS**: one `dcsmanager.exe`, no server, no container, nothing to configure. It opens in **its own window**, like an ordinary application: no browser to launch, no address to remember.
 
 Because it is local, it can read **DCS's own files** — the airfields, frequencies and beacons of every installed map, as well as the Saved Games folder — instead of relying on a hand-maintained dataset.
 
@@ -40,13 +40,12 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Aeronautical charts | ✅ Phase 6 | Approach plates and ground plans indexed from `maps_dcs/` and shown as documents |
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
 | Career | ✅ New | A separate **Career** page with the player's logbook, favourite maps and countries, and a 30-day daily activity heatmap |
-| Flight planning | ✅ New | Route editor with worldwide airports and DCS airfields, wind-corrected navlog and printable DCS briefing |
 | Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the **player-profile backup** and the debug log as sub-tabs |
 | Profile backup | ✅ New | Save/restore the logbook, bindings, options and scripts (and optionally kneeboard, missions, mods) as a portable zip, from the CLI, the API or Settings |
 | Mods & skins | ✅ New | A dedicated library page: enable/disable mods, quarantine and restore, import ZIP/7z/RAR archives, browse liveries, detect flat or misplaced packs, and classify them. See [docs/mods-skins.md](docs/mods-skins.md) |
 | Local by design | ✅ New | The desktop is one self-contained Windows `.exe`: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |
 | Web server (Docker) | ✅ New | Optional multi-user web application: accounts, roles, audit log, personal desktop tokens and one-way upload of finished missions. The desktop works without it; see [docs/docker.md](docs/docker.md) |
-| Shared documents | ✅ New | Flight plans and checklists have an owner and `private`/`squadron` visibility; desktop ↔ server sync is last-write-wins with tombstones and conflict copies |
+| Shared documents | ✅ New | Checklists have an owner and `private`/`squadron` visibility; desktop ↔ server sync is last-write-wins with tombstones and conflict copies |
 | Squadron tools | ✅ New | Aggregated dashboard, uploader and pilot filters, “my flights”, DCS-name highlighting, account ↔ pilot names, server backup download and conflict restore |
 | Password recovery | ✅ New | Optional SMTP reset links with single-use, expiring tokens; an administrator can still reset a password |
 
@@ -427,10 +426,9 @@ DCS Manager/
 - [x] **Phase 4 bis — Telemetry collection**: position and loss samples remain stored; analytical maps and sortie calculations were removed
 - [x] **Phase 5 — Packaging**: CLI, safe Lua injector, single self-contained binary
 - [x] **Phase 6 — Aerodromes**: read from DCS's own terrain files (frequencies, aids, charts)
-- [x] **Flight planning**: worldwide airports and DCS airfields, wind-corrected navlog, printable DCS briefing
 - [x] **UI redesign and checklists**: addressable pages, overview, flights, checklists with templates and import/export
 - [x] **Multi-user server (Docker)**: accounts, roles, personal tokens, audit log and desktop upload
-- [x] **Shared documents**: ownership, visibility and bidirectional sync for flight plans and checklists
+- [x] **Shared documents**: ownership, visibility and bidirectional sync for checklists
 - [x] **Squadron tools**: filters, account/pilot names, server backup and conflict restore
 - [ ] **Phase 1 - Live map**: removed; telemetry is still collected
 

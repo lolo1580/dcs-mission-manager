@@ -1,7 +1,6 @@
 // Package idgen produces short, random, URL-safe identifiers.
 //
-// Stored documents (flight plans, checklists, checklist items) need an
-// identifier that survives export/import and, later, synchronisation between
+// Stored documents (checklists and checklist items) need an identifier that survives export/import and, later, synchronisation between
 // two databases. A random 64-bit value in hexadecimal is short enough to read
 // and wide enough that a collision is not a practical concern.
 package idgen

@@ -190,15 +190,13 @@ func (s *Server) handleSyncRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = syncer.SaveCursor(root, cursor)
-	detail := fmt.Sprintf("%d mission(s), %d plan(s), %d checklist(s)",
-		result.Imported, documents.Plans, documents.Checklists)
+	detail := fmt.Sprintf("%d mission(s), %d checklist(s)", result.Imported, documents.Checklists)
 	if documents.Conflicts > 0 {
 		detail += fmt.Sprintf(", %d conflict(s)", documents.Conflicts)
 	}
 	_ = syncer.RecordSync(root, result.Imported, detail, started)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"imported":   result.Imported,
-		"plans":      documents.Plans,
 		"checklists": documents.Checklists,
 		"conflicts":  documents.Conflicts,
 	})

@@ -19,7 +19,6 @@ import (
 	"dcsmanager/internal/checklist"
 	"dcsmanager/internal/config"
 	"dcsmanager/internal/db"
-	"dcsmanager/internal/flightplan"
 	"dcsmanager/internal/idgen"
 )
 
@@ -297,7 +296,6 @@ func (c *Client) Upload(ctx context.Context) (Result, error) {
 
 // DocumentResult reports the documents exchanged by SyncDocuments.
 type DocumentResult struct {
-	Plans      int `json:"plans"`
 	Checklists int `json:"checklists"`
 	Conflicts  int `json:"conflicts"`
 }
@@ -318,10 +316,6 @@ func (c *Client) SyncDocuments(ctx context.Context, database *db.DB, cursor int6
 		return DocumentResult{}, cursor, errors.New("persistence is disabled")
 	}
 
-	plans, err := database.ExportFlightPlansForSync(500)
-	if err != nil {
-		return DocumentResult{}, cursor, err
-	}
 	checklists, err := database.ExportChecklistsForSync(500)
 	if err != nil {
 		return DocumentResult{}, cursor, err
@@ -342,17 +336,11 @@ func (c *Client) SyncDocuments(ctx context.Context, database *db.DB, cursor int6
 		return DocumentResult{}, cursor, responseError(pullResp)
 	}
 	var pulled struct {
-		Plans      []flightplan.Plan     `json:"plans"`
 		Checklists []checklist.Checklist `json:"checklists"`
 		Cursor     int64                 `json:"cursor"`
 	}
 	if err := json.NewDecoder(io.LimitReader(pullResp.Body, 32<<20)).Decode(&pulled); err != nil {
 		return DocumentResult{}, cursor, err
-	}
-	for _, plan := range pulled.Plans {
-		if _, err := database.ApplySyncedFlightPlan(plan); err != nil {
-			return DocumentResult{}, cursor, err
-		}
 	}
 	for _, item := range pulled.Checklists {
 		if _, err := database.ApplySyncedChecklist(item); err != nil {
@@ -363,9 +351,8 @@ func (c *Client) SyncDocuments(ctx context.Context, database *db.DB, cursor int6
 
 	push := struct {
 		ClientID   string                `json:"clientId"`
-		Plans      []flightplan.Plan     `json:"plans"`
 		Checklists []checklist.Checklist `json:"checklists"`
-	}{ClientID: c.ClientID, Plans: plans, Checklists: checklists}
+	}{ClientID: c.ClientID, Checklists: checklists}
 	body, err := json.Marshal(push)
 	if err != nil {
 		return DocumentResult{}, cursor, err
@@ -385,7 +372,6 @@ func (c *Client) SyncDocuments(ctx context.Context, database *db.DB, cursor int6
 		return DocumentResult{}, cursor, responseError(resp)
 	}
 	var pushed struct {
-		Plans      []flightplan.Plan     `json:"plans"`
 		Checklists []checklist.Checklist `json:"checklists"`
 		Conflicts  int                   `json:"conflicts"`
 		Cursor     int64                 `json:"cursor"`
@@ -393,18 +379,10 @@ func (c *Client) SyncDocuments(ctx context.Context, database *db.DB, cursor int6
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&pushed); err != nil {
 		return DocumentResult{}, cursor, err
 	}
-	for _, plan := range pushed.Plans {
-		if _, err := database.ApplySyncedFlightPlan(plan); err != nil {
-			return DocumentResult{}, cursor, err
-		}
-	}
 	for _, item := range pushed.Checklists {
 		if _, err := database.ApplySyncedChecklist(item); err != nil {
 			return DocumentResult{}, cursor, err
 		}
-	}
-	if err := database.MarkFlightPlansSynced(plans); err != nil {
-		return DocumentResult{}, cursor, err
 	}
 	if err := database.MarkChecklistsSynced(checklists); err != nil {
 		return DocumentResult{}, cursor, err
@@ -413,7 +391,6 @@ func (c *Client) SyncDocuments(ctx context.Context, database *db.DB, cursor int6
 		nextCursor = pushed.Cursor
 	}
 	return DocumentResult{
-		Plans:      len(pushed.Plans),
 		Checklists: len(pushed.Checklists),
 		Conflicts:  pushed.Conflicts,
 	}, nextCursor, nil

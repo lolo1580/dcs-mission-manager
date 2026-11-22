@@ -85,7 +85,7 @@
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error ?? `${response.status}`);
       info = $t('sync.result', { count: body.imported ?? 0 });
-      info += ` · ${body.plans ?? 0} ${$t('overview.plans')} · ${body.checklists ?? 0} ${$t('checklist.title')}`;
+      info += ` · ${body.checklists ?? 0} ${$t('checklist.title')}`;
       if (body.conflicts) info += ` · ${body.conflicts} ${$t('admin.conflicts')}`;
       await load();
     } catch (err) {
