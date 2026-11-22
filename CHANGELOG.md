@@ -27,6 +27,10 @@ to [semantic versioning](https://semver.org/).
 - A dedicated **control-mapping backup** in Settings > Player profile backup:
   inventory of `Config\Input`, per-aircraft selection, a mapping-only archive,
   and restore/dry-run with DCS closed.
+- **Docker hardening**: a named data volume isolated from the desktop's `./data`,
+  graceful SIGTERM shutdown, a database-aware healthcheck, versioned image
+  labels/build args, a read-only root filesystem with dropped capabilities, and
+  a CI job that builds and smoke-tests the image.
 
 ### Security
 

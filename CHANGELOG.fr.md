@@ -28,6 +28,10 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 - Une **sauvegarde dédiée des mappings de commandes** dans Paramètres >
   Sauvegarde du profil : inventaire de `Config\Input`, sélection par appareil,
   archive dédiée, et restauration/simulation avec DCS fermé.
+- **Durcissement Docker** : volume de données nommé et isolé du `./data` du
+  desktop, arrêt propre sur SIGTERM, healthcheck conscient de la base, image
+  versionnée, système de fichiers racine en lecture seule avec capacités
+  supprimées, et job CI qui construit et teste l’image.
 
 ### Sécurité
 

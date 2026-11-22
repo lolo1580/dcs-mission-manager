@@ -1,11 +1,14 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"dcsmanager/internal/aerodrome"
@@ -35,6 +38,9 @@ func RunServer() error {
 	}
 
 	log.Printf("dcsmanager server %s", Version)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
@@ -73,12 +79,17 @@ func RunServer() error {
 	go func() {
 		ticker := time.NewTicker(6 * time.Hour)
 		defer ticker.Stop()
-		for range ticker.C {
-			if err := database.PruneSessions(time.Now().UnixMilli()); err != nil {
-				log.Printf("sessions: prune: %v", err)
-			}
-			if err := database.PrunePasswordResets(time.Now().UnixMilli()); err != nil {
-				log.Printf("password resets: prune: %v", err)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := database.PruneSessions(time.Now().UnixMilli()); err != nil {
+					log.Printf("sessions: prune: %v", err)
+				}
+				if err := database.PrunePasswordResets(time.Now().UnixMilli()); err != nil {
+					log.Printf("password resets: prune: %v", err)
+				}
 			}
 		}
 	}()
@@ -87,10 +98,20 @@ func RunServer() error {
 		Addr:              cfg.HTTPAddr,
 		Handler:           server.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      120 * time.Second,
+		ReadTimeout:       5 * time.Minute,
+		WriteTimeout:      5 * time.Minute,
 		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
+	go func() {
+		<-ctx.Done()
+		log.Printf("server: shutting down")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("server: shutdown: %v", err)
+		}
+	}()
 	log.Printf("server: web app on http://%s", cfg.HTTPAddr)
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err

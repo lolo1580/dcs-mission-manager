@@ -531,8 +531,22 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	if s.store != nil {
 		units = s.store.Count()
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  "ok",
+	dbOK := s.db != nil
+	if s.Mode() == "server" && s.auth != nil {
+		var one int
+		if err := s.auth.QueryRow("SELECT 1").Scan(&one); err != nil {
+			dbOK = false
+			s.debugf("health", "database check failed: %v", err)
+		}
+	}
+	code := http.StatusOK
+	status := "ok"
+	if s.Mode() == "server" && !dbOK {
+		code = http.StatusServiceUnavailable
+		status = "degraded"
+	}
+	writeJSON(w, code, map[string]any{
+		"status":  status,
 		"service": "dcsmanager",
 		"version": s.version,
 		// mode distinguishes the Windows desktop from the multi-user server,
@@ -544,6 +558,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		"auth":   s.Mode() == "server",
 		"local":  s.localOnly,
 		"checks": s.db != nil,
+		"db":     dbOK,
 	})
 }
 

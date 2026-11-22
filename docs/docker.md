@@ -20,24 +20,21 @@ Open `http://<server-ip>:8080`. The first account is created from
 table is empty**. Later starts keep the accounts stored in the database, and the
 environment password is ignored.
 
-The SQLite database, sessions and tokens live in `./data` (mounted at `/data`).
-That directory is the only thing to back up.
+The SQLite database, sessions and tokens live in the **named volume**
+`dcsmanager_data` (mounted at `/data`). It is deliberately separate from the
+desktop's `./data` folder, so running compose from the repository cannot touch
+the desktop database. That volume is the only thing to back up.
 
 For a NAS, build both architectures with Buildx:
 
 ```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t dcsmanager-web:2.0.0 .
+docker buildx build --platform linux/amd64,linux/arm64 \
+  --build-arg VERSION=2.1.0 -t dcsmanager-web:2.1.0 .
 ```
 
-On Linux, the container runs as UID 10001; create the folder with the right
-owner before the first start:
-
-```bash
-mkdir -p data
-sudo chown -R 10001:10001 data
-```
-
-Docker Desktop on Windows and macOS handles bind-mount permissions itself.
+The image runs as UID 10001 and the named volume is created with the right
+ownership automatically. Do not point the volume at a host folder unless you
+manage its permissions yourself.
 
 ## 2. Create a desktop token
 
@@ -61,9 +58,10 @@ Administrators create accounts from **Administration**:
 - `member`: shared flights, statistics, flight plans and checklists;
 - `admin`: also accounts, tokens and the audit log.
 
-There is no self-registration and no email recovery. An administrator resets a
-password from the same page; changing a password signs the account out
-everywhere and issues a new session to the current browser.
+There is no self-registration. Email recovery is optional and disabled until
+SMTP is configured (see below). An administrator resets a password from the same
+page; changing a password signs the account out everywhere and issues a new
+session to the current browser.
 
 ### Password recovery
 
@@ -109,10 +107,21 @@ every mutation is checked against the request `Origin`.
 An administrator can download a zip snapshot from **Administration → Server
 backup**. It contains a consistent `dcsmanager.db` and a short README.
 
+For a volume-level copy:
+
 ```bash
-# Backup
+# Backup (the container may stay stopped during the copy)
 docker compose stop
-cp -r data data-backup-$(date +%F)
+docker run --rm -v "$PWD":/backup \
+  --volumes-from "$(docker compose ps -aq dcsmanager)" alpine \
+  tar czf /backup/dcsmanager-data.tgz -C /data .
+docker compose start
+
+# Restore a volume copy
+docker compose stop
+docker run --rm -v "$PWD":/backup \
+  --volumes-from "$(docker compose ps -aq dcsmanager)" alpine \
+  sh -c 'cd /data && tar xzf /backup/dcsmanager-data.tgz'
 docker compose start
 
 # Upgrade
@@ -120,8 +129,22 @@ git pull
 docker compose up -d --build
 ```
 
-The database schema is migrated automatically at startup. Test a restore on a
-copy before relying on a backup.
+The database schema is migrated automatically at startup. The health endpoint
+checks that SQLite answers, so an unhealthy database marks the container
+unhealthy. Test a restore on a copy before relying on a backup.
+
+Upgrading from the old bind-mounted `./data` layout: copy that folder into the
+named volume once before starting 2.1.0:
+
+```bash
+docker compose down
+docker run --rm -v "$PWD/data":/from -v dcsmanager_data:/to alpine \
+  sh -c 'cp -a /from/. /to/'
+docker compose up -d --build
+```
+
+`docker compose down -v` also removes the named volume. Do not use it unless you
+mean to delete the server database.
 
 ## 6. Limits
 

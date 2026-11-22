@@ -6,16 +6,24 @@
 #   copy .env.example .env      # then edit the password
 #   docker compose up -d --build
 #
+# Data lives in the named volume below, not in the desktop's ./data folder.
 services:
   dcsmanager:
     build:
       context: .
       dockerfile: Dockerfile
-    image: dcsmanager-web:2.0.0
+      args:
+        VERSION: "${DCSMANAGER_VERSION:-2.1.0}"
+    image: dcsmanager-web:${DCSMANAGER_VERSION:-2.1.0}
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
       - "${DCSMANAGER_PORT:-8080}:8080"
     environment:
+      DCSMANAGER_MODE: server
+      DCSMANAGER_HTTP_ADDR: 0.0.0.0:8080
+      DCSMANAGER_DB_PATH: /data/dcsmanager.db
+      DCSMANAGER_LOG_LEVEL: "${DCSMANAGER_LOG_LEVEL:-info}"
       DCSMANAGER_ADMIN_USER: "${DCSMANAGER_ADMIN_USER:-admin}"
       DCSMANAGER_ADMIN_PASSWORD: "${DCSMANAGER_ADMIN_PASSWORD:?Set DCSMANAGER_ADMIN_PASSWORD in .env}"
       # Set to true when the container is behind an HTTPS reverse proxy.
@@ -29,10 +37,26 @@ services:
       DCSMANAGER_PASSWORD_RESET_TTL: "${DCSMANAGER_PASSWORD_RESET_TTL:-1800}"
       TZ: "${TZ:-UTC}"
     volumes:
-      - ./data:/data
+      - dcsmanager_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  dcsmanager_data:
+    name: dcsmanager_data

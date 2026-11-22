@@ -120,3 +120,44 @@ jobs:
 
       - name: Smoke test (runs and serves the UI)
         run: pwsh -File tools/smoke-serve.ps1
+
+  # ---------------------------------------------------------------------------
+  # Docker image: build it and check that the container reaches a healthy state.
+  # This catches a broken Dockerfile or healthcheck before a release.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build --build-arg VERSION=ci -t dcsmanager-web:ci .
+
+      - name: Validate compose file
+        env:
+          DCSMANAGER_ADMIN_PASSWORD: ci-password-123
+        run: docker compose config --quiet
+
+      - name: Run and check health
+        run: |
+          docker run -d --name dcsmanager-ci \
+            -e DCSMANAGER_ADMIN_USER=admin \
+            -e DCSMANAGER_ADMIN_PASSWORD=ci-password-123 \
+            -v dcsmanager-ci-data:/data \
+            -p 18080:8080 \
+            dcsmanager-web:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/api/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs dcsmanager-ci
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f dcsmanager-ci || true
+          docker volume rm dcsmanager-ci-data || true

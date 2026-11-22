@@ -20,24 +20,21 @@ Ouvre `http://<ip-du-serveur>:8080`. Le premier compte est créé à partir de
 des utilisateurs est vide**. Aux démarrages suivants, les comptes en base sont
 conservés et le mot de passe de l’environnement est ignoré.
 
-La base SQLite, les sessions et les jetons vivent dans `./data` (monté sur
-`/data`). C’est le seul dossier à sauvegarder.
+La base SQLite, les sessions et les jetons vivent dans le **volume nommé**
+`dcsmanager_data` (monté sur `/data`). Il est volontairement séparé du dossier
+`./data` du desktop : lancer compose depuis le dépôt ne peut donc pas toucher à
+la base du desktop. C’est le seul volume à sauvegarder.
 
 Pour un NAS, construis les deux architectures avec Buildx :
 
 ```bash
-docker buildx build --platform linux/amd64,linux/arm64 -t dcsmanager-web:2.0.0 .
+docker buildx build --platform linux/amd64,linux/arm64 \
+  --build-arg VERSION=2.1.0 -t dcsmanager-web:2.1.0 .
 ```
 
-Sous Linux, le conteneur tourne avec l’UID 10001 ; crée le dossier avec le bon
-propriétaire avant le premier démarrage :
-
-```bash
-mkdir -p data
-sudo chown -R 10001:10001 data
-```
-
-Docker Desktop sous Windows et macOS gère lui-même les permissions du montage.
+L’image tourne avec l’UID 10001 et le volume nommé est créé avec le bon
+propriétaire automatiquement. Ne monte un dossier hôte que si tu gères
+toi-même ses permissions.
 
 ## 2. Créer un jeton pour le desktop
 
@@ -61,7 +58,8 @@ Les administrateurs créent les comptes depuis **Administration** :
 - `member` : vols, statistiques, plans et check-lists partagés ;
 - `admin` : en plus, les comptes, les jetons et le journal d’audit.
 
-Pas d’auto-inscription ni de récupération par email. Un administrateur
+Pas d’auto-inscription. La récupération par email est optionnelle et désactivée
+tant que SMTP n’est pas configuré (voir ci-dessous). Un administrateur
 réinitialise un mot de passe depuis la même page ; changer son mot de passe
 déconnecte le compte partout et ouvre une nouvelle session au navigateur
 courant.
@@ -113,10 +111,21 @@ Un administrateur peut télécharger un instantané zip depuis
 **Administration → Sauvegarde du serveur**. Il contient un `dcsmanager.db`
 cohérent et un court README.
 
+Pour une copie du volume :
+
 ```bash
-# Sauvegarde
+# Sauvegarde (le conteneur peut rester arrêté pendant la copie)
 docker compose stop
-cp -r data data-backup-$(date +%F)
+docker run --rm -v "$PWD":/backup \
+  --volumes-from "$(docker compose ps -aq dcsmanager)" alpine \
+  tar czf /backup/dcsmanager-data.tgz -C /data .
+docker compose start
+
+# Restauration d’une copie de volume
+docker compose stop
+docker run --rm -v "$PWD":/backup \
+  --volumes-from "$(docker compose ps -aq dcsmanager)" alpine \
+  sh -c 'cd /data && tar xzf /backup/dcsmanager-data.tgz'
 docker compose start
 
 # Mise à jour
@@ -124,8 +133,23 @@ git pull
 docker compose up -d --build
 ```
 
-Le schéma de la base est migré automatiquement au démarrage. Teste une
-restauration sur une copie avant de compter sur une sauvegarde.
+Le schéma de la base est migré automatiquement au démarrage. Le healthcheck
+vérifie que SQLite répond ; une base injoignable marque le conteneur comme
+« unhealthy ». Teste une restauration sur une copie avant de compter sur une
+sauvegarde.
+
+Mise à jour depuis l’ancien montage `./data` : copie ce dossier dans le volume
+nommé une fois avant de démarrer la 2.1.0 :
+
+```bash
+docker compose down
+docker run --rm -v "$PWD/data":/from -v dcsmanager_data:/to alpine \
+  sh -c 'cp -a /from/. /to/'
+docker compose up -d --build
+```
+
+`docker compose down -v` supprime aussi le volume nommé. Ne l’utilise pas sans
+vouloir effacer la base du serveur.
 
 ## 6. Limites
 
