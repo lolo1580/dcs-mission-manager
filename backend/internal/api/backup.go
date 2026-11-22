@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"dcsmanager/internal/backup"
+	"dcsmanager/internal/install"
 )
 
 // backupDir is where the manager keeps profile archives: beside the database,
@@ -124,6 +125,122 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, err := backup.Restore(path, s.cfg.SavedGames, req.DryRun)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"result": res})
+}
+
+// handleBackupMappings lists the control bindings and the mapping-only archives.
+//
+//	GET  /api/backup/mappings
+//	POST /api/backup/mappings
+func (s *Server) handleBackupMappings(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		scan, err := backup.ScanInput(s.cfg.SavedGames)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		list, err := backup.List(s.backupDir())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		var archives []backup.Archive
+		for _, a := range list {
+			if backup.IsInputArchive(a.Categories) {
+				archives = append(archives, a)
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"mappings":  scan,
+			"archives":  archives,
+			"directory": s.backupDir(),
+		})
+	case http.MethodPost:
+		if s.cfg.SavedGames == "" {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "DCS Saved Games folder not found; set DCSMANAGER_SAVED_GAMES",
+			})
+			return
+		}
+		scan, err := backup.ScanInput(s.cfg.SavedGames)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		if scan.Files == 0 {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "aucun mapping trouvé dans Config\\Input"})
+			return
+		}
+		a, err := backup.Create(s.cfg.SavedGames, s.backupDir(), []string{"input"}, s.version)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"backup": a, "mappings": scan})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use GET or POST"})
+	}
+}
+
+// handleBackupMappingsRestore restores one mapping-only archive. DCS must be
+// closed so the restored files are not overwritten when the game exits.
+//
+//	POST /api/backup/mappings/restore   {name, dryRun}
+func (s *Server) handleBackupMappingsRestore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "use POST"})
+		return
+	}
+	var req restoreBackupRequest
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body: " + err.Error()})
+		return
+	}
+	check := s.dcsRunning
+	if check == nil {
+		check = install.DCSRunning
+	}
+	running, err := check()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "impossible de vérifier si DCS est fermé"})
+		return
+	}
+	if running {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "Ferme DCS avant de restaurer les mappings."})
+		return
+	}
+	list, err := backup.List(s.backupDir())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	var selected *backup.Archive
+	for i := range list {
+		if list[i].Name == req.Name {
+			selected = &list[i]
+			break
+		}
+	}
+	if selected == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "archive not found"})
+		return
+	}
+	if !backup.IsInputArchive(selected.Categories) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "cette archive n’est pas une sauvegarde de mappings"})
+		return
+	}
+	if s.cfg.SavedGames == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error": "DCS Saved Games folder not found; set DCSMANAGER_SAVED_GAMES",
+		})
+		return
+	}
+	res, err := backup.Restore(selected.Path, s.cfg.SavedGames, req.DryRun)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return

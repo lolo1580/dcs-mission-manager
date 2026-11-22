@@ -11,10 +11,14 @@
   let categories = [];
   let selected = new Set();
   let backups = [];
+  let generalBackups = [];
+  let mappings = null;
+  let mappingArchives = [];
   let directory = '';
   let savedGames = '';
   let loading = true;
   let busy = false;
+  let mappingBusy = false;
   let error = '';
   let notice = '';
 
@@ -38,13 +42,21 @@
     loading = true;
     error = '';
     try {
-      const cfg = await getJSON('/api/backup/categories');
+      const [cfg, list, mappingData] = await Promise.all([
+        getJSON('/api/backup/categories'),
+        getJSON('/api/backup'),
+        getJSON('/api/backup/mappings'),
+      ]);
       categories = cfg.categories ?? [];
       directory = cfg.directory ?? '';
       savedGames = cfg.savedGames ?? '';
       if (selected.size === 0) selected = new Set(cfg.default ?? []);
-      const list = await getJSON('/api/backup');
       backups = list.backups ?? [];
+      generalBackups = backups.filter(
+        (a) => !(a.categories?.length === 1 && a.categories[0] === 'input')
+      );
+      mappings = mappingData.mappings ?? null;
+      mappingArchives = mappingData.archives ?? [];
     } catch (e) {
       error = String(e.message ?? e);
     } finally {
@@ -72,6 +84,39 @@
       busy = false;
     }
   }
+
+  async function createMappings() {
+    mappingBusy = true;
+    error = '';
+    notice = '';
+    try {
+      const res = await postJSON('/api/backup/mappings', {});
+      notice = `Mappings sauvegardés dans ${res.backup.name}`;
+      await reload();
+    } catch (e) {
+      error = String(e.message ?? e);
+    } finally {
+      mappingBusy = false;
+    }
+  }
+
+  async function restoreMappings(a, dryRun) {
+    mappingBusy = true;
+    error = '';
+    notice = '';
+    try {
+      const res = await postJSON('/api/backup/mappings/restore', { name: a.name, dryRun });
+      const r = res.result;
+      notice = dryRun
+        ? `Simulation : ${r.files} fichier(s) seraient restaurés depuis ${a.name}`
+        : `Mappings restaurés depuis ${a.name}${r.safetyBackup ? ' (copie de sécurité conservée)' : ''}`;
+    } catch (e) {
+      error = String(e.message ?? e);
+    } finally {
+      mappingBusy = false;
+    }
+  }
+
 
   async function restore(a, dryRun) {
     busy = true;
@@ -121,6 +166,66 @@
     <p class="empty">{$t('backup.noSavedGames')}</p>
   {/if}
 
+  <div class="block mappings">
+    <h3>
+      {$t('backup.mappings.title')}
+      {#if mappings?.files}<span class="count">{mappings.files}</span>{/if}
+    </h3>
+    <p class="hint">{$t('backup.mappings.hint')}</p>
+    {#if mappings?.files}
+      <p class="mapping-summary">
+        {$t('backup.mappings.summary', {
+          aircraft: mappings.aircraft?.length ?? 0,
+          files: mappings.files,
+          size: fmtSize(mappings.bytes),
+        })}
+      </p>
+      {#if mappings.aircraft?.length}
+        <div class="aircraft-list">
+          {#each mappings.aircraft.slice(0, 12) as aircraft (aircraft.name)}
+            <span class="tag">{aircraft.name} <b>{aircraft.files}</b></span>
+          {/each}
+          {#if mappings.aircraft.length > 12}
+            <span class="tag">+{mappings.aircraft.length - 12}</span>
+          {/if}
+        </div>
+      {/if}
+    {:else}
+      <p class="empty">{$t('backup.mappings.noneFound')}</p>
+    {/if}
+    <button class="primary" on:click={createMappings} disabled={mappingBusy || !mappings?.files}>
+      {$t(mappingBusy ? 'backup.mappings.saving' : 'backup.mappings.save')}
+    </button>
+
+    {#if mappingArchives.length}
+      <h4>{$t('backup.mappings.archives')}</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>{$t('backup.col.name')}</th>
+            <th>{$t('backup.col.date')}</th>
+            <th>{$t('backup.col.size')}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each mappingArchives as a (a.name)}
+            <tr>
+              <td class="name" title={a.name}>{a.name}</td>
+              <td class="num">{fmtDate(a.createdAt)}</td>
+              <td class="num">{fmtSize(a.bytes)}</td>
+              <td class="actions">
+                <a class="link" href={'/api/backup/download/' + encodeURIComponent(a.name)} download>{$t('backup.download')}</a>
+                <button on:click={() => restoreMappings(a, true)} disabled={mappingBusy}>{$t('backup.dryRun')}</button>
+                <button class="danger" on:click={() => restoreMappings(a, false)} disabled={mappingBusy}>{$t('backup.restore')}</button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  </div>
+
   <div class="block">
     <h3>{$t('backup.create')}</h3>
     <p class="hint">{$t('backup.hint')}</p>
@@ -139,10 +244,10 @@
   </div>
 
   <div class="block">
-    <h3>{$t('backup.archives')} {#if backups.length}<span class="count">{backups.length}</span>{/if}</h3>
+    <h3>{$t('backup.archives')} {#if generalBackups.length}<span class="count">{generalBackups.length}</span>{/if}</h3>
     {#if loading}
       <p class="empty">{$t('debriefs.loading')}</p>
-    {:else if backups.length === 0}
+    {:else if generalBackups.length === 0}
       <p class="empty">{$t('backup.none')}</p>
     {:else}
       <table>
@@ -156,7 +261,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each backups as a (a.name)}
+          {#each generalBackups as a (a.name)}
             <tr>
               <td class="name" title={a.name}>{a.name}</td>
               <td class="num">{fmtDate(a.createdAt)}</td>
@@ -237,6 +342,39 @@
     margin: 0.2rem 0 0.6rem;
     color: var(--muted);
     font-size: 0.76rem;
+  }
+
+  .mapping-summary {
+    margin: 0.1rem 0 0.45rem;
+    color: var(--text);
+    font-size: 0.78rem;
+  }
+
+  .aircraft-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .aircraft-list .tag {
+    color: var(--muted);
+    font-size: 0.68rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.05rem 0.4rem;
+  }
+
+  .aircraft-list .tag b {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mappings h4 {
+    margin: 0.8rem 0 0.35rem;
+    font-size: 0.76rem;
+    color: var(--muted);
+    font-weight: 600;
   }
 
   .count {

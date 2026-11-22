@@ -410,6 +410,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/backup", s.handleBackup)
 	mux.HandleFunc("/api/backup/categories", s.handleBackupCategories)
 	mux.HandleFunc("/api/backup/restore", s.handleBackupRestore)
+	mux.HandleFunc("/api/backup/mappings", s.handleBackupMappings)
+	mux.HandleFunc("/api/backup/mappings/restore", s.handleBackupMappingsRestore)
 	mux.HandleFunc("/api/backup/download/", s.handleBackupDownload)
 	mux.HandleFunc("/api/mods", s.handleMods)
 	mux.HandleFunc("/api/scripts", s.handleScripts)
