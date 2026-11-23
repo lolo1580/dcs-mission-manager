@@ -4,6 +4,9 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
+
+	"dcsmanager/internal/model"
 )
 
 func openTestDB(t *testing.T) *DB {
@@ -136,5 +139,196 @@ func TestUpsertPlayerKeepsNewUCID(t *testing.T) {
 	}
 	if ucid != "new-ucid" {
 		t.Fatalf("the UCID should have been recorded, got %q", ucid)
+	}
+}
+
+// TestStartMissionClosesEmptyMissionAtStart locks the stale-session fix: an
+// interrupted mission with no data must not last until the next start.
+func TestStartMissionClosesEmptyMissionAtStart(t *testing.T) {
+	d := openTestDB(t)
+	first, err := d.StartMission("Empty", "Caucasus", SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now().Add(-48 * time.Hour).UnixMilli()
+	if _, err := d.sql.Exec(`UPDATE missions SET started_at = ?, last_activity_at = 0 WHERE id = ?`, start, first); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.StartMission("Next", "Caucasus", SourceLive); err != nil {
+		t.Fatal(err)
+	}
+	var ended int64
+	var abandoned bool
+	if err := d.sql.QueryRow(`SELECT ended_at, abandoned FROM missions WHERE id = ?`, first).Scan(&ended, &abandoned); err != nil {
+		t.Fatal(err)
+	}
+	if ended != start {
+		t.Fatalf("empty mission ended at %d, want its start %d", ended, start)
+	}
+	if !abandoned {
+		t.Fatal("an empty interrupted mission must be marked abandoned")
+	}
+}
+
+// TestStartMissionClosesAtLastActivity checks that a stale mission with real
+// data keeps the time it was actually active, not the next mission's start.
+func TestStartMissionClosesAtLastActivity(t *testing.T) {
+	d := openTestDB(t)
+	first, err := d.StartMission("Flown", "Caucasus", SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now().Add(-48 * time.Hour).UnixMilli()
+	activity := start + 25*60*1000
+	if _, err := d.sql.Exec(`UPDATE missions SET started_at = ?, last_activity_at = 0 WHERE id = ?`, start, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SaveEvent(first, model.Event{Event: "takeoff", RealTS: activity}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.StartMission("Next", "Caucasus", SourceLive); err != nil {
+		t.Fatal(err)
+	}
+	var ended int64
+	var abandoned bool
+	if err := d.sql.QueryRow(`SELECT ended_at, abandoned FROM missions WHERE id = ?`, first).Scan(&ended, &abandoned); err != nil {
+		t.Fatal(err)
+	}
+	if ended != activity {
+		t.Fatalf("mission ended at %d, want last activity %d", ended, activity)
+	}
+	if !abandoned {
+		t.Fatal("a mission closed after a long silence must be marked abandoned")
+	}
+}
+
+// TestStartMissionSplitsStaleSameName covers a manager that stayed online: a
+// new flight with the same name days later must not be merged into the stale
+// row just because the name and theatre match.
+func TestStartMissionSplitsStaleSameName(t *testing.T) {
+	d := openTestDB(t)
+	first, err := d.StartMission("Same", "Caucasus", SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-48 * time.Hour).UnixMilli()
+	if _, err := d.sql.Exec(`UPDATE missions SET started_at = ?, last_activity_at = 0 WHERE id = ?`, old, first); err != nil {
+		t.Fatal(err)
+	}
+	second, err := d.StartMission("Same", "Caucasus", SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second == first {
+		t.Fatal("a stale mission with the same name must still be split")
+	}
+	var ended int64
+	var abandoned bool
+	if err := d.sql.QueryRow(`SELECT ended_at, abandoned FROM missions WHERE id = ?`, first).Scan(&ended, &abandoned); err != nil {
+		t.Fatal(err)
+	}
+	if ended != old || !abandoned {
+		t.Fatalf("stale mission = (%d, %v), want (%d, true)", ended, abandoned, old)
+	}
+}
+
+// TestEndOpenMissionRecentKeepsNow checks an ordinary mission end still uses the
+// end time instead of clamping every mission to its last snapshot.
+func TestEndOpenMissionRecentKeepsNow(t *testing.T) {
+	d := openTestDB(t)
+	id, err := d.StartMission("Live", "Caucasus", SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	if err := d.SaveEvent(id, model.Event{Event: "landing", RealTS: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.EndOpenMission("blue"); err != nil {
+		t.Fatal(err)
+	}
+	var ended int64
+	var abandoned bool
+	if err := d.sql.QueryRow(`SELECT ended_at, abandoned FROM missions WHERE id = ?`, id).Scan(&ended, &abandoned); err != nil {
+		t.Fatal(err)
+	}
+	if ended < now {
+		t.Fatalf("ended at %d, want at least %d", ended, now)
+	}
+	if abandoned {
+		t.Fatal("a mission ended while active must not be abandoned")
+	}
+}
+
+// TestRepairBackfillsLastActivity checks the startup repair recovers the newest
+// child timestamp for missions written before last_activity_at existed.
+func TestRepairBackfillsLastActivity(t *testing.T) {
+	d := openTestDB(t)
+	id, err := d.StartMission("Backfill", "Caucasus", SourceLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SaveEvent(id, model.Event{Event: "takeoff", RealTS: 12345}); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a row written by an older version.
+	if _, err := d.sql.Exec(`UPDATE missions SET last_activity_at = 0 WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.repairMissionDurations(); err != nil {
+		t.Fatal(err)
+	}
+	var last int64
+	if err := d.sql.QueryRow(`SELECT last_activity_at FROM missions WHERE id = ?`, id).Scan(&last); err != nil {
+		t.Fatal(err)
+	}
+	if last != 12345 {
+		t.Fatalf("last_activity_at = %d, want the event timestamp 12345", last)
+	}
+}
+
+// TestRepairMissionDurations fixes databases written before the stale-close
+// rule and leaves legitimate long missions alone.
+func TestRepairMissionDurations(t *testing.T) {
+	d := openTestDB(t)
+	old := time.Now().Add(-72 * time.Hour).UnixMilli()
+	res, err := d.sql.Exec(
+		`INSERT INTO missions(name, theatre, source, started_at, ended_at, last_activity_at)
+		 VALUES('Stale', 'Caucasus', 'live', ?, ?, 0)`,
+		old, old+48*3600*1000,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleID, _ := res.LastInsertId()
+
+	// A real two-hour flight with activity five minutes before its end.
+	res, err = d.sql.Exec(
+		`INSERT INTO missions(name, theatre, source, started_at, ended_at, last_activity_at)
+		 VALUES('Real', 'Caucasus', 'live', ?, ?, ?)`,
+		old, old+2*3600*1000, old+2*3600*1000-5*60*1000,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	realID, _ := res.LastInsertId()
+
+	if err := d.repairMissionDurations(); err != nil {
+		t.Fatal(err)
+	}
+
+	var ended int64
+	var abandoned bool
+	if err := d.sql.QueryRow(`SELECT ended_at, abandoned FROM missions WHERE id = ?`, staleID).Scan(&ended, &abandoned); err != nil {
+		t.Fatal(err)
+	}
+	if ended != old || !abandoned {
+		t.Fatalf("stale mission = (%d, %v), want (%d, true)", ended, abandoned, old)
+	}
+	if err := d.sql.QueryRow(`SELECT ended_at, abandoned FROM missions WHERE id = ?`, realID).Scan(&ended, &abandoned); err != nil {
+		t.Fatal(err)
+	}
+	if ended != old+2*3600*1000 || abandoned {
+		t.Fatalf("real mission = (%d, %v), want its original end and false", ended, abandoned)
 	}
 }

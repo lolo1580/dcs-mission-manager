@@ -27,10 +27,14 @@ func (d *DB) SaveSamples(missionID int64, samples []model.Sample) error {
 	defer stmt.Close()
 
 	now := time.Now().UnixMilli()
+	var lastTS int64
 	for _, s := range samples {
 		ts := s.RealTS
 		if ts == 0 {
 			ts = now
+		}
+		if ts > lastTS {
+			lastTS = ts
 		}
 		if _, err := stmt.Exec(
 			nullInt(missionID), s.UnitID, nullStr(s.Name), nullStr(s.Type),
@@ -40,18 +44,30 @@ func (d *DB) SaveSamples(missionID int64, samples []model.Sample) error {
 			return err
 		}
 	}
+	if missionID != 0 && lastTS != 0 {
+		if _, err := tx.Exec(
+			`UPDATE missions SET last_activity_at = ? WHERE id = ? AND last_activity_at < ?`,
+			lastTS, missionID, lastTS,
+		); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
 // SaveLoss records a unit that vanished, with its last known position.
 func (d *DB) SaveLoss(missionID int64, s model.Sample) error {
+	now := time.Now().UnixMilli()
 	_, err := d.sql.Exec(`
 		INSERT INTO losses(mission_id, unit_id, type, category, coalition, lat, lng, alt, ownship, real_ts)
 		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		nullInt(missionID), s.UnitID, nullStr(s.Type), nullStr(s.Category),
 		nullStr(s.Coalition), s.Lat, s.Lng, s.Alt, boolInt(s.Ownship),
-		time.Now().UnixMilli(),
+		now,
 	)
+	if err == nil {
+		_ = d.touchMission(missionID, now)
+	}
 	return err
 }
 

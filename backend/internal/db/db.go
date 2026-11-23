@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"dcsmanager/internal/idgen"
 
@@ -80,6 +81,11 @@ CREATE TABLE IF NOT EXISTS missions (
 	started_at INTEGER NOT NULL,
 	ended_at   INTEGER,
 	winner     TEXT,
+	-- Newest activity recorded for the mission. A stale open mission (DCS
+	-- crashed or the manager was stopped) is closed at this time rather than
+	-- when the next mission starts, which used to create multi-day durations.
+	last_activity_at INTEGER NOT NULL DEFAULT 0,
+	abandoned        INTEGER NOT NULL DEFAULT 0,
 	-- Import metadata: a mission uploaded by a desktop is identified by its
 	-- owner, the desktop that produced it and the desktop-side mission id.
 	owner_id    INTEGER,
@@ -365,9 +371,9 @@ func (d *DB) ensureSingleOpenMissionIndex() error {
 	}
 
 	// Reconcile a database that predates the constraint: close every open mission
-	// but the most recent one.
+	// but the most recent one, and mark the duplicates as abandoned.
 	if _, err := d.sql.Exec(`
-		UPDATE missions SET ended_at = started_at
+		UPDATE missions SET ended_at = started_at, abandoned = 1
 		WHERE ended_at IS NULL
 		  AND id <> (SELECT id FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1)`,
 	); err != nil {
@@ -441,7 +447,74 @@ func (d *DB) migrations() error {
 	if err := d.ensureColumn("checklists", "dirty", "INTEGER NOT NULL DEFAULT 1"); err != nil {
 		return err
 	}
+	// Mission duration repair: the columns then the one-off backfill that fixes
+	// databases written before stale sessions were closed at their last activity.
+	if err := d.ensureColumn("missions", "last_activity_at", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn("missions", "abandoned", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := d.repairMissionDurations(); err != nil {
+		return err
+	}
 	return d.backfillFlightPlanUIDs()
+}
+
+// staleMissionAfter is the longest silence accepted inside a running mission.
+// DCS sends player snapshots periodically, so a mission with no activity for
+// longer than this was interrupted (crash, manager stopped) rather than flown.
+const staleMissionAfter = 6 * time.Hour
+
+// repairMissionDurations backfills the last activity of existing missions and
+// clamps durations that were inflated by a late close. It is idempotent: after
+// the first run there is nothing left to repair, and a mission with continuous
+// activity is never shortened.
+func (d *DB) repairMissionDurations() error {
+	// Backfill from every child table. Missions that were only imported may
+	// still have their activity in events, chat, snapshots or tracks.
+	if _, err := d.sql.Exec(`
+		UPDATE missions SET last_activity_at = COALESCE((
+			SELECT MAX(ts) FROM (
+				SELECT MAX(real_ts) AS ts FROM events WHERE mission_id = missions.id
+				UNION ALL SELECT MAX(real_ts) FROM chat WHERE mission_id = missions.id
+				UNION ALL SELECT MAX(real_ts) FROM player_stats WHERE mission_id = missions.id
+				UNION ALL SELECT MAX(real_ts) FROM track_positions WHERE mission_id = missions.id
+				UNION ALL SELECT MAX(real_ts) FROM losses WHERE mission_id = missions.id
+			)
+		), 0)
+		WHERE last_activity_at = 0`); err != nil {
+		return err
+	}
+
+	now := time.Now().UnixMilli()
+	stale := staleMissionAfter.Milliseconds()
+
+	// Close an open mission left behind by a previous run once it has been
+	// silent for longer than the stale threshold.
+	if _, err := d.sql.Exec(`
+		UPDATE missions SET
+			ended_at = CASE WHEN COALESCE(last_activity_at,0) = 0 THEN started_at ELSE last_activity_at END,
+			abandoned = 1
+		WHERE ended_at IS NULL
+		  AND ((COALESCE(last_activity_at,0) = 0 AND ? - started_at > ?)
+		    OR (COALESCE(last_activity_at,0) > 0 AND ? - last_activity_at > ?))`,
+		now, stale, now, stale); err != nil {
+		return err
+	}
+
+	// Repair sessions that were closed days after their last activity.
+	if _, err := d.sql.Exec(`
+		UPDATE missions SET
+			ended_at = CASE WHEN COALESCE(last_activity_at,0) = 0 THEN started_at ELSE last_activity_at END,
+			abandoned = 1
+		WHERE ended_at IS NOT NULL
+		  AND ended_at - started_at > ?
+		  AND (COALESCE(last_activity_at,0) = 0 OR ended_at - last_activity_at > ?)`,
+		stale, stale); err != nil {
+		return err
+	}
+	return nil
 }
 
 // backfillFlightPlanUIDs gives an identifier to plans written by a version that

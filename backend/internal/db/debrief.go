@@ -34,6 +34,7 @@ func (d *DB) SaveDebrief(rec model.Debrief) (model.Debrief, error) {
 	if err != nil {
 		return rec, err
 	}
+	_ = d.touchMission(rec.MissionID, rec.CreatedAt)
 	// A solo or offline flight may have no live player snapshots. The debrief is
 	// then the only source of pilot/landing data, so import it for the statistics
 	// views. Importing is idempotent per mission.

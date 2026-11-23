@@ -30,7 +30,7 @@
       const [ov, pi, mi, de, cl] = await Promise.all([
         getJSON('/api/stats/overview'),
         getJSON('/api/stats/pilots'),
-        getJSON('/api/history/missions?limit=100'),
+        getJSON('/api/history/missions?limit=100&withData=1&source=live'),
         getJSON('/api/debriefs?limit=100'),
         getJSON('/api/checklists'),
       ]);
@@ -56,12 +56,12 @@
     ...mission,
     debrief: byMission.get(mission.id) ?? null,
   }));
+  // Flight time comes from the statistics overview, which uses the same mission
+  // scope as the mission counter. Summing the history list here used to mix
+  // "missions with data" and every empty session, showing thousands of hours.
   $: hours = (() => {
-    let total = 0;
-    for (const mission of missions) {
-      if (mission.startedAt && mission.endedAt) total += mission.endedAt - mission.startedAt;
-    }
-    return Math.round(total / 3_600_000);
+    const h = (overview?.flightSeconds ?? 0) / 3600;
+    return h >= 10 ? Math.round(h) : Math.round(h * 10) / 10;
   })();
 
   function dateOf(ms) {
@@ -76,7 +76,7 @@
 
   function duration(mission) {
     if (!mission?.startedAt) return '—';
-    const end = mission.endedAt || Date.now();
+    const end = mission.endedAt || mission.lastActivityAt || mission.startedAt;
     const total = Math.max(0, Math.round((end - mission.startedAt) / 60000));
     return total >= 60 ? `${Math.floor(total / 60)} h ${String(total % 60).padStart(2, '0')}` : `${total} min`;
   }
@@ -111,11 +111,14 @@
                   <strong>{mission.name}</strong>
                   <span>{dateOf(mission.startedAt)} · {mission.theatre || '—'} · {duration(mission)}</span>
                 </div>
-                {#if mission.debrief}
-                  <Badge tone="blue">{$t('flights.debrief')}</Badge>
-                {:else}
-                  <Badge>{$t('flights.noDebrief')}</Badge>
-                {/if}
+                <span class="badges">
+                  {#if mission.abandoned}<Badge tone="amber">{$t('flights.abandoned')}</Badge>{/if}
+                  {#if mission.debrief}
+                    <Badge tone="blue">{$t('flights.debrief')}</Badge>
+                  {:else}
+                    <Badge>{$t('flights.noDebrief')}</Badge>
+                  {/if}
+                </span>
               </li>
             {/each}
           </ul>
@@ -195,6 +198,13 @@
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+  }
+
+  .badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
   }
 
   .flight-list div,

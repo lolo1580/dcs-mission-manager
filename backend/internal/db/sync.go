@@ -20,6 +20,10 @@ type MissionExport struct {
 	StartedAt  int64  `json:"startedAt"`
 	EndedAt    int64  `json:"endedAt,omitempty"`
 	Winner     string `json:"winner,omitempty"`
+	// LastActivityAt and Abandoned travel with the mission so the server can
+	// show a real duration for an interrupted desktop session too.
+	LastActivityAt int64 `json:"lastActivityAt,omitempty"`
+	Abandoned      bool  `json:"abandoned,omitempty"`
 
 	Events   []model.Event   `json:"events,omitempty"`
 	Chat     []model.Chat    `json:"chat,omitempty"`
@@ -45,7 +49,8 @@ func (d *DB) ExportMissions(limit int) ([]MissionExport, error) {
 	}
 	rows, err := d.sql.Query(
 		`SELECT id, name, COALESCE(theatre,''), COALESCE(source,'live'), started_at,
-		        COALESCE(ended_at,0), COALESCE(winner,'')
+		        COALESCE(ended_at,0), COALESCE(winner,''),
+		        COALESCE(last_activity_at,0), COALESCE(abandoned,0)
 		 FROM missions WHERE source = ? ORDER BY id DESC LIMIT ?`,
 		SourceLive, limit)
 	if err != nil {
@@ -57,7 +62,7 @@ func (d *DB) ExportMissions(limit int) ([]MissionExport, error) {
 	for rows.Next() {
 		var m MissionExport
 		if err := rows.Scan(&m.ExternalID, &m.Name, &m.Theatre, &m.Source, &m.StartedAt,
-			&m.EndedAt, &m.Winner); err != nil {
+			&m.EndedAt, &m.Winner, &m.LastActivityAt, &m.Abandoned); err != nil {
 			return nil, err
 		}
 		missions = append(missions, m)
@@ -207,6 +212,7 @@ func (d *DB) ImportMission(ownerID int64, clientID string, m MissionExport) (int
 	if m.StartedAt == 0 {
 		m.StartedAt = time.Now().UnixMilli()
 	}
+	m = sanitizeImportedMission(m)
 
 	var existing int64
 	err := d.sql.QueryRow(
@@ -217,10 +223,10 @@ func (d *DB) ImportMission(ownerID int64, clientID string, m MissionExport) (int
 	case errors.Is(err, sql.ErrNoRows):
 		result, err := d.sql.Exec(
 			`INSERT INTO missions(name, theatre, source, started_at, ended_at, winner,
-			   owner_id, client_id, external_id)
-			 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			   last_activity_at, abandoned, owner_id, client_id, external_id)
+			 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			m.Name, nullStr(m.Theatre), m.Source, m.StartedAt, nullInt(m.EndedAt),
-			nullStr(m.Winner), ownerID, clientID, m.ExternalID,
+			nullStr(m.Winner), m.LastActivityAt, boolInt(m.Abandoned), ownerID, clientID, m.ExternalID,
 		)
 		if err != nil {
 			return 0, err
@@ -234,9 +240,10 @@ func (d *DB) ImportMission(ownerID int64, clientID string, m MissionExport) (int
 	default:
 		if _, err := d.sql.Exec(
 			`UPDATE missions SET name = ?, theatre = ?, source = ?, started_at = ?,
-			   ended_at = ?, winner = ? WHERE id = ?`,
+			   ended_at = ?, winner = ?, last_activity_at = MAX(last_activity_at, ?),
+			   abandoned = ? WHERE id = ?`,
 			m.Name, nullStr(m.Theatre), m.Source, m.StartedAt, nullInt(m.EndedAt),
-			nullStr(m.Winner), existing,
+			nullStr(m.Winner), m.LastActivityAt, boolInt(m.Abandoned), existing,
 		); err != nil {
 			return 0, err
 		}
@@ -282,6 +289,33 @@ func (d *DB) ImportMission(ownerID int64, clientID string, m MissionExport) (int
 		}
 	}
 	return existing, nil
+}
+
+// sanitizeImportedMission clamps durations coming from a desktop that predates
+// the last-activity close. A mission closed days after its last data point is
+// treated as abandoned, exactly like one closed locally by StartMission.
+func sanitizeImportedMission(m MissionExport) MissionExport {
+	if m.LastActivityAt > 0 && m.LastActivityAt < m.StartedAt {
+		m.LastActivityAt = m.StartedAt
+	}
+	if m.EndedAt <= 0 {
+		return m
+	}
+	stale := staleMissionAfter.Milliseconds()
+	if m.EndedAt < m.StartedAt {
+		m.EndedAt = m.StartedAt
+		m.Abandoned = true
+		return m
+	}
+	switch {
+	case m.LastActivityAt == 0 && m.EndedAt-m.StartedAt > stale:
+		m.EndedAt = m.StartedAt
+		m.Abandoned = true
+	case m.LastActivityAt > 0 && m.EndedAt-m.LastActivityAt > stale:
+		m.EndedAt = m.LastActivityAt
+		m.Abandoned = true
+	}
+	return m
 }
 
 func (d *DB) importDebrief(missionID int64, rec DebriefExport) error {

@@ -179,6 +179,14 @@ type Mission struct {
 	StartedAt int64  `json:"startedAt"`
 	EndedAt   int64  `json:"endedAt,omitempty"`
 	Winner    string `json:"winner,omitempty"`
+	// LastActivityAt is the newest event, chat, player snapshot or telemetry
+	// sample recorded for the mission. It lets a stale session be closed at its
+	// real end instead of when the next mission happens to start.
+	LastActivityAt int64 `json:"lastActivityAt,omitempty"`
+	// Abandoned marks a mission whose end was never received (DCS crash, manager
+	// stopped). Its duration is clamped to LastActivityAt, or zero when the
+	// session produced no data at all.
+	Abandoned bool `json:"abandoned,omitempty"`
 	// OwnerID and Uploader are set on a server for a mission uploaded by a
 	// desktop account. They stay empty on the desktop itself.
 	OwnerID  int64  `json:"ownerId,omitempty"`

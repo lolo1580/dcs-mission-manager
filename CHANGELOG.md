@@ -7,6 +7,16 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres
 to [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Interrupted DCS sessions no longer inflate flight hours: a mission left open
+  by a crash or a stopped manager is closed at its last activity (or at its start
+  when it produced no data) instead of when the next mission begins. Existing
+  databases are repaired at startup, and the squadron dashboard now computes
+  flight time over the same missions as its mission counter.
+
 ## [2.1.0] - 2026-11-22
 
 ### Added

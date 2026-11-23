@@ -143,17 +143,18 @@ type NetworkStats struct {
 
 // Overview is the top-level dashboard payload.
 type Overview struct {
-	Scope      string           `json:"scope"`
-	MissionID  int64            `json:"missionId,omitempty"`
-	Missions   int              `json:"missions"`
-	Players    int              `json:"players"`
-	Events     int              `json:"events"`
-	Kills      int              `json:"kills"`
-	Deaths     int              `json:"deaths"`
-	Crashes    int              `json:"crashes"`
-	Ejections  int              `json:"ejections"`
-	FriendlyFF int              `json:"friendlyFire"`
-	Coalitions []CoalitionStats `json:"coalitions"`
+	Scope         string           `json:"scope"`
+	MissionID     int64            `json:"missionId,omitempty"`
+	Missions      int              `json:"missions"`
+	FlightSeconds int64            `json:"flightSeconds"`
+	Players       int              `json:"players"`
+	Events        int              `json:"events"`
+	Kills         int              `json:"kills"`
+	Deaths        int              `json:"deaths"`
+	Crashes       int              `json:"crashes"`
+	Ejections     int              `json:"ejections"`
+	FriendlyFF    int              `json:"friendlyFire"`
+	Coalitions    []CoalitionStats `json:"coalitions"`
 }
 
 // MissionTrend is one mission's final snapshot totals. It is not derived from
@@ -591,6 +592,20 @@ func (s *Service) Overview(sc Scope) (Overview, error) {
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM missions WHERE 1=1`+mWhere, mArgs...).Scan(&o.Missions); err != nil {
 		return o, err
 	}
+	// Flight time uses exactly the same mission scope as the count above, so the
+	// dashboard can never show "6 missions" next to hours summed over every
+	// recorded session. An open mission contributes up to its last activity.
+	var flightMs int64
+	if err := s.db.QueryRow(`
+		SELECT COALESCE(SUM(
+			CASE WHEN COALESCE(ended_at, NULLIF(last_activity_at,0), started_at) > started_at
+			     THEN COALESCE(ended_at, NULLIF(last_activity_at,0), started_at) - started_at
+			     ELSE 0 END
+		), 0)
+		FROM missions WHERE 1=1`+mWhere, mArgs...).Scan(&flightMs); err != nil {
+		return o, err
+	}
+	o.FlightSeconds = flightMs / 1000
 	// Count only pilots with snapshots in this scope. A UCID can have several
 	// player rows after a callsign change; count it once. Anonymous rows retain
 	// their own identity instead of collapsing into one empty UCID.

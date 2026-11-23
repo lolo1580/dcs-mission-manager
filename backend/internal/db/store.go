@@ -30,6 +30,7 @@ type Store interface {
 	CountMissions(source string) (int, error)
 	Missions(limit int) ([]model.Mission, error)
 	MissionsWithSource(source string, limit int) ([]model.Mission, error)
+	MissionsWithData(source string, limit int) ([]model.Mission, error)
 	MissionsForPilot(pilot string, limit int) ([]model.Mission, error)
 	MissionsSince(sinceID int64, limit int) ([]model.Mission, error)
 

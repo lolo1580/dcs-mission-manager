@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"dcsmanager/internal/db"
 	"dcsmanager/internal/model"
 )
 
@@ -176,6 +177,19 @@ func (s *Server) handleHistoryMissions(w http.ResponseWriter, r *http.Request) {
 			"missions":    missions,
 			"nextSinceId": maxMissionID(missions),
 		})
+		return
+	}
+	if r.URL.Query().Get("withData") == "1" || r.URL.Query().Get("withData") == "true" {
+		source := strings.TrimSpace(r.URL.Query().Get("source"))
+		if source == "" {
+			source = db.SourceLive
+		}
+		missions, err := s.db.MissionsWithData(source, limitParam(r, 200))
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"count": len(missions), "missions": missions})
 		return
 	}
 	if pilot := strings.TrimSpace(r.URL.Query().Get("pilot")); pilot != "" {

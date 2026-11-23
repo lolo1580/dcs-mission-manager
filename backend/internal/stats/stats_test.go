@@ -3,6 +3,7 @@ package stats
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"dcsmanager/internal/category"
 	"dcsmanager/internal/db"
@@ -494,5 +495,37 @@ func TestSameDCSIDAcrossMissions(t *testing.T) {
 	if byName["Alice"].Deaths != 1 || byName["Bob"].Deaths != 1 {
 		t.Fatalf("each should have exactly 1 death: Alice=%d Bob=%d",
 			byName["Alice"].Deaths, byName["Bob"].Deaths)
+	}
+}
+
+// TestOverviewFlightSecondsUsesMissionScope locks the dashboard fix: flight
+// time must use the same "missions with data" scope as the mission count, not
+// every empty session in the history.
+func TestOverviewFlightSecondsUsesMissionScope(t *testing.T) {
+	s, d := setup(t)
+	id := seed(t, d)
+	start := time.Now().Add(-2 * time.Hour).UnixMilli()
+	end := start + time.Hour.Milliseconds()
+	if _, err := d.SQL().Exec(`UPDATE missions SET started_at = ?, ended_at = ? WHERE id = ?`, start, end, id); err != nil {
+		t.Fatal(err)
+	}
+	// An empty session with an absurd 30-day duration must not contribute.
+	if _, err := d.SQL().Exec(
+		`INSERT INTO missions(name, theatre, source, started_at, ended_at)
+		 VALUES('Empty', 'Caucasus', 'live', ?, ?)`,
+		start-30*24*time.Hour.Milliseconds(), start,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	ov, err := s.Overview(Scope{Mode: "career"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ov.Missions != 1 {
+		t.Fatalf("missions = %d, want 1 (only the mission with data)", ov.Missions)
+	}
+	if ov.FlightSeconds != 3600 {
+		t.Fatalf("flightSeconds = %d, want 3600", ov.FlightSeconds)
 	}
 }

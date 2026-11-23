@@ -44,29 +44,44 @@ func (d *DB) EnsureMissionTagged(name, theatre, source string) (int64, error) {
 	d.openMissionMu.Lock()
 	defer d.openMissionMu.Unlock()
 
-	var id int64
-	err := d.sql.QueryRow(`SELECT id FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`).Scan(&id)
+	now := time.Now().UnixMilli()
+	var (
+		id           int64
+		startedAt    int64
+		lastActivity int64
+	)
+	err := d.sql.QueryRow(
+		`SELECT id, started_at, COALESCE(last_activity_at,0)
+		 FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`,
+	).Scan(&id, &startedAt, &lastActivity)
 	if err == nil {
-		// If the open mission was created as live but the current session turns
-		// out to be simulated, upgrade the tag: a run must never be counted as
-		// real just because it was announced before the first test packet.
-		if source == SourceTest {
-			if _, upErr := d.sql.Exec(
-				`UPDATE missions SET source = ? WHERE id = ? AND source = ?`,
-				SourceTest, id, SourceLive,
-			); upErr != nil {
-				return id, upErr
+		if missionIsStale(now, startedAt, lastActivity) {
+			if endErr := d.closeMission(id, "", now); endErr != nil {
+				return 0, endErr
 			}
+		} else {
+			// If the open mission was created as live but the current session
+			// turns out to be simulated, upgrade the tag: a run must never be
+			// counted as real just because it was announced before the first
+			// test packet.
+			if source == SourceTest {
+				if _, upErr := d.sql.Exec(
+					`UPDATE missions SET source = ? WHERE id = ? AND source = ?`,
+					SourceTest, id, SourceLive,
+				); upErr != nil {
+					return id, upErr
+				}
+			}
+			return id, nil
 		}
-		return id, nil
 	}
-	if err != sql.ErrNoRows {
+	if err != nil && err != sql.ErrNoRows {
 		return 0, err
 	}
 
 	res, err := d.sql.Exec(
 		`INSERT INTO missions(name, theatre, source, started_at) VALUES(?, ?, ?, ?)`,
-		name, theatre, source, time.Now().UnixMilli(),
+		name, theatre, source, now,
 	)
 	if err != nil {
 		// A concurrent caller may have won the race despite the mutex (another
@@ -95,18 +110,24 @@ func (d *DB) StartMission(name, theatre, source string) (int64, error) {
 	d.openMissionMu.Lock()
 	defer d.openMissionMu.Unlock()
 
+	now := time.Now().UnixMilli()
 	var (
-		id      int64
-		oldName string
-		oldThe  string
+		id           int64
+		oldName      string
+		oldThe       string
+		startedAt    int64
+		lastActivity int64
 	)
 	err := d.sql.QueryRow(
-		`SELECT id, name, COALESCE(theatre,'') FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`,
-	).Scan(&id, &oldName, &oldThe)
+		`SELECT id, name, COALESCE(theatre,''), started_at, COALESCE(last_activity_at,0)
+		 FROM missions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`,
+	).Scan(&id, &oldName, &oldThe, &startedAt, &lastActivity)
+	stale := err == nil && missionIsStale(now, startedAt, lastActivity)
 
 	switch {
-	case err == nil && oldName == name && oldThe == theatre:
-		// Same flight announced again: keep it, do not double-open.
+	case err == nil && oldName == name && oldThe == theatre && !stale:
+		// Same flight announced again: keep it, do not double-open. A stale row
+		// with the same name is still an interruption, not a reconnect.
 		if source == SourceTest {
 			if _, upErr := d.sql.Exec(`UPDATE missions SET source = ? WHERE id = ? AND source = ?`,
 				SourceTest, id, SourceLive); upErr != nil {
@@ -115,9 +136,10 @@ func (d *DB) StartMission(name, theatre, source string) (int64, error) {
 		}
 		return id, nil
 	case err == nil:
-		// A different mission is still open: close it before opening the new one.
-		if _, endErr := d.sql.Exec(
-			`UPDATE missions SET ended_at = ? WHERE id = ?`, time.Now().UnixMilli(), id); endErr != nil {
+		// A different or stale mission is still open: close it at its last
+		// activity before opening the new one, so an interrupted session does
+		// not last until now.
+		if endErr := d.closeMission(id, "", now); endErr != nil {
 			return 0, endErr
 		}
 	case err != sql.ErrNoRows:
@@ -126,7 +148,7 @@ func (d *DB) StartMission(name, theatre, source string) (int64, error) {
 
 	res, err := d.sql.Exec(
 		`INSERT INTO missions(name, theatre, source, started_at) VALUES(?, ?, ?, ?)`,
-		name, theatre, source, time.Now().UnixMilli(),
+		name, theatre, source, now,
 	)
 	if err != nil {
 		return 0, err
@@ -298,7 +320,7 @@ func (d *DB) MissionsWithSource(source string, limit int) ([]model.Mission, erro
 	}
 	q := `SELECT m.id, m.name, COALESCE(m.theatre,''), COALESCE(m.source,'live'), m.started_at,
 	             COALESCE(m.ended_at,0), COALESCE(m.winner,''), COALESCE(m.owner_id,0),
-	             COALESCE(u.username,'')
+	             COALESCE(u.username,''), COALESCE(m.last_activity_at,0), COALESCE(m.abandoned,0)
 	      FROM missions m LEFT JOIN users u ON u.id = m.owner_id`
 	var args []any
 	if source != "" {
@@ -318,7 +340,8 @@ func (d *DB) MissionsWithSource(source string, limit int) ([]model.Mission, erro
 	for rows.Next() {
 		var m model.Mission
 		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source,
-			&m.StartedAt, &m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader); err != nil {
+			&m.StartedAt, &m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader,
+			&m.LastActivityAt, &m.Abandoned); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -335,7 +358,8 @@ func (d *DB) MissionsForPilot(pilot string, limit int) ([]model.Mission, error) 
 	rows, err := d.sql.Query(
 		`SELECT DISTINCT m.id, m.name, COALESCE(m.theatre,''), COALESCE(m.source,'live'),
 		        m.started_at, COALESCE(m.ended_at,0), COALESCE(m.winner,''),
-		        COALESCE(m.owner_id,0), COALESCE(u.username,'')
+		        COALESCE(m.owner_id,0), COALESCE(u.username,''),
+		        COALESCE(m.last_activity_at,0), COALESCE(m.abandoned,0)
 		 FROM missions m
 		 LEFT JOIN users u ON u.id = m.owner_id
 		 JOIN player_stats ps ON ps.mission_id = m.id
@@ -351,7 +375,8 @@ func (d *DB) MissionsForPilot(pilot string, limit int) ([]model.Mission, error) 
 	for rows.Next() {
 		var m model.Mission
 		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source, &m.StartedAt,
-			&m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader); err != nil {
+			&m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader,
+			&m.LastActivityAt, &m.Abandoned); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -368,7 +393,7 @@ func (d *DB) MissionsWithData(source string, limit int) ([]model.Mission, error)
 	}
 	q := `SELECT m.id, m.name, COALESCE(m.theatre,''), COALESCE(m.source,'live'), m.started_at,
 	             COALESCE(m.ended_at,0), COALESCE(m.winner,''), COALESCE(m.owner_id,0),
-	             COALESCE(u.username,'')
+	             COALESCE(u.username,''), COALESCE(m.last_activity_at,0), COALESCE(m.abandoned,0)
 	      FROM missions m LEFT JOIN users u ON u.id = m.owner_id
 	      WHERE (EXISTS (SELECT 1 FROM player_stats ps WHERE ps.mission_id = m.id)
 	          OR EXISTS (SELECT 1 FROM debriefs d WHERE d.mission_id = m.id))`
@@ -390,7 +415,8 @@ func (d *DB) MissionsWithData(source string, limit int) ([]model.Mission, error)
 	for rows.Next() {
 		var m model.Mission
 		if err := rows.Scan(&m.ID, &m.Name, &m.Theatre, &m.Source,
-			&m.StartedAt, &m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader); err != nil {
+			&m.StartedAt, &m.EndedAt, &m.Winner, &m.OwnerID, &m.Uploader,
+			&m.LastActivityAt, &m.Abandoned); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

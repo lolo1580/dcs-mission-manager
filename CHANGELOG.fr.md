@@ -7,6 +7,17 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet adhère
 au [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Corrigé
+
+- Les sessions DCS interrompues ne gonflent plus les heures de vol : une mission
+  laissée ouverte par un crash ou un manager arrêté est fermée à sa dernière
+  activité (ou à son début si elle n'a produit aucune donnée) au lieu du
+  démarrage de la mission suivante. Les bases existantes sont réparées au
+  démarrage, et le tableau de bord escadrille calcule les heures sur les mêmes
+  missions que son compteur.
+
 ## [2.1.0] - 2026-11-22
 
 ### Ajouté

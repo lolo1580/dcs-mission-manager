@@ -115,7 +115,7 @@
 
   function duration(mission) {
     if (!mission?.startedAt) return '—';
-    const end = mission.endedAt || Date.now();
+    const end = mission.endedAt || mission.lastActivityAt || mission.startedAt;
     const total = Math.max(0, Math.round((end - mission.startedAt) / 1000));
     if (total >= 3600) {
       const hours = Math.floor(total / 3600);
@@ -187,6 +187,7 @@
               <span class="row-head">
                 <span class="name">{title(flight)}</span>
                 {#if flight.mission?.source === 'test'}<Badge tone="amber">{$t('flights.sourceTest')}</Badge>{/if}
+                {#if flight.mission?.abandoned}<Badge tone="amber">{$t('flights.abandoned')}</Badge>{/if}
                 {#if flight.debrief}<Badge tone="blue">{$t('flights.debrief')}</Badge>{/if}
               </span>
               <span class="sub">
@@ -222,6 +223,9 @@
               <div><span>{$t('flights.ended')}</span>{selected.mission.endedAt ? dateOf(selected.mission.endedAt) : $t('flights.inProgress')}</div>
               <div><span>{$t('flights.duration')}</span>{duration(selected.mission)}</div>
               <div><span>{$t('flights.winner')}</span>{selected.mission.winner || '—'}</div>
+              {#if selected.mission.abandoned}
+                <div><span>{$t('flights.status')}</span>{$t('flights.abandoned')}</div>
+              {/if}
             </div>
           {/if}
 

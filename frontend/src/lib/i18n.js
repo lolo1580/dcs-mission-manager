@@ -684,6 +684,7 @@ const en = {
   'flights.status': 'Status',
   'flights.ended': 'Ended',
   'flights.inProgress': 'In progress',
+  'flights.abandoned': 'Interrupted session',
 
   'checklist.title': 'Checklists',
   'checklist.new': 'New checklist',
@@ -1415,6 +1416,7 @@ const fr = {
   'flights.status': 'Statut',
   'flights.ended': 'Fin',
   'flights.inProgress': 'En cours',
+  'flights.abandoned': 'Session interrompue',
 
   'checklist.title': 'Check-lists',
   'checklist.new': 'Nouvelle check-list',
