@@ -68,6 +68,13 @@ export const SERVER_NAV_GROUPS = [
     ],
   },
   {
+    label: 'nav.school',
+    items: [
+      { id: 'school', path: '/school', label: 'tab.school', subtitle: 'sub.school', icon: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5V6a2 2 0 0 1 2-2h14v13H6.5A2.5 2.5 0 0 0 4 19.5zM8 7h8M8 10h6' },
+      { id: 'culture', path: '/culture', label: 'tab.culture', subtitle: 'sub.culture', icon: 'M12 3l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 16l9 5 9-5' },
+    ],
+  },
+  {
     label: 'nav.account',
     items: [
       { id: 'profile', path: '/profile', label: 'tab.profile', subtitle: 'sub.profile', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },

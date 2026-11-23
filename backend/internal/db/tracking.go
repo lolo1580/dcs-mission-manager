@@ -77,7 +77,7 @@ func (d *DB) PruneTracking(olderThan time.Duration) (int64, error) {
 	cutoff := time.Now().Add(-olderThan).UnixMilli()
 	var total int64
 	for _, table := range []string{"track_positions", "losses"} {
-		res, err := d.sql.Exec(`DELETE FROM `+table+` WHERE real_ts < ?`, cutoff)
+		res, err := d.sql.Exec(`DELETE FROM `+table+` WHERE real_ts <= ?`, cutoff)
 		if err != nil {
 			return total, err
 		}

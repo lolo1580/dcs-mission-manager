@@ -6,6 +6,7 @@
   import Card from './ui/Card.svelte';
   import Badge from './ui/Badge.svelte';
   import EmptyState from './ui/EmptyState.svelte';
+  import SchoolAdmin from './SchoolAdmin.svelte';
 
   let users = [];
   let audit = [];
@@ -372,6 +373,8 @@
       </ul>
     {/if}
   </Card>
+
+  <SchoolAdmin />
 </div>
 
 <style>

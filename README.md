@@ -41,6 +41,7 @@ Because it is local, it can read **DCS's own files** — the airfields, frequenc
 | Installed modules | ✅ New | Terrains, aircraft, campaigns and tech packs, read from DCS's own inventory; **owned** (bought) and **installed** (on disk) shown apart |
 | Career | ✅ New | A separate **Career** page with the player's logbook, favourite maps and countries, and a 30-day daily activity heatmap |
 | Settings | ✅ New | One tab grouping the installed modules, the DCS-side install (mods, script state, shared `Export.lua`), the **player-profile backup** and the debug log as sub-tabs |
+| School & Culture G | ✅ New (server) | Server-only lessons with progress, an encyclopedic fact-sheet library (aircraft, armament, radars, eras…), quizzes scored on the server, a squadron leaderboard and admin moderation |
 | Profile backup | ✅ New | Save/restore the logbook, bindings, options and scripts (and optionally kneeboard, missions, mods) as a portable zip, from the CLI, the API or Settings |
 | Mods & skins | ✅ New | A dedicated library page: enable/disable mods, quarantine and restore, import ZIP/7z/RAR archives, browse liveries, detect flat or misplaced packs, and classify them. See [docs/mods-skins.md](docs/mods-skins.md) |
 | Local by design | ✅ New | The desktop is one self-contained Windows `.exe`: SQLite persistence in `data/`, and every read (terrains, Saved Games) happens on the same machine as DCS |

@@ -12,6 +12,8 @@
   import SettingsPanel from './lib/SettingsPanel.svelte';
   import ProfilePanel from './lib/ProfilePanel.svelte';
   import AdminPanel from './lib/AdminPanel.svelte';
+  import SchoolPanel from './lib/SchoolPanel.svelte';
+  import CulturePanel from './lib/CulturePanel.svelte';
   import LoginPage from './lib/LoginPage.svelte';
   import ResetPasswordPage from './lib/ResetPasswordPage.svelte';
   import Toasts from './lib/ui/Toasts.svelte';
@@ -218,6 +220,10 @@
           <div class="view"><ChecklistsPanel /></div>
         {:else if $routeID === 'airfields'}
           <div class="view"><AerodromePanel /></div>
+        {:else if $routeID === 'school'}
+          <div class="view"><SchoolPanel /></div>
+        {:else if $routeID === 'culture'}
+          <div class="view"><CulturePanel /></div>
         {:else if $routeID === 'admin' && $isAdmin}
           <div class="view"><AdminPanel /></div>
         {:else if $routeID === 'profile'}

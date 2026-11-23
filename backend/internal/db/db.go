@@ -215,6 +215,116 @@ CREATE TABLE IF NOT EXISTS checklists (
 );
 CREATE INDEX IF NOT EXISTS idx_checklists_updated ON checklists(updated_at);
 
+-- École & Culture G. These tables are created in both profiles for a uniform
+-- schema, but only the server profile exposes their API and page.
+CREATE TABLE IF NOT EXISTS school_items (
+	id             INTEGER PRIMARY KEY AUTOINCREMENT,
+	uid            TEXT NOT NULL UNIQUE,
+	kind           TEXT NOT NULL,
+	title          TEXT NOT NULL,
+	designation    TEXT NOT NULL DEFAULT '',
+	summary        TEXT NOT NULL DEFAULT '',
+	body_md        TEXT NOT NULL DEFAULT '',
+	domain         TEXT NOT NULL DEFAULT '',
+	era            TEXT NOT NULL DEFAULT '',
+	country        TEXT NOT NULL DEFAULT '',
+	manufacturer   TEXT NOT NULL DEFAULT '',
+	service_start  INTEGER,
+	service_end    INTEGER,
+	specs_json     TEXT NOT NULL DEFAULT '[]',
+	sources_json   TEXT NOT NULL DEFAULT '[]',
+	image_url      TEXT NOT NULL DEFAULT '',
+	tags           TEXT NOT NULL DEFAULT '',
+	author_id      INTEGER NOT NULL DEFAULT 0,
+	status         TEXT NOT NULL DEFAULT 'pending',
+	review_note    TEXT NOT NULL DEFAULT '',
+	reviewed_by    INTEGER,
+	reviewed_at    INTEGER,
+	created_at     INTEGER NOT NULL,
+	updated_at     INTEGER NOT NULL,
+	published_at   INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_school_items_kind_status ON school_items(kind, status);
+CREATE INDEX IF NOT EXISTS idx_school_items_filters ON school_items(kind, domain, era, status);
+CREATE INDEX IF NOT EXISTS idx_school_items_author ON school_items(author_id);
+
+CREATE TABLE IF NOT EXISTS school_questions (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	quiz_uid      TEXT NOT NULL,
+	prompt        TEXT NOT NULL,
+	choices_json  TEXT NOT NULL DEFAULT '[]',
+	correct_index INTEGER NOT NULL DEFAULT 0,
+	explanation   TEXT NOT NULL DEFAULT '',
+	position      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_school_questions_quiz ON school_questions(quiz_uid, position);
+
+CREATE TABLE IF NOT EXISTS school_progress (
+	user_id    INTEGER NOT NULL,
+	item_uid   TEXT NOT NULL,
+	status     TEXT NOT NULL DEFAULT 'in_progress',
+	percent    INTEGER NOT NULL DEFAULT 0,
+	updated_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, item_uid)
+);
+CREATE INDEX IF NOT EXISTS idx_school_progress_user ON school_progress(user_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS school_attempts (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	quiz_uid   TEXT NOT NULL,
+	user_id    INTEGER NOT NULL,
+	score      INTEGER NOT NULL,
+	max_score  INTEGER NOT NULL,
+	answers    TEXT NOT NULL DEFAULT '[]',
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_school_attempts_user ON school_attempts(user_id, quiz_uid, score);
+
+CREATE TABLE IF NOT EXISTS school_links (
+	from_uid TEXT NOT NULL,
+	to_uid   TEXT NOT NULL,
+	relation TEXT NOT NULL DEFAULT 'see_also',
+	PRIMARY KEY (from_uid, to_uid, relation)
+);
+CREATE INDEX IF NOT EXISTS idx_school_links_to ON school_links(to_uid);
+
+CREATE TABLE IF NOT EXISTS school_taxonomy (
+	id       INTEGER PRIMARY KEY AUTOINCREMENT,
+	kind     TEXT NOT NULL,
+	slug     TEXT NOT NULL,
+	label_fr TEXT NOT NULL,
+	label_en TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0,
+	UNIQUE (kind, slug)
+);
+
+CREATE TABLE IF NOT EXISTS school_revisions (
+	id             INTEGER PRIMARY KEY AUTOINCREMENT,
+	item_uid       TEXT NOT NULL,
+	title          TEXT NOT NULL,
+	designation    TEXT NOT NULL DEFAULT '',
+	summary        TEXT NOT NULL DEFAULT '',
+	body_md        TEXT NOT NULL DEFAULT '',
+	domain         TEXT NOT NULL DEFAULT '',
+	era            TEXT NOT NULL DEFAULT '',
+	country        TEXT NOT NULL DEFAULT '',
+	manufacturer   TEXT NOT NULL DEFAULT '',
+	service_start  INTEGER,
+	service_end    INTEGER,
+	specs_json     TEXT NOT NULL DEFAULT '[]',
+	sources_json   TEXT NOT NULL DEFAULT '[]',
+	image_url      TEXT NOT NULL DEFAULT '',
+	tags           TEXT NOT NULL DEFAULT '',
+	links_json     TEXT NOT NULL DEFAULT '[]',
+	questions_json TEXT NOT NULL DEFAULT '[]',
+	author_id      INTEGER NOT NULL,
+	status         TEXT NOT NULL DEFAULT 'pending',
+	review_note    TEXT NOT NULL DEFAULT '',
+	created_at     INTEGER NOT NULL,
+	reviewed_at    INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_school_revisions_item ON school_revisions(item_uid, status);
+
 -- Server-wide revision counter for document synchronisation.
 CREATE TABLE IF NOT EXISTS server_meta (
 	key   TEXT PRIMARY KEY,
@@ -348,6 +458,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)
 `
 
 	if _, err := d.sql.Exec(schema); err != nil {
+		return err
+	}
+	if err := d.seedSchoolTaxonomy(); err != nil {
 		return err
 	}
 	if err := d.migrations(); err != nil {

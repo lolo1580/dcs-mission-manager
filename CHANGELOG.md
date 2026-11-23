@@ -9,6 +9,14 @@ to [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A server-only **School & Culture G** section: lessons with per-member
+  progress, an encyclopedic fact-sheet library (aircraft, armament, radars,
+  eras, ships, vehicles, electronic warfare, engines), quizzes scored on the
+  server, a squadron leaderboard, and administrator moderation with a
+  configurable domain/era taxonomy.
+
 ### Fixed
 
 - Interrupted DCS sessions no longer inflate flight hours: a mission left open

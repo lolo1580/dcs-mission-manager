@@ -9,6 +9,14 @@ au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Ajouté
+
+- Une section **École & Culture G** réservée au serveur : leçons avec
+  progression par membre, bibliothèque de fiches (avions, armement, radars,
+  époques, navires, véhicules, guerre électronique, moteurs), quiz corrigés
+  côté serveur, classement d'escadrille et modération administrateur avec une
+  taxonomie de domaines et d'époques configurable.
+
 ### Corrigé
 
 - Les sessions DCS interrompues ne gonflent plus les heures de vol : une mission
