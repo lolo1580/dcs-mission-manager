@@ -25,10 +25,10 @@ func TestDetectionPreservesUnicodeForWindowsINI(t *testing.T) {
 
 func TestDetectionUsesSavedSettingsAndEnvironmentPriority(t *testing.T) {
 	base := t.TempDir()
-	t.Setenv("LOCALAPPDATA", base)
+	t.Setenv("DCSMANAGER_DATA_ROOT", base)
 	t.Setenv("DCSMANAGER_SAVED_GAMES", "")
 	t.Setenv("DCSMANAGER_DCS_INSTALL", "")
-	root := filepath.Join(base, "DCS Manager")
+	root := base
 	if err := os.MkdirAll(root, 0755); err != nil {
 		t.Fatal(err)
 	}
